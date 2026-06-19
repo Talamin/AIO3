@@ -32,11 +32,12 @@ namespace AIO3.Core.Rotations.Warrior
                 priority: 0.05f),
             CombatBlocks.OffensiveRacial("Blood Fury", 4.2f, ctx => _settings.UseRacials.Value),
             CombatBlocks.OffensiveRacial("Berserking", 4.21f, ctx => _settings.UseRacials.Value),
+            WarriorCommon.Recklessness(_settings, priority: 4.3f),
 
             // --- baseline / upkeep ---
             WarriorCommon.EnsureStance("Battle Stance", priority: 0.1f),
             CombatBlocks.AutoAttack(priority: 1f),
-            CombatBlocks.Interrupt("Pummel", priority: 2f),
+            CombatBlocks.Interrupt("Pummel", priority: 2f, mode: ctx => _settings.InterruptMode.Value),
             CombatBlocks.SelfBuff("Battle Shout", priority: 3f, supersededBy: "Greater Blessing of Might"),
             WarriorCommon.BerserkerRage(priority: 4f),
             CombatBlocks.DefensiveBelow("Enraged Regeneration", healthPercent: 50, priority: 4.5f),

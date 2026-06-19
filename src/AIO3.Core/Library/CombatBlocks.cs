@@ -20,12 +20,33 @@ namespace AIO3.Core.Library
         /// The DSL's automatic range gate ensures the caster is within interrupt range.
         /// (Detecting whether a cast is actually interruptible is a later refinement.)
         /// </summary>
-        public static RotationStep Interrupt(string spell, float priority = 1f) =>
-            Skill.Spell(spell)
-                 .Priority(priority)
-                 .On(Targets.EnemiesCasting)
-                 .OffGcd() // interrupts must be able to fire during the GCD
-                 .Build();
+        /// <summary>
+        /// Interrupt an enemy cast. <paramref name="mode"/> returns Always / Smart / Never:
+        /// Always tries every cast; Smart skips spells the InterruptTracker learned are non-interruptible;
+        /// Never disables it (e.g. a product handles interrupts). Records each attempt so the tracker can learn.
+        /// </summary>
+        public static RotationStep Interrupt(string spell, float priority = 1f, Func<CombatContext, string> mode = null) =>
+            new RotationStep(
+                name: spell,
+                priority: priority,
+                targets: Targets.EnemiesCasting,
+                condition: (ctx, t) =>
+                {
+                    if (!ctx.Game.IsSpellKnown(spell) || !ctx.Game.IsSpellReady(spell)) return false;
+                    float range = ctx.Game.SpellRange(spell);
+                    if (range > 0f && t.Distance > range) return false;
+
+                    string m = mode == null ? InterruptModes.Always : mode(ctx);
+                    if (m == InterruptModes.Never) return false;
+                    if (m == InterruptModes.Smart && !ctx.Interrupts.ShouldInterrupt(t.CastingSpellId)) return false;
+                    return true;
+                },
+                action: (ctx, t) =>
+                {
+                    ctx.Interrupts.RecordAttempt(t.Guid, t.CastingSpellId);
+                    return ctx.Game.Cast(spell, t);
+                },
+                ignoreGcd: true);
 
         /// <summary>
         /// Ensure melee auto-attack is running on the current target (off the GCD). WRobot's own

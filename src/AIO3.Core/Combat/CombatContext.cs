@@ -22,27 +22,33 @@ namespace AIO3.Core.Combat
         public IReadOnlyList<IWowUnit> Enemies { get; }
         public IReadOnlyList<IWowUnit> Party { get; }
 
+        /// <summary>Shared interrupt learner (lives across ticks; supplied by the host).</summary>
+        public InterruptTracker Interrupts { get; }
+
         public CombatContext(
             IGameClient game,
             IWowUnit me,
             IWowUnit target,
             IReadOnlyList<IWowUnit> enemies,
-            IReadOnlyList<IWowUnit> party)
+            IReadOnlyList<IWowUnit> party,
+            InterruptTracker interrupts = null)
         {
             Game = game;
             Me = me;
             Target = target;
             Enemies = enemies;
             Party = party;
+            Interrupts = interrupts ?? new InterruptTracker();
         }
 
         /// <summary>Take a snapshot of the current game state.</summary>
-        public static CombatContext Capture(IGameClient game) => new CombatContext(
+        public static CombatContext Capture(IGameClient game, InterruptTracker interrupts = null) => new CombatContext(
             game,
             game.Me,
             game.Target,
             game.Enemies.ToArray(),
-            game.Party.ToArray());
+            game.Party.ToArray(),
+            interrupts);
 
         // --- shared, computed-once world facts ---
 

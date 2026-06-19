@@ -42,7 +42,7 @@ namespace AIO3.Core.Rotations.Warrior
             CombatBlocks.DefensiveBelow("Shield Wall", healthPercent: 35, priority: 1.6f),
 
             // Interrupt (Protection uses Shield Bash).
-            CombatBlocks.Interrupt("Shield Bash", priority: 2f),
+            CombatBlocks.Interrupt("Shield Bash", priority: 2f, mode: ctx => _settings.InterruptMode.Value),
             WarriorCommon.BerserkerRage(priority: 2.5f),
 
             CombatBlocks.SelfBuff("Battle Shout", priority: 3f, supersededBy: "Greater Blessing of Might"),

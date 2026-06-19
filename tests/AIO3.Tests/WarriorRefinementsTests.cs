@@ -153,6 +153,60 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Interrupt_mode_never_disables_and_always_enables()
+        {
+            FakeGameClient g = Game();
+            g.TargetUnit.IsCasting = true;
+            g.TargetUnit.CastingSpellId = 123;
+
+            Assert.Null(Fire(g, CombatBlocks.Interrupt("Pummel", 1f, mode: ctx => InterruptModes.Never)));
+            Assert.Equal("Pummel", Fire(g, CombatBlocks.Interrupt("Pummel", 1f, mode: ctx => InterruptModes.Always))?.Name);
+        }
+
+        [Fact]
+        public void Smart_interrupt_skips_spells_learned_to_be_non_interruptible()
+        {
+            var tracker = new InterruptTracker();
+            tracker.RecordAttempt(1, 100);
+            tracker.OnCastCompleted(1, 100); // 100 completed despite our attempt → non-interruptible
+
+            FakeGameClient g = Game();
+            g.TargetUnit.Guid = 1;
+            g.TargetUnit.IsCasting = true;
+            RotationStep step = CombatBlocks.Interrupt("Pummel", 1f, ctx => InterruptModes.Smart);
+
+            g.TargetUnit.CastingSpellId = 100; // blacklisted → skip
+            Assert.Null(new RotationEngine(new[] { step }).Tick(CombatContext.Capture(g, tracker)));
+
+            g.TargetUnit.CastingSpellId = 200; // unknown → interrupt
+            Assert.Equal("Pummel", new RotationEngine(new[] { step }).Tick(CombatContext.Capture(g, tracker))?.Name);
+        }
+
+        [Fact]
+        public void Recklessness_bursts_on_an_elite_but_not_lone_trash()
+        {
+            var s = new WarriorSettings();
+
+            FakeGameClient g = Game();
+            g.TargetUnit.IsElite = true;
+            Assert.Equal("Recklessness", Fire(g, WarriorCommon.Recklessness(s, 1f))?.Name);
+
+            FakeGameClient trash = Game(); // single, non-elite, not a boss
+            Assert.Null(Fire(trash, WarriorCommon.Recklessness(s, 1f)));
+        }
+
+        [Fact]
+        public void Recklessness_respects_the_cooldowns_toggle()
+        {
+            var s = new WarriorSettings();
+            s.UseCooldowns.Value = false;
+
+            FakeGameClient g = Game();
+            g.TargetUnit.IsElite = true;
+            Assert.Null(Fire(g, WarriorCommon.Recklessness(s, 1f)));
+        }
+
+        [Fact]
         public void Berserker_Rage_breaks_fear()
         {
             FakeGameClient g = Game();

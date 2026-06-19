@@ -30,8 +30,10 @@ namespace AIO3.Adapter
         public int Rage => (int)_unit.Rage;
         public float Distance => _unit.GetDistance;
         public bool IsCasting => _unit.IsCast;
+        public int CastingSpellId => _unit.CastingSpellId;
         public bool IsTargetingMe => _unit.IsTargetingMe;
         public bool IsAttackable => _unit.IsAttackable;
+        public bool IsElite => _unit.IsElite;
 
         // Creature type is read via Lua and cached per creature entry. We can only query it reliably
         // for the current target, so we resolve it when this unit is the target and reuse it after.

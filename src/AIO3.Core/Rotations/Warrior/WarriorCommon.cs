@@ -26,6 +26,12 @@ namespace AIO3.Core.Rotations.Warrior
             Skill.Spell("Berserker Rage").Priority(priority).On(Targets.Self)
                  .When(ctx => ctx.Me.HasAura("Fear")).OffGcd();
 
+        /// <summary>Major DPS cooldown (Recklessness): on a boss/elite or a pack, when enabled.</summary>
+        public static RotationStep Recklessness(WarriorSettings s, float priority) =>
+            Skill.Spell("Recklessness").Priority(priority).On(Targets.Self)
+                 .When(ctx => s.UseCooldowns.Value && ctx.HasEnemyTarget
+                              && (ctx.Target.IsBoss() || ctx.Target.IsElite || ctx.EnemiesWithin(8f) >= 3)).OffGcd();
+
         public static RotationStep Intercept(WarriorSettings s, float priority) =>
             Skill.Spell("Intercept").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => s.UseGapClosers.Value

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using AIO3.Adapter;
+using AIO3.Combat;
 using AIO3.Core.Combat;
 using AIO3.Core.Engine;
 using AIO3.Core.Game;
@@ -13,6 +14,7 @@ using AIO3.Overlay;
 using AIO3.Persistence;
 using AIO3.Talents;
 using robotManager.Helpful;
+using wManager.Events;
 using wManager.Wow.Helpers;
 using wManager.Wow.ObjectManager;
 
@@ -29,6 +31,8 @@ public class Main : ICustomClass
     private SettingsOverlay _overlay;
     private SettingsStore _store;
     private TalentTrainer _talentTrainer;
+    private InterruptTracker _interrupts;
+    private InterruptLearner _interruptLearner;
     private CancellationTokenSource _cts;
 
     // Warrior wiring (only class implemented so far).
@@ -58,6 +62,12 @@ public class Main : ICustomClass
 
             _overlay = new SettingsOverlay("Warrior", list);
             _talentTrainer = new TalentTrainer();
+
+            // Empirical interrupt learner: feeds the tracker from the combat log (the API's
+            // interruptible flag is unreliable). Blacklist persists per character.
+            _interrupts = new InterruptTracker();
+            _interruptLearner = new InterruptLearner(_interrupts, string.IsNullOrEmpty(profile) ? "default" : profile);
+            EventsLuaWithArgs.OnEventsLuaStringWithArgs += _interruptLearner.OnCombatLog;
 
             // Initial engine; Reconcile() in the loop swaps to the actually-resolved spec.
             _activeSpec = WarriorSpec.Fury;
@@ -143,7 +153,7 @@ public class Main : ICustomClass
                     // Don't run the rotation while mounted/travelling (casting would dismount;
                     // WRobot dismounts itself to fight). Mirrors the old code's pervasive !IsMounted.
                     if (!mounted)
-                        fired = _engine.Tick(CombatContext.Capture(_game));
+                        fired = _engine.Tick(CombatContext.Capture(_game, _interrupts));
                 });
 
                 // Persist outside the frame lock (file I/O) when the player changed a setting.
@@ -190,6 +200,11 @@ public class Main : ICustomClass
     public void Dispose()
     {
         _cts?.Cancel();
+        if (_interruptLearner != null)
+        {
+            EventsLuaWithArgs.OnEventsLuaStringWithArgs -= _interruptLearner.OnCombatLog;
+            _interruptLearner.Save();
+        }
         Logging.Write("[AIO3] Disposed.");
     }
 

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AIO3.Core.Combat;
 using AIO3.Core.Settings;
 
 namespace AIO3.Core.Rotations.Warrior
@@ -34,6 +35,15 @@ namespace AIO3.Core.Rotations.Warrior
         public readonly ToggleSetting UseRacials =
             new ToggleSetting("racials", "Use racials", value: true);
 
+        /// <summary>How to interrupt enemy casts: Smart (learns what's interruptible) / Always / Never
+        /// (set Never if a WRobot product already handles interrupts, to avoid fighting it).</summary>
+        public readonly ChoiceSetting InterruptMode =
+            new ChoiceSetting("interrupt", "Interrupt", InterruptModes.Smart, InterruptModes.All);
+
+        /// <summary>Use major offensive cooldowns (e.g. Recklessness) on elites/bosses/packs.</summary>
+        public readonly ToggleSetting UseCooldowns =
+            new ToggleSetting("cooldowns", "Use cooldowns", value: true);
+
         /// <summary>Use an emergency healthstone/potion below this health %. 0 disables it.</summary>
         public readonly IntSetting EmergencyHealthPercent =
             new IntSetting("emergencyHp", "Emergency item below HP%", value: 30, min: 0, max: 90, step: 5);
@@ -49,12 +59,14 @@ namespace AIO3.Core.Rotations.Warrior
             UseGapClosers.Category = "General";
             UseHamstring.Category = "General";
             UseRacials.Category = "General";
+            InterruptMode.Category = "General";
+            UseCooldowns.Category = "General";
             EmergencyHealthPercent.Category = "General";
 
             _all = new Setting[]
             {
                 HeroicStrikeRageReserve, AoeThreshold, UseGapClosers, UseHamstring,
-                AutoAssignTalents, UseRacials, EmergencyHealthPercent
+                AutoAssignTalents, UseRacials, InterruptMode, UseCooldowns, EmergencyHealthPercent
             };
         }
 
