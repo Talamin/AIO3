@@ -94,6 +94,9 @@ namespace AIO3.Adapter
 
         public float SpellRange(string spell) => GetSpell(spell).MaxRange;
 
+        public bool IsCurrentSpell(string spell) =>
+            Lua.LuaDoString<bool>($"return IsCurrentSpell('{spell}') == 1 or IsCurrentSpell('{spell}') == true");
+
         public bool IsSpellReady(string spell)
         {
             Spell s = GetSpell(spell);

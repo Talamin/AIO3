@@ -20,6 +20,9 @@ namespace AIO3.Core.Testing
         public readonly HashSet<string> KnownSpells = new HashSet<string>();
         public readonly HashSet<string> SpellsOnCooldown = new HashSet<string>();
 
+        /// <summary>Spells currently queued/casting (e.g. on-next-swing abilities).</summary>
+        public readonly HashSet<string> CurrentSpells = new HashSet<string>();
+
         /// <summary>Per-spell range; unset spells use <see cref="DefaultSpellRange"/> (large = never gated).</summary>
         public readonly Dictionary<string, float> SpellRanges = new Dictionary<string, float>();
         public float DefaultSpellRange = 100f;
@@ -47,6 +50,7 @@ namespace AIO3.Core.Testing
 
         public bool IsSpellKnown(string spell) => KnownSpells.Count == 0 || KnownSpells.Contains(spell);
         public bool IsSpellReady(string spell) => !SpellsOnCooldown.Contains(spell);
+        public bool IsCurrentSpell(string spell) => CurrentSpells.Contains(spell);
         public float SpellRange(string spell) => SpellRanges.TryGetValue(spell, out float r) ? r : DefaultSpellRange;
         public int GlobalCooldownRemainingMs => Gcd;
         public bool PlayerIsCasting => Casting;

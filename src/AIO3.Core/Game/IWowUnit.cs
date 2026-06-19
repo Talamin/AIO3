@@ -29,6 +29,9 @@ namespace AIO3.Core.Game
         /// <summary>Whether the player may actually attack this unit (false for friendly NPCs).</summary>
         bool IsAttackable { get; }
 
+        /// <summary>Localized creature type (e.g. "Humanoid", "Elemental"); "" if unknown.</summary>
+        string CreatureType { get; }
+
         /// <summary>True if the unit has the named aura from any caster.</summary>
         bool HasAura(string name);
 

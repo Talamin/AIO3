@@ -20,6 +20,11 @@ namespace AIO3.Core.Rotations.Warrior
             Skill.Spell("Bloodrage").Priority(priority).On(Targets.Self)
                  .When(ctx => ctx.HasEnemyTarget && ctx.Target.Distance < 8f).OffGcd();
 
+        /// <summary>Break fear (and enrage) with Berserker Rage.</summary>
+        public static RotationStep BerserkerRage(float priority) =>
+            Skill.Spell("Berserker Rage").Priority(priority).On(Targets.Self)
+                 .When(ctx => ctx.Me.HasAura("Fear")).OffGcd();
+
         public static RotationStep Intercept(WarriorSettings s, float priority) =>
             Skill.Spell("Intercept").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => s.UseGapClosers.Value
@@ -31,10 +36,13 @@ namespace AIO3.Core.Rotations.Warrior
                               && ctx.Target.Distance > 8f && ctx.Target.Distance <= 25f
                               && !ctx.Game.IsSpellKnown("Intercept"));
 
-        /// <summary>Slow a fleeing target below 40% (creature-type filtering is a later refinement).</summary>
+        /// <summary>Slow a fleeing humanoid below 40% (snare; humanoids are the ones that flee).</summary>
         public static RotationStep Hamstring(WarriorSettings s, float priority) =>
             Skill.Spell("Hamstring").Priority(priority).On(Targets.CurrentEnemy)
-                 .When(ctx => s.UseHamstring.Value && ctx.Target.HealthPercent < 40 && !ctx.Target.HasAura("Hamstring"));
+                 .When(ctx => s.UseHamstring.Value
+                              && ctx.Target.HealthPercent < 40
+                              && ctx.Target.CreatureType == "Humanoid"
+                              && !ctx.Target.HasAura("Hamstring"));
 
         public static RotationStep Execute(float priority) =>
             Skill.Spell("Execute").Priority(priority).On(Targets.CurrentEnemy)
@@ -44,18 +52,26 @@ namespace AIO3.Core.Rotations.Warrior
         public static RotationStep VictoryRush(float priority) =>
             Skill.Spell("Victory Rush").Priority(priority).On(Targets.CurrentEnemy);
 
+        /// <summary>Keep Rend up — but not on bleed-immune creatures (Elemental/Mechanical).</summary>
         public static RotationStep Rend(float priority) =>
             Skill.Spell("Rend").Priority(priority).On(Targets.CurrentEnemy)
-                 .When(ctx => !ctx.Target.HasMyAura("Rend"));
+                 .When(ctx => !ctx.Target.HasMyAura("Rend")
+                              && ctx.Target.CreatureType != "Elemental"
+                              && ctx.Target.CreatureType != "Mechanical");
 
-        /// <summary>Off-GCD rage dump; lowest-priority "leftover" once spare rage is above the reserve.</summary>
+        /// <summary>
+        /// Off-GCD rage dump; lowest-priority "leftover" once spare rage is above the reserve.
+        /// Guarded so we don't re-queue the on-next-swing attack every tick.
+        /// </summary>
         public static RotationStep HeroicStrike(WarriorSettings s, float priority) =>
             Skill.Spell("Heroic Strike").Priority(priority).On(Targets.CurrentEnemy)
-                 .When(ctx => ctx.Me.Rage > s.HeroicStrikeRageReserve.Value).OffGcd();
+                 .When(ctx => ctx.Me.Rage > s.HeroicStrikeRageReserve.Value
+                              && !ctx.Game.IsCurrentSpell("Heroic Strike")).OffGcd();
 
-        /// <summary>Off-GCD AoE rage dump (use over Heroic Strike when several enemies are in range).</summary>
+        /// <summary>Off-GCD AoE rage dump (preferred over Heroic Strike with several enemies in range).</summary>
         public static RotationStep Cleave(WarriorSettings s, float priority) =>
             Skill.Spell("Cleave").Priority(priority).On(Targets.CurrentEnemy)
-                 .When(ctx => ctx.EnemiesWithin(10f) >= s.AoeThreshold.Value).OffGcd();
+                 .When(ctx => ctx.EnemiesWithin(10f) >= s.AoeThreshold.Value
+                              && !ctx.Game.IsCurrentSpell("Cleave")).OffGcd();
     }
 }

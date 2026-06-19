@@ -17,6 +17,7 @@ namespace AIO3.Core.Testing
         public Reaction Reaction { get; set; } = Reaction.Hostile;
         public bool IsTargetingMe { get; set; }
         public bool IsAttackable { get; set; } = true;
+        public string CreatureType { get; set; } = "";
 
         public sealed class Aura
         {

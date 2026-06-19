@@ -45,6 +45,9 @@ namespace AIO3.Core.Game
         bool IsSpellKnown(string spell);
         bool IsSpellReady(string spell);
 
+        /// <summary>True if the named spell is the current/queued cast (e.g. an on-next-swing ability).</summary>
+        bool IsCurrentSpell(string spell);
+
         /// <summary>Max cast range of a spell in yards (0 or less = no range gate / self/melee-handled).</summary>
         float SpellRange(string spell);
 

@@ -30,6 +30,8 @@ namespace AIO3.Core.Rotations.Warrior
             CombatBlocks.AutoAttack(priority: 1f),
             CombatBlocks.Interrupt("Pummel", priority: 2f),
             CombatBlocks.SelfBuff("Battle Shout", priority: 3f, supersededBy: "Greater Blessing of Might"),
+            WarriorCommon.BerserkerRage(priority: 4f),
+            CombatBlocks.DefensiveBelow("Enraged Regeneration", healthPercent: 50, priority: 4.5f),
             WarriorCommon.Bloodrage(priority: 5f),
 
             // --- single target ---

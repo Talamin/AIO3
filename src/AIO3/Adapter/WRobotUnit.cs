@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Linq;
 using AIO3.Core.Game;
 using wManager.Wow.Class;
@@ -30,6 +31,30 @@ namespace AIO3.Adapter
         public bool IsCasting => _unit.IsCast;
         public bool IsTargetingMe => _unit.IsTargetingMe;
         public bool IsAttackable => _unit.IsAttackable;
+
+        // Creature type is read via Lua and cached per creature entry. We can only query it reliably
+        // for the current target, so we resolve it when this unit is the target and reuse it after.
+        private static readonly ConcurrentDictionary<int, string> CreatureTypeByEntry = new ConcurrentDictionary<int, string>();
+
+        public string CreatureType
+        {
+            get
+            {
+                if (CreatureTypeByEntry.TryGetValue(_unit.Entry, out string cached) && !string.IsNullOrEmpty(cached))
+                    return cached;
+
+                WoWUnit target = ObjectManager.Target;
+                if (target != null && target.Guid == _unit.Guid)
+                {
+                    string ct = Lua.LuaDoString<string>("return UnitCreatureType('target') or ''");
+                    if (!string.IsNullOrEmpty(ct))
+                        CreatureTypeByEntry[_unit.Entry] = ct;
+                    return ct;
+                }
+
+                return cached ?? "";
+            }
+        }
 
         public Reaction Reaction =>
             _unit.Reaction > WReaction.Neutral ? Reaction.Friendly :
