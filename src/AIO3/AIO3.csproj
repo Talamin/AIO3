@@ -38,8 +38,12 @@
       <HintPath>$(WRobotBin)\robotManager.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <!-- MemoryRobot is no longer referenced: cooldowns now use the supported SpellManager
-         API, so the adapter performs NO raw memory access. Re-add if that ever changes. -->
+    <!-- MemoryRobot: the adapter reads the spell-cooldown list directly from memory (WowMemory.Memory)
+         because the SpellManager cooldown API costs ~30ms per spell. Referenced, never shipped. -->
+    <Reference Include="MemoryRobot">
+      <HintPath>$(WRobotBin)\MemoryRobot.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <!--

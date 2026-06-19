@@ -18,6 +18,7 @@ namespace AIO3.Adapter
         private const float ScanRange = 50f;
 
         private readonly Dictionary<string, Spell> _spellCache = new Dictionary<string, Spell>();
+        private readonly WRobotCooldowns _cooldowns = new WRobotCooldowns();
 
         private Spell GetSpell(string name)
         {
@@ -101,13 +102,14 @@ namespace AIO3.Adapter
         public bool IsSpellReady(string spell)
         {
             Spell s = GetSpell(spell);
-            if (!s.KnownSpell || !s.IsSpellUsable) return false;
-            // IsSpellUsable does not gate on cooldown, so check the cooldown separately via the
-            // supported API (no raw memory). Same units the engine expects: <= 0 means ready.
-            return SpellManager.GetSpellCooldownTimeLeftBySpellName(s.Name) <= 0;
+            if (!s.KnownSpell) return false;
+            // Cooldown comes from one per-tick memory walk (WRobotCooldowns) instead of a slow ~30ms
+            // SpellManager call per spell. Usability (rage/stance/range) is handled by the step's When
+            // predicate, the DSL range gate, and Cast itself — so it is not re-checked here.
+            return _cooldowns.CooldownLeftMs((uint)s.Id) <= 0;
         }
 
-        public int GlobalCooldownRemainingMs => SpellManager.GlobalCooldownTimeLeft();
+        public int GlobalCooldownRemainingMs => _cooldowns.GcdRemainingMs;
 
         public bool PlayerIsCasting => ObjectManager.Me.IsCast;
 
