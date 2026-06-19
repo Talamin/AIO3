@@ -33,6 +33,12 @@ namespace AIO3.Adapter
         public WowClass PlayerClass =>
             System.Enum.TryParse(ObjectManager.Me.WowClass.ToString(), out WowClass c) ? c : WowClass.None;
 
+        public int HighestTalentTab =>
+            Lua.LuaDoString<int>(
+                "local best,bp=0,-1 " +
+                "for i=1,GetNumTalentTabs() do local _,_,p=GetTalentTabInfo(i) if p and p>bp then bp=p best=i end end " +
+                "if bp<=0 then return 0 end return best");
+
         public string ActiveStanceName =>
             Lua.LuaDoString<string>(
                 "for i=1,10 do local _, name, isActive = GetShapeshiftFormInfo(i); " +

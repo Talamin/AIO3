@@ -1,51 +1,86 @@
-# AIO3 — Rework der AIO WRobot Fightclass (WotLK 3.3.5a)
+# AIO3 — All-in-One Combat Class for WRobot (WotLK 3.3.5a)
 
-Greenfield-Neubau der [Talamin/AIO-Public](https://github.com/Talamin/AIO-Public)
-Fightclass. Ziel: das bewährte **Prioritätslisten-Modell (APL)** behalten, aber auf
-ein sauberes, **testbares, geschichtetes** Fundament stellen. Kein Big-Bang —
-Content (BossList, Talente, Spell-IDs) wird später aus dem Altprojekt **portiert**,
-nicht neu erfunden.
+AIO3 is a ground-up rework of the [Talamin/AIO-Public](https://github.com/Talamin/AIO-Public)
+WRobot fightclass. It keeps the proven **Action Priority List (APL)** model from the original
+but rebuilds the foundation to be **layered, testable, and configurable in-game**.
 
-## Schichten
+> Status: early but functional. The Warrior **Solo Fury** rotation runs end-to-end in-game,
+> with an in-game settings overlay, per-character persistence, and runtime spec selection.
+> Other classes/specs are not implemented yet.
+
+## Design goals
+
+- **Keep the APL model** — a rotation is a priority-sorted list of steps; the first one whose
+  condition holds and whose target is valid casts. This matches how WoW rotations are reasoned about.
+- **One hard boundary** — only a single adapter touches the WRobot API; everything above it is
+  WRobot-agnostic and unit-testable offline. The boundary is *compiler-enforced* (see below).
+- **No drift** — cross-cutting behaviour (interrupts, defensives, buffs, auto-attack, gap-closers)
+  lives in a shared library that every spec composes, instead of being copy-pasted per spec.
+- **Configure in-game** — settings are typed objects rendered as a clickable WoW UI panel (`/aio3`),
+  edited live, and persisted per character.
+
+## Architecture
 
 ```
-5 · Settings & GUI      (noch nicht gebaut)
-4 · Rotations           dünn: Baseline + Klassen-Filler        [AIO3.Core]
-3 · Shared Step Library Interrupt/Defensive/AoE/Burst (geplant) [AIO3.Core]
-2 · Engine              Prioritäts-Runner + Exclusive-Tokens    [AIO3.Core]
-1 · CombatContext       EIN unveränderlicher Snapshot pro Tick  [AIO3.Core]
-0 · WRobot-Adapter      einziger Code, der wManager berührt     [AIO3]
+┌───────────────────────────────────────────────────────────────────────┐
+│ Rotations (Layer 4)   thin specs: a baseline + class-specific filler    │  AIO3.Core
+│ Shared library (L3)   Interrupt / Defensive / AutoAttack / SelfBuff …    │  (no WRobot
+│ Engine (Layer 2)      priority runner + exclusive tokens + GCD gating    │   reference)
+│ CombatContext (L1)    one immutable world snapshot per tick              │
+│ IGameClient (seam)    the only abstraction the layers above talk to      │
+├───────────────────────────────────────────────────────────────────────┤
+│ WRobotGameClient      Layer 0 adapter — the ONLY code that uses wManager │  AIO3 (fightclass)
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
-**Architektur-Garantie:** `AIO3.Core` referenziert WRobot **nicht**. Damit kann
-keine Schicht oberhalb des Adapters versehentlich `wManager` importieren — der
-Compiler erzwingt die Grenze. Testbarkeit folgt daraus: `FakeGameClient` erlaubt,
-Rotationen offline ohne laufendes Spiel zu prüfen.
+**Compiler-enforced boundary.** `AIO3.Core` has *no reference* to the WRobot assemblies, so nothing
+above the adapter can accidentally call the game API. The adapter (`WRobotGameClient`) implements the
+`IGameClient` seam; tests and an offline `FakeGameClient` implement the same seam.
 
-## Projekte
+**Per-tick snapshot.** Each tick builds one immutable `CombatContext` (me, target, enemies, party,
+resources). It is the cache — created once, read many — which removes the data races the old static
+cache had.
 
-| Projekt        | Ausgabe         | WRobot-Referenz | Zweck                                  |
-|----------------|-----------------|-----------------|----------------------------------------|
-| `AIO3.Core`    | `AIO3.Core.dll` | nein            | Domäne, Engine, Rotationen, Fakes      |
-| `AIO3`         | `AIO3.dll`      | ja (`Private=false`) | Fightclass-Einstieg + Adapter      |
-| `AIO3.Tests`   | (nicht ausgeliefert) | nein       | Unit-Tests gegen `FakeGameClient`      |
+**Single self-contained DLL.** WRobot loads the fightclass DLL from a byte array (so it is not
+file-locked and hot-swaps while WRobot runs). To keep that property, the Core sources are compiled
+*into* `AIO3.dll` rather than referenced as a second assembly; the WRobot libraries are referenced
+but **not** bundled (`Private=false`) and are resolved from the WRobot `Bin` folder at runtime.
 
-Die WRobot-Libs werden mit `Private=false` referenziert → **nicht** in die
-Fightclass mitkompiliert. WRobot lädt sie zur Laufzeit aus seinem `Bin`-Ordner
-(`<probing privatePath="Bin;Products;FightClass" />`). Ausgeliefert werden nur
-`AIO3.dll` + `AIO3.Core.dll` in den `FightClass`-Ordner.
+### In-game settings + spec selection
 
-## Bauen
+- Settings are typed (`ToggleSetting`, `IntSetting`, `ChoiceSetting`) and exposed by each rotation.
+- `SettingsOverlay` auto-generates a movable WoW UI panel from that list (checkboxes, `[-]/[+]`,
+  cycle buttons) — adding a setting needs no UI code. Toggle the panel with **`/aio3`**.
+- Edits flow Lua → C# through a small `AIO3Bridge` table and take effect live; values are saved
+  per character under `<WRobot>\Settings\AIO3\<Character>.conf`.
+- **Spec selection** combines talent auto-detection with a manual override (the `Spec` dropdown):
+  `Auto` picks the spec from the highest talent tree; below level 10 it falls back to a sensible
+  default. The active rotation is swapped at runtime when the spec changes.
+
+## Project layout
+
+| Project        | Output            | WRobot reference     | Purpose                                  |
+|----------------|-------------------|----------------------|------------------------------------------|
+| `AIO3.Core`    | (compiled into AIO3) | none              | domain model, engine, rotations, settings, fakes |
+| `AIO3`         | `AIO3.dll`        | yes (`Private=false`) | fightclass entry + adapter + overlay + persistence |
+| `AIO3.Tests`   | (not shipped)     | none                 | offline xUnit tests against `FakeGameClient` |
+
+## Building
+
+Requires the .NET SDK (builds `net472`) or Visual Studio Build Tools, and a local WRobot install.
 
 ```powershell
-# WRobotBin ist in Directory.Build.props vorbelegt; bei Bedarf überschreiben:
-dotnet build AIO3.sln -c Release -p:WRobotBin="E:\Games\Wrobot\BOT3.3.5\WRobot\Bin"
+# WRobotBin defaults to the path in Directory.Build.props; override if needed:
+dotnet build AIO3.sln -c Release -p:WRobotBin="C:\path\to\WRobot\Bin"
 dotnet test  AIO3.sln
 ```
 
-## Status
+A successful build copies `AIO3.dll` into the WRobot `FightClass` folder (override with
+`-p:WRobotFightClass=...`). Restart the WRobot product to reload it — no need to close WRobot.
 
-Erster vertikaler Schnitt: Engine + DSL + Context stehen und sind durch einen
-Test abgesichert; der Adapter kompiliert gegen die echten WRobot-DLLs und baut
-pro Tick einen `CombatContext`. Noch **keine** echte Rotation verdrahtet
-(Main loggt nur einen Heartbeat) — das ist der nächste Schritt (Frost Mage).
+## Roadmap
+
+- Warrior: Arms and Protection specs; settings-gated utilities (Hamstring, Piercing Howl).
+- Port curated content from the old project (boss list, talent builds, important debuffs).
+- More classes/specs; richer shared library (cooldowns, time-to-die, incoming damage).
+- CI (build + tests) and distributing the compiled DLL via GitHub Releases.

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,6 +8,7 @@ using AIO3.Core.Combat;
 using AIO3.Core.Engine;
 using AIO3.Core.Game;
 using AIO3.Core.Rotations.Warrior;
+using AIO3.Core.Settings;
 using AIO3.Overlay;
 using AIO3.Persistence;
 using robotManager.Helpful;
@@ -14,8 +16,10 @@ using wManager.Wow.Helpers;
 using wManager.Wow.ObjectManager;
 
 /// <summary>
-/// WRobot entry point (ICustomClass). Selects a rotation by class, then runs a single-threaded
-/// loop that builds one CombatContext per tick and lets the engine pick and cast one action.
+/// WRobot entry point (ICustomClass). Resolves the active spec (auto-detected from talents, with a
+/// manual override via the overlay) and runs a single-threaded loop that builds one CombatContext per
+/// tick and lets the engine cast one action. The active rotation is swapped at runtime when the spec
+/// changes (e.g. picking a spec at level 10, or respeccing).
 /// </summary>
 public class Main : ICustomClass
 {
@@ -25,32 +29,73 @@ public class Main : ICustomClass
     private SettingsStore _store;
     private CancellationTokenSource _cts;
 
+    // Warrior wiring (only class implemented so far).
+    private bool _isWarrior;
+    private FurySettings _furySettings;
+    private ChoiceSetting _specSetting;
+    private WarriorSpec? _activeSpec;
+
     public float Range => 5f; // melee; per-spec range refinement comes later
 
     public void Initialize()
     {
-        IRotation rotation = null;
+        _isWarrior = _game.PlayerClass == WowClass.Warrior;
 
-        // Warrior is the only class wired so far. It gets live settings, persistence + an overlay.
-        if (_game.PlayerClass == WowClass.Warrior)
+        if (_isWarrior)
         {
-            var fury = new SoloFury();
+            _furySettings = new FurySettings();
+            _specSetting = new ChoiceSetting("spec", "Spec", WarriorSpecs.Auto, WarriorSpecs.Choices);
+
+            // Panel/persistence cover the spec selector plus the active spec's tunables.
+            var list = new List<Setting> { _specSetting };
+            list.AddRange(_furySettings.All);
+
             string profile = ObjectManager.Me.Name;
-            _store = new SettingsStore(string.IsNullOrEmpty(profile) ? "default" : profile, fury.Settings);
-            _store.Load(); // apply persisted values before the rotation runs
-            rotation = fury;
-            _overlay = new SettingsOverlay(fury.Name, fury.Settings);
+            _store = new SettingsStore(string.IsNullOrEmpty(profile) ? "default" : profile, list);
+            _store.Load(); // apply persisted values (incl. the saved spec override) before running
+
+            _overlay = new SettingsOverlay("Warrior", list);
+
+            // Initial engine; Reconcile() in the loop swaps to the actually-resolved spec.
+            _activeSpec = WarriorSpec.Fury;
+            _engine = new RotationEngine(new SoloFury(_furySettings).BuildSteps());
+            Logging.Write("[AIO3] Loaded: Warrior (spec auto-selected from talents; /aio3 to override).");
         }
-
-        _engine = new RotationEngine(rotation?.BuildSteps() ?? Array.Empty<RotationStep>());
-
-        if (rotation != null)
-            Logging.Write($"[AIO3] Loaded rotation: {rotation.Name}");
         else
+        {
+            _engine = new RotationEngine(Array.Empty<RotationStep>());
             Logging.Write($"[AIO3] No rotation for class {_game.PlayerClass} yet — running idle.");
+        }
 
         _cts = new CancellationTokenSource();
         Task.Factory.StartNew(() => Loop(_cts.Token), _cts.Token);
+    }
+
+    /// <summary>Resolve the desired warrior spec (override or talent auto-detect) and swap the engine if it changed.</summary>
+    private void Reconcile()
+    {
+        if (!_isWarrior) return;
+
+        WarriorSpec desired = WarriorSpecs.Resolve(_specSetting.Value, _game.HighestTalentTab);
+        if (_activeSpec == desired) return;
+        _activeSpec = desired;
+
+        IRotation rotation = BuildWarriorRotation(desired);
+        _engine = new RotationEngine(rotation.BuildSteps());
+        Logging.Write($"[AIO3] Active spec: {desired} ({rotation.Name})");
+    }
+
+    private IRotation BuildWarriorRotation(WarriorSpec spec)
+    {
+        switch (spec)
+        {
+            case WarriorSpec.Fury:
+                return new SoloFury(_furySettings);
+            default:
+                // Arms / Protection not implemented yet — fall back so the bot still functions.
+                Logging.Write($"[AIO3] {spec} rotation not implemented yet — using Solo Fury as fallback.");
+                return new SoloFury(_furySettings);
+        }
     }
 
     private void Loop(CancellationToken token)
@@ -59,6 +104,7 @@ public class Main : ICustomClass
         string lastFired = null;
         var sinceLastLog = Stopwatch.StartNew();
         var overlayPoll = Stopwatch.StartNew();
+        var reconcile = Stopwatch.StartNew();
 
         while (!token.IsCancellationRequested)
         {
@@ -83,6 +129,14 @@ public class Main : ICustomClass
                     {
                         overlayPoll.Restart();
                         settingsChanged = _overlay != null && _overlay.Poll();
+                    }
+
+                    // Re-resolve the spec immediately after a manual change, and periodically for
+                    // talent auto-detect (e.g. choosing a spec at level 10 / respeccing).
+                    if (settingsChanged || reconcile.ElapsedMilliseconds > 2000)
+                    {
+                        reconcile.Restart();
+                        Reconcile();
                     }
 
                     // Don't run the rotation while mounted/travelling (casting would dismount;
@@ -130,6 +184,6 @@ public class Main : ICustomClass
 
     public void ShowConfiguration()
     {
-        Logging.Write("[AIO3] No settings UI yet.");
+        Logging.Write("[AIO3] Settings are configured in-game via the /aio3 overlay.");
     }
 }

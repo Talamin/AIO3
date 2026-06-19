@@ -44,6 +44,28 @@ namespace AIO3.Core.Settings
         }
     }
 
+    /// <summary>A choice among fixed options, rendered as a cycle button (e.g. spec selection).</summary>
+    public sealed class ChoiceSetting : Setting
+    {
+        public string Value;
+        public readonly string[] Options;
+
+        public ChoiceSetting(string key, string label, string value, string[] options) : base(key, label)
+        {
+            Value = value;
+            Options = options;
+        }
+
+        public override string Serialize() => Value ?? "";
+
+        public override void Deserialize(string raw)
+        {
+            foreach (string o in Options)
+                if (o == raw) { Value = raw; return; }
+            // unknown option → keep current value
+        }
+    }
+
     /// <summary>An integer with bounds and a step, rendered as a value with [-]/[+] buttons.</summary>
     public sealed class IntSetting : Setting
     {

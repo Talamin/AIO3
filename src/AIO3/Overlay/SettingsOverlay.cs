@@ -68,6 +68,17 @@ namespace AIO3.Overlay
                         Logging.Write($"[AIO3] {t.Label} = {t.Value}");
                     }
                 }
+                else if (s is ChoiceSetting c)
+                {
+                    string v = Lua.LuaDoString<string>(
+                        $"if AIO3Bridge and AIO3Bridge['{c.Key}'] then return tostring(AIO3Bridge['{c.Key}']) end return ''");
+                    if (!string.IsNullOrEmpty(v) && v != c.Value && System.Array.IndexOf(c.Options, v) >= 0)
+                    {
+                        c.Value = v;
+                        changed = true;
+                        Logging.Write($"[AIO3] {c.Label} = {c.Value}");
+                    }
+                }
             }
             return changed;
         }
@@ -125,6 +136,22 @@ namespace AIO3.Overlay
                     sb.Append("local lbl=AIO3Frame:CreateFontString(nil,\"OVERLAY\",\"GameFontNormal\") lbl:SetPoint(\"LEFT\",cb,\"RIGHT\",2,0)\n");
                     sb.Append("lbl:SetText(\"").Append(label).Append("\")\n");
                     sb.Append("cb:SetScript(\"OnClick\",function() AIO3Bridge[key]=cb:GetChecked() and true or false end)\n");
+                    sb.Append("end\n");
+                }
+                else if (s is ChoiceSetting c)
+                {
+                    sb.Append("do local key=\"").Append(key).Append("\"\n");
+                    sb.Append("if AIO3Bridge[key]==nil then AIO3Bridge[key]=\"").Append(Escape(c.Value)).Append("\" end\n");
+                    sb.Append("local opts={");
+                    for (int o = 0; o < c.Options.Length; o++)
+                    {
+                        if (o > 0) sb.Append(',');
+                        sb.Append('"').Append(Escape(c.Options[o])).Append('"');
+                    }
+                    sb.Append("}\n");
+                    sb.Append("local btn=CreateFrame(\"Button\",nil,AIO3Frame,\"UIPanelButtonTemplate\") btn:SetWidth(150) btn:SetHeight(22) btn:SetPoint(\"TOPLEFT\",16,").Append(y).Append(")\n");
+                    sb.Append("local function refresh() btn:SetText(\"").Append(label).Append(": \"..AIO3Bridge[key]) end refresh()\n");
+                    sb.Append("btn:SetScript(\"OnClick\",function() local cur=AIO3Bridge[key] local idx=1 for i=1,#opts do if opts[i]==cur then idx=i break end end idx=idx % #opts + 1 AIO3Bridge[key]=opts[idx] refresh() end)\n");
                     sb.Append("end\n");
                 }
             }

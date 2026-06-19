@@ -30,6 +30,9 @@ namespace AIO3.Core.Game
         /// <summary>The local player's class (drives which rotation is selected).</summary>
         WowClass PlayerClass { get; }
 
+        /// <summary>Index of the talent tab with the most points (1-based), or 0 if none spent yet.</summary>
+        int HighestTalentTab { get; }
+
         /// <summary>Name of the player's active stance/shapeshift form (e.g. "Berserker Stance"), or "".</summary>
         string ActiveStanceName { get; }
 

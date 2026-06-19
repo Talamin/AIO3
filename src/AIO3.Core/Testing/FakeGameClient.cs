@@ -30,6 +30,7 @@ namespace AIO3.Core.Testing
         public bool Mounted;
         public bool AutoAttacking;
         public WowClass Class = WowClass.None;
+        public int TalentTab; // highest talent tab (0 = none)
         public string StanceName = "";
 
         /// <summary>Names of spells that were cast, in order.</summary>
@@ -38,6 +39,7 @@ namespace AIO3.Core.Testing
         public IWowUnit Me => MeUnit;
         public IWowUnit Target => TargetUnit;
         public WowClass PlayerClass => Class;
+        public int HighestTalentTab => TalentTab;
         public string ActiveStanceName => StanceName;
         public IReadOnlyList<IWowUnit> Enemies => EnemyList;
         public IReadOnlyList<IWowUnit> Party => PartyList;
