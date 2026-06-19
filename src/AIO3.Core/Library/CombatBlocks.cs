@@ -1,6 +1,9 @@
+using System;
+using System.Collections.Generic;
 using AIO3.Core.Combat;
 using AIO3.Core.Dsl;
 using AIO3.Core.Engine;
+using AIO3.Core.Game;
 
 namespace AIO3.Core.Library
 {
@@ -69,6 +72,24 @@ namespace AIO3.Core.Library
                  .Priority(priority)
                  .On(Targets.CurrentEnemy)
                  .When(ctx => !ctx.Target.HasMyAura(spell) || ctx.Target.MyAuraTimeLeftMs(spell) < minMsLeft);
+
+        /// <summary>
+        /// Use the first ready item from <paramref name="names"/> when <paramref name="when"/> holds
+        /// (e.g. an emergency healthstone/potion below a health threshold). Off the GCD.
+        /// </summary>
+        public static RotationStep UseItems(string label, IReadOnlyList<string> names, Func<CombatContext, bool> when, float priority) =>
+            new RotationStep(
+                name: label,
+                priority: priority,
+                targets: Targets.Self,
+                condition: (ctx, t) => when(ctx),
+                action: (ctx, t) => ctx.Game.UseFirstReadyItem(names) ? CastResult.Success : CastResult.Failed,
+                ignoreGcd: true);
+
+        /// <summary>An offensive racial (used in combat with an enemy, off the GCD; IsSpellKnown gates by race).</summary>
+        public static RotationStep OffensiveRacial(string spell, float priority, Func<CombatContext, bool> enabled) =>
+            Skill.Spell(spell).Priority(priority).On(Targets.Self)
+                 .When(ctx => enabled(ctx) && ctx.Game.PlayerInCombat && ctx.HasEnemyTarget).OffGcd();
 
         private static bool HasAnyAura(CombatContext ctx, string[] names)
         {

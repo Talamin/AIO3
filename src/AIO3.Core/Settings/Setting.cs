@@ -13,6 +13,9 @@ namespace AIO3.Core.Settings
         public string Key { get; }
         public string Label { get; }
 
+        /// <summary>Tab/group the setting is shown under in the overlay (e.g. "Spec", "Rotation", "General").</summary>
+        public string Category { get; set; } = "General";
+
         protected Setting(string key, string label)
         {
             Key = key;

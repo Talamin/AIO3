@@ -40,6 +40,10 @@ namespace AIO3.Core.Testing
         /// <summary>Names of spells that were cast, in order.</summary>
         public readonly List<string> CastLog = new List<string>();
 
+        /// <summary>Items considered present + off cooldown; UseFirstReadyItem picks from these.</summary>
+        public readonly HashSet<string> ReadyItems = new HashSet<string>();
+        public readonly List<string> UsedItems = new List<string>();
+
         public IWowUnit Me => MeUnit;
         public IWowUnit Target => TargetUnit;
         public WowClass PlayerClass => Class;
@@ -63,6 +67,19 @@ namespace AIO3.Core.Testing
         {
             CastLog.Add(spell);
             return CastResult.Success;
+        }
+
+        public bool UseFirstReadyItem(IReadOnlyList<string> names)
+        {
+            foreach (string n in names)
+            {
+                if (ReadyItems.Contains(n))
+                {
+                    UsedItems.Add(n);
+                    return true;
+                }
+            }
+            return false;
         }
 
         public void RunLocked(Action action) => action();

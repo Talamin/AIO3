@@ -30,11 +30,32 @@ namespace AIO3.Core.Rotations.Warrior
         public readonly ToggleSetting AutoAssignTalents =
             new ToggleSetting("autoTalents", "Auto-assign talents", value: true);
 
+        /// <summary>Use offensive racials (Blood Fury / Berserking) in combat.</summary>
+        public readonly ToggleSetting UseRacials =
+            new ToggleSetting("racials", "Use racials", value: true);
+
+        /// <summary>Use an emergency healthstone/potion below this health %. 0 disables it.</summary>
+        public readonly IntSetting EmergencyHealthPercent =
+            new IntSetting("emergencyHp", "Emergency item below HP%", value: 30, min: 0, max: 90, step: 5);
+
         private readonly Setting[] _all;
 
         public WarriorSettings()
         {
-            _all = new Setting[] { HeroicStrikeRageReserve, AoeThreshold, UseGapClosers, UseHamstring, AutoAssignTalents };
+            // Tab assignment for the in-game overlay.
+            HeroicStrikeRageReserve.Category = "Rotation";
+            AoeThreshold.Category = "Rotation";
+            AutoAssignTalents.Category = "Spec";
+            UseGapClosers.Category = "General";
+            UseHamstring.Category = "General";
+            UseRacials.Category = "General";
+            EmergencyHealthPercent.Category = "General";
+
+            _all = new Setting[]
+            {
+                HeroicStrikeRageReserve, AoeThreshold, UseGapClosers, UseHamstring,
+                AutoAssignTalents, UseRacials, EmergencyHealthPercent
+            };
         }
 
         public IReadOnlyList<Setting> All => _all;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using AIO3.Core.Game;
 using wManager.Wow.Class;
 using wManager.Wow.Helpers;
@@ -136,6 +137,22 @@ namespace AIO3.Adapter
             SpellManager.CastSpellByNameOn(s.Name, LuaUnitId(unit));
             return CastResult.Success;
         }
+
+        public bool UseFirstReadyItem(IReadOnlyList<string> names)
+        {
+            foreach (WoWItem item in Bag.GetBagItem())
+            {
+                if (!names.Contains(item.Name)) continue;
+                if (IsItemOnCooldown(item.Entry)) continue;
+                ItemsManager.UseItemByNameOrId(item.Name);
+                return true;
+            }
+            return false;
+        }
+
+        private static bool IsItemOnCooldown(int entry) =>
+            Lua.LuaDoString<bool>(
+                $"local s,d = GetItemCooldown({entry}); if d and d > 0 and (GetTime()-s) < d then return true else return false end");
 
         private static string LuaUnitId(WoWUnit unit)
         {

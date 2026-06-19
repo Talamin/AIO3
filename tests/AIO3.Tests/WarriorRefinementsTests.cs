@@ -116,6 +116,43 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Emergency_item_used_when_low_and_one_is_ready()
+        {
+            FakeGameClient g = Game();
+            g.MeUnit.HealthPercent = 20;
+            g.ReadyItems.Add("Healthstone");
+            RotationStep step = CombatBlocks.UseItems("Emergency heal",
+                new[] { "Healthstone", "Major Healing Potion" }, ctx => ctx.Me.HealthPercent < 30, 1f);
+
+            Assert.Equal("Emergency heal", Fire(g, step)?.Name);
+            Assert.Contains("Healthstone", g.UsedItems);
+        }
+
+        [Fact]
+        public void Emergency_item_skipped_when_none_ready()
+        {
+            FakeGameClient g = Game();
+            g.MeUnit.HealthPercent = 20; // low, but no item available
+            RotationStep step = CombatBlocks.UseItems("Emergency heal",
+                new[] { "Healthstone" }, ctx => ctx.Me.HealthPercent < 30, 1f);
+
+            Assert.Null(Fire(g, step));
+            Assert.Empty(g.UsedItems);
+        }
+
+        [Fact]
+        public void Offensive_racial_fires_only_in_combat_with_an_enemy()
+        {
+            FakeGameClient g = Game();
+            RotationStep step = CombatBlocks.OffensiveRacial("Blood Fury", 1f, ctx => true);
+
+            Assert.Null(Fire(g, step)); // not in combat yet
+
+            g.InCombatFlag = true;
+            Assert.Equal("Blood Fury", Fire(g, step)?.Name);
+        }
+
+        [Fact]
         public void Berserker_Rage_breaks_fear()
         {
             FakeGameClient g = Game();

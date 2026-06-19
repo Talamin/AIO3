@@ -64,6 +64,9 @@ namespace AIO3.Core.Game
 
         CastResult Cast(string spell, IWowUnit target, bool force = false);
 
+        /// <summary>Use the first of these items that is in the bags and off cooldown. Returns true if one was used.</summary>
+        bool UseFirstReadyItem(System.Collections.Generic.IReadOnlyList<string> names);
+
         /// <summary>Run an action under the WoW frame lock (consistent memory reads).</summary>
         void RunLocked(Action action);
     }

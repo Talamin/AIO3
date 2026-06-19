@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AIO3.Core.Data;
 using AIO3.Core.Dsl;
 using AIO3.Core.Engine;
 using AIO3.Core.Library;
@@ -25,6 +26,13 @@ namespace AIO3.Core.Rotations.Warrior
 
         public IReadOnlyList<RotationStep> BuildSteps() => new List<RotationStep>
         {
+            // --- survival + burst ---
+            CombatBlocks.UseItems("Emergency heal", Consumables.HealthItems,
+                ctx => _settings.EmergencyHealthPercent.Value > 0 && ctx.Me.HealthPercent < _settings.EmergencyHealthPercent.Value,
+                priority: 0.05f),
+            CombatBlocks.OffensiveRacial("Blood Fury", 4.2f, ctx => _settings.UseRacials.Value),
+            CombatBlocks.OffensiveRacial("Berserking", 4.21f, ctx => _settings.UseRacials.Value),
+
             // --- baseline / upkeep ---
             WarriorCommon.EnsureStance("Defensive Stance", priority: 0.1f),
             CombatBlocks.AutoAttack(priority: 1f),

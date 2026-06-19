@@ -46,7 +46,7 @@ public class Main : ICustomClass
         if (_isWarrior)
         {
             _warriorSettings = new WarriorSettings();
-            _specSetting = new ChoiceSetting("spec", "Spec", WarriorSpecs.Auto, WarriorSpecs.Choices);
+            _specSetting = new ChoiceSetting("spec", "Spec", WarriorSpecs.Auto, WarriorSpecs.Choices) { Category = "Spec" };
 
             // Panel/persistence cover the spec selector plus the shared warrior tunables.
             var list = new List<Setting> { _specSetting };
