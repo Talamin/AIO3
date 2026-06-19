@@ -117,6 +117,10 @@ namespace AIO3.Adapter
 
         public bool PlayerInCombat => ObjectManager.Me.InCombat;
 
+        // WRobot's own fight state — true throughout a fight including the approach. Mirrors how the old
+        // AIO gated its combat rotation, so we only act when the product has committed to a target.
+        public bool ProductIsFighting => Fight.InFight;
+
         public bool PlayerIsAutoAttacking =>
             Lua.LuaDoString<bool>("return IsCurrentSpell('Auto Attack') == 1 or IsCurrentSpell('Auto Attack') == true");
 
@@ -171,12 +175,20 @@ namespace AIO3.Adapter
 
         public void RunLocked(Action action)
         {
-            // Current WRobot has no explicit LockFrame()/UnlockFrame(); ObjectManager.Locker
-            // is the lock WRobot itself uses around object-manager operations, so taking it
-            // gives us consistent reads against WRobot's own threads.
-            lock (ObjectManager.Locker)
+            // Use WRobot's frame lock (the mechanism the old AIO uses around its rotation). Taking
+            // ObjectManager.Locker instead contended with the product's own use of it during combat,
+            // intermittently stalling our tick for seconds (the "reacts too late" delay).
+            lock (wManager.Wow.Memory.WowMemory.LockFrameLocker)
             {
-                action();
+                try
+                {
+                    wManager.Wow.Memory.WowMemory.LockFrame();
+                    action();
+                }
+                finally
+                {
+                    wManager.Wow.Memory.WowMemory.UnlockFrame();
+                }
             }
         }
     }

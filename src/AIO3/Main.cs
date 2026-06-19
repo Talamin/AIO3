@@ -34,6 +34,7 @@ public class Main : ICustomClass
     private InterruptTracker _interrupts;
     private InterruptLearner _interruptLearner;
     private CancellationTokenSource _cts;
+    private volatile bool _applyingTalents; // talents run off-thread so they never freeze the rotation
 
     // Warrior wiring (only class implemented so far).
     private bool _isWarrior;
@@ -41,11 +42,18 @@ public class Main : ICustomClass
     private ChoiceSetting _specSetting;
     private WarriorSpec? _activeSpec;
 
-    public float Range => 5f; // melee; per-spec range refinement comes later
+    // Combat distance reported to WRobot. Tunable live via the warrior settings so we can dial in the
+    // melee stop distance (default 5, same as the old AIO). Falls back to 5 before settings exist.
+    public float Range => _warriorSettings?.CombatRange.Value ?? 5f;
 
     public void Initialize()
     {
         _isWarrior = _game.PlayerClass == WowClass.Warrior;
+
+        // An earlier build set this global WRobot setting to true; it persists in WRobot's saved config,
+        // so just removing that line didn't undo it. With our ObjectManager.Locker the Lua mover can
+        // contend and freeze the rotation during combat, so force it back to the default (off).
+        wManager.wManagerSetting.CurrentSetting.UseLuaToMove = false;
 
         if (_isWarrior)
         {
@@ -131,33 +139,34 @@ public class Main : ICustomClass
                 RotationStep fired = null;
                 bool settingsChanged = false;
 
-                _game.RunLocked(() =>
+                // Overlay polling and spec reconcile use Lua but DON'T need the frame lock — running them
+                // under it pauses the game's frame (stutter) for ~12 Lua reads. Keep them out of the lock.
+                _overlay?.EnsureCreated();
+                if (overlayPoll.ElapsedMilliseconds > 400)
                 {
-                    // Build the in-game overlay once, and poll its edits periodically. Runs even
-                    // while mounted so settings can be tweaked any time in-world.
-                    _overlay?.EnsureCreated();
-                    if (overlayPoll.ElapsedMilliseconds > 400)
-                    {
-                        overlayPoll.Restart();
-                        settingsChanged = _overlay != null && _overlay.Poll();
-                    }
+                    overlayPoll.Restart();
+                    settingsChanged = _overlay != null && _overlay.Poll();
+                }
+                if (settingsChanged || reconcile.ElapsedMilliseconds > 2000)
+                {
+                    reconcile.Restart();
+                    Reconcile();
+                }
+                if (settingsChanged)
+                    _store?.Save(); // file I/O, outside the lock
 
-                    // Re-resolve the spec immediately after a manual change, and periodically for
-                    // talent auto-detect (e.g. choosing a spec at level 10 / respeccing).
-                    if (settingsChanged || reconcile.ElapsedMilliseconds > 2000)
-                    {
-                        reconcile.Restart();
-                        Reconcile();
-                    }
+                // Hold the frame lock ONLY for the unit snapshot (consistent reads while iterating the
+                // object manager). The rotation's per-spell cooldown/known queries and the cast itself
+                // don't need it, so they run UNLOCKED — otherwise those slow queries pause the game's
+                // frame every tick (the stutter). Don't run while mounted/travelling.
+                if (!mounted)
+                {
+                    CombatContext ctx = null;
+                    _game.RunLocked(() => ctx = CombatContext.Capture(_game, _interrupts));
 
-                    // Don't run the rotation while mounted/travelling (casting would dismount;
-                    // WRobot dismounts itself to fight). Mirrors the old code's pervasive !IsMounted.
-                    if (!mounted)
+                    if (ctx != null)
                     {
-                        CombatContext ctx = CombatContext.Capture(_game, _interrupts);
-
-                        // Optional add-management only (off by default; never pulls — the product owns
-                        // the opener). Applies next tick; the rotation uses ctx as-is this tick.
+                        // Optional add-management only (off by default; never pulls — product owns the opener).
                         if (_isWarrior && _warriorSettings.UseTargetSelection.Value)
                         {
                             IWowUnit desired = TargetSelector.Pick(ctx);
@@ -167,20 +176,26 @@ public class Main : ICustomClass
 
                         fired = _engine.Tick(ctx);
                     }
-                });
+                }
 
-                // Persist outside the frame lock (file I/O) when the player changed a setting.
-                if (settingsChanged)
-                    _store?.Save();
-
-                // Auto-assign talents out of combat (blocking via LearnTalent, so never mid-fight).
+                // Auto-assign talents out of combat. Runs on a background task because TalentTrainer
+                // sleeps between LearnTalent calls — doing it inline froze the whole rotation loop while
+                // spending points. Guarded so only one application runs at a time.
                 if (_isWarrior && _talentTrainer != null && _activeSpec.HasValue
                     && _warriorSettings.AutoAssignTalents.Value
+                    && !_applyingTalents
                     && !_game.PlayerInCombat
                     && talentTimer.ElapsedMilliseconds > 15000)
                 {
                     talentTimer.Restart();
-                    _talentTrainer.Apply(WarriorTalents.For(_activeSpec.Value));
+                    _applyingTalents = true;
+                    WarriorSpec spec = _activeSpec.Value;
+                    Task.Factory.StartNew(() =>
+                    {
+                        try { _talentTrainer.Apply(WarriorTalents.For(spec)); }
+                        catch (Exception ex) { Logging.WriteError($"[AIO3] talents: {ex.Message}"); }
+                        finally { _applyingTalents = false; }
+                    });
                 }
 
                 if (fired != null)

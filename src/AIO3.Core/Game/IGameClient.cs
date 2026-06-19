@@ -59,6 +59,11 @@ namespace AIO3.Core.Game
         bool PlayerIsMounted { get; }
         bool PlayerInCombat { get; }
 
+        /// <summary>True when the WRobot product is engaged in a fight (its own fight state, set during
+        /// the approach too). The rotation only runs while this (or actual combat) holds, so the FC
+        /// never acts — or moves (Charge) — while the product is merely navigating.</summary>
+        bool ProductIsFighting { get; }
+
         /// <summary>True if the player is currently auto-attacking (melee swing toggle on).</summary>
         bool PlayerIsAutoAttacking { get; }
 
