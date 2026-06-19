@@ -82,6 +82,14 @@ namespace AIO3.Core.Testing
             return false;
         }
 
+        /// <summary>GUID passed to the most recent <see cref="SetTarget"/> call (0 = never called).</summary>
+        public ulong LastSetTargetGuid;
+
+        public void SetTarget(IWowUnit unit)
+        {
+            if (unit != null) LastSetTargetGuid = unit.Guid;
+        }
+
         public void RunLocked(Action action) => action();
     }
 }

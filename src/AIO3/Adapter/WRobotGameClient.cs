@@ -162,6 +162,13 @@ namespace AIO3.Adapter
             return "focus";
         }
 
+        public void SetTarget(IWowUnit unit)
+        {
+            // Verified API: WoWUnit.Target is a settable ulong (GUID) on the local player that performs
+            // the actual in-game target switch, so WRobot's facing/movement follows the new target.
+            if (unit != null && unit.Guid != 0) ObjectManager.Me.Target = unit.Guid;
+        }
+
         public void RunLocked(Action action)
         {
             // Current WRobot has no explicit LockFrame()/UnlockFrame(); ObjectManager.Locker

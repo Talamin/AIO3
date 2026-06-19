@@ -40,6 +40,12 @@ namespace AIO3.Core.Rotations.Warrior
         public readonly ChoiceSetting InterruptMode =
             new ChoiceSetting("interrupt", "Interrupt", InterruptModes.Smart, InterruptModes.All);
 
+        /// <summary>Manage adds when fighting several enemies (switch to an attacker if the current
+        /// target isn't one). Never pulls or starts a fight — the product owns the opener. Off by
+        /// default so it does not fight a WRobot product that already owns target selection.</summary>
+        public readonly ToggleSetting UseTargetSelection =
+            new ToggleSetting("targetSelect", "Manage adds (multi-target)", value: false);
+
         /// <summary>Use major offensive cooldowns (e.g. Recklessness) on elites/bosses/packs.</summary>
         public readonly ToggleSetting UseCooldowns =
             new ToggleSetting("cooldowns", "Use cooldowns", value: true);
@@ -60,13 +66,15 @@ namespace AIO3.Core.Rotations.Warrior
             UseHamstring.Category = "General";
             UseRacials.Category = "General";
             InterruptMode.Category = "General";
+            UseTargetSelection.Category = "General";
             UseCooldowns.Category = "General";
             EmergencyHealthPercent.Category = "General";
 
             _all = new Setting[]
             {
                 HeroicStrikeRageReserve, AoeThreshold, UseGapClosers, UseHamstring,
-                AutoAssignTalents, UseRacials, InterruptMode, UseCooldowns, EmergencyHealthPercent
+                AutoAssignTalents, UseRacials, InterruptMode, UseTargetSelection,
+                UseCooldowns, EmergencyHealthPercent
             };
         }
 

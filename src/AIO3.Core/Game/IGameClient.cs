@@ -67,6 +67,9 @@ namespace AIO3.Core.Game
         /// <summary>Use the first of these items that is in the bags and off cooldown. Returns true if one was used.</summary>
         bool UseFirstReadyItem(System.Collections.Generic.IReadOnlyList<string> names);
 
+        /// <summary>Set the player's current target (so WRobot's facing/movement follows it).</summary>
+        void SetTarget(IWowUnit unit);
+
         /// <summary>Run an action under the WoW frame lock (consistent memory reads).</summary>
         void RunLocked(Action action);
     }

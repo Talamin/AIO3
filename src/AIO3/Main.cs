@@ -153,7 +153,20 @@ public class Main : ICustomClass
                     // Don't run the rotation while mounted/travelling (casting would dismount;
                     // WRobot dismounts itself to fight). Mirrors the old code's pervasive !IsMounted.
                     if (!mounted)
-                        fired = _engine.Tick(CombatContext.Capture(_game, _interrupts));
+                    {
+                        CombatContext ctx = CombatContext.Capture(_game, _interrupts);
+
+                        // Optional add-management only (off by default; never pulls — the product owns
+                        // the opener). Applies next tick; the rotation uses ctx as-is this tick.
+                        if (_isWarrior && _warriorSettings.UseTargetSelection.Value)
+                        {
+                            IWowUnit desired = TargetSelector.Pick(ctx);
+                            if (desired != null && (ctx.Target == null || desired.Guid != ctx.Target.Guid))
+                                _game.SetTarget(desired);
+                        }
+
+                        fired = _engine.Tick(ctx);
+                    }
                 });
 
                 // Persist outside the frame lock (file I/O) when the player changed a setting.
