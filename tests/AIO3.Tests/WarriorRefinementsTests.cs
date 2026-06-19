@@ -49,6 +49,17 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Hamstring_skips_bosses()
+        {
+            FakeGameClient g = Game();
+            g.TargetUnit.HealthPercent = 30;
+            g.TargetUnit.CreatureType = "Humanoid";
+            g.TargetUnit.Entry = 31146; // a boss entry
+
+            Assert.Null(Fire(g, WarriorCommon.Hamstring(new WarriorSettings(), 1f)));
+        }
+
+        [Fact]
         public void Rend_skips_bleed_immune_creatures()
         {
             FakeGameClient g = Game();

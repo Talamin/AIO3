@@ -1,5 +1,6 @@
 using AIO3.Core.Dsl;
 using AIO3.Core.Engine;
+using AIO3.Core.Game;
 
 namespace AIO3.Core.Rotations.Warrior
 {
@@ -42,6 +43,7 @@ namespace AIO3.Core.Rotations.Warrior
                  .When(ctx => s.UseHamstring.Value
                               && ctx.Target.HealthPercent < 40
                               && ctx.Target.CreatureType == "Humanoid"
+                              && !ctx.Target.IsBoss()
                               && !ctx.Target.HasAura("Hamstring"));
 
         public static RotationStep Execute(float priority) =>

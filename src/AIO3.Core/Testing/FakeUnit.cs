@@ -7,6 +7,7 @@ namespace AIO3.Core.Testing
     public sealed class FakeUnit : IWowUnit
     {
         public ulong Guid { get; set; }
+        public int Entry { get; set; }
         public string Name { get; set; } = "";
         public bool IsAlive { get; set; } = true;
         public double HealthPercent { get; set; } = 100;

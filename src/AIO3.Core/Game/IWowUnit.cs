@@ -7,6 +7,10 @@ namespace AIO3.Core.Game
     public interface IWowUnit
     {
         ulong Guid { get; }
+
+        /// <summary>Creature template entry ID (used for boss detection, etc.).</summary>
+        int Entry { get; }
+
         string Name { get; }
         bool IsAlive { get; }
 
@@ -49,5 +53,8 @@ namespace AIO3.Core.Game
     {
         /// <summary>Hostile or neutral counts as "enemy" (matches the old AIO semantics).</summary>
         public static bool IsEnemy(this IWowUnit unit) => unit != null && unit.Reaction != Reaction.Friendly;
+
+        /// <summary>True if the unit's entry is in the ported boss list.</summary>
+        public static bool IsBoss(this IWowUnit unit) => unit != null && Data.BossList.Contains(unit.Entry);
     }
 }

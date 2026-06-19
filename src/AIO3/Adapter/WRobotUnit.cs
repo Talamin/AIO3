@@ -22,6 +22,7 @@ namespace AIO3.Adapter
         public WoWUnit Inner => _unit;
 
         public ulong Guid => _unit.Guid;
+        public int Entry => _unit.Entry;
         public string Name => _unit.Name;
         public bool IsAlive => _unit.IsAlive;
         public double HealthPercent => _unit.HealthPercent;
