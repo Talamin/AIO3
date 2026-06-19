@@ -1,0 +1,22 @@
+## Build output
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
+*.suo
+
+## NuGet
+*.nupkg
+packages/
+
+## Rider / VS
+.idea/
+
+## We never commit WRobot binaries or our compiled fightclass
+Dependencies/
+*.dll
+!*.deps.dll
+
+## Throwaway API-reflection probe scripts (wrobot-api-scout)
+probe-*.ps1
+_probe*.ps1

@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The fightclass assembly WRobot loads. This is the ONLY project that references
+    the WRobot binaries. They are referenced with <Private>false</Private> so they
+    are NOT copied into the output: every WRobot install already ships them in Bin,
+    and WRobot resolves them at runtime via its probing path (Bin;Products;FightClass).
+    Deploy = copy AIO3.dll + AIO3.Core.dll into the WRobot 'FightClass' folder.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <AssemblyName>AIO3</AssemblyName>
+    <RootNamespace>AIO3</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    Compile the Core sources directly INTO this assembly instead of referencing the separate
+    AIO3.Core.dll. Reason: WRobot loads the FightClass DLL from a byte[], so AIO3.dll is NOT
+    file-locked and can be hot-swapped while WRobot runs. A *referenced* dependency DLL, however,
+    is resolved via the file system (LoadFrom) and DOES get locked — which is why only
+    AIO3.Core.dll ever showed copy-lock warnings. Shipping a single self-contained AIO3.dll
+    restores the normal "replace the fightclass without closing WRobot" workflow.
+
+    The architectural boundary is still enforced: the AIO3.Core project compiles the SAME sources
+    without a wManager reference, so any wManager usage in Core code breaks that build. Tests keep
+    referencing the standalone AIO3.Core project.
+  -->
+  <ItemGroup>
+    <Compile Include="..\AIO3.Core\**\*.cs" Exclude="..\AIO3.Core\obj\**\*.cs;..\AIO3.Core\bin\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="wManager">
+      <HintPath>$(WRobotBin)\wManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="robotManager">
+      <HintPath>$(WRobotBin)\robotManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- MemoryRobot is no longer referenced: cooldowns now use the supported SpellManager
+         API, so the adapter performs NO raw memory access. Re-add if that ever changes. -->
+  </ItemGroup>
+
+  <!--
+    Convenience deploy: after a successful build, copy the single self-contained fightclass
+    (AIO3.dll) into the WRobot FightClass folder. WRobot loads it from a byte[], so it is not
+    file-locked and hot-swaps while WRobot runs. Runs only if the folder exists (no-op on CI).
+    Override the destination with: dotnet build -p:WRobotFightClass="...\WRobot\FightClass"
+  -->
+  <PropertyGroup>
+    <WRobotFightClass Condition="'$(WRobotFightClass)' == ''">E:\Games\Wrobot\BOT3.3.5\WRobot\FightClass</WRobotFightClass>
+  </PropertyGroup>
+
+  <Target Name="DeployToFightClass" AfterTargets="Build" Condition="Exists('$(WRobotFightClass)')">
+    <ItemGroup>
+      <DeployFiles Include="$(TargetDir)AIO3.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(WRobotFightClass)" SkipUnchangedFiles="true" Retries="0" ContinueOnError="true" />
+    <Message Importance="high" Text="AIO3 deployed to $(WRobotFightClass)." />
+  </Target>
+
+</Project>

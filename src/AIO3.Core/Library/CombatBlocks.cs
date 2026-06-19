@@ -1,0 +1,71 @@
+using AIO3.Core.Combat;
+using AIO3.Core.Dsl;
+using AIO3.Core.Engine;
+
+namespace AIO3.Core.Library
+{
+    /// <summary>
+    /// Layer 3 — the shared step library. Parameterised, reusable combat behaviours that
+    /// every spec composes instead of re-implementing. This is the mechanism that keeps
+    /// the "all-in-one" consistent: improve a block here and every spec that uses it
+    /// improves at once, with no edit to the spec. Each block returns a ready RotationStep.
+    /// </summary>
+    public static class CombatBlocks
+    {
+        /// <summary>
+        /// Interrupt an enemy that is currently casting, using <paramref name="spell"/>.
+        /// The DSL's automatic range gate ensures the caster is within interrupt range.
+        /// (Detecting whether a cast is actually interruptible is a later refinement.)
+        /// </summary>
+        public static RotationStep Interrupt(string spell, float priority = 1f) =>
+            Skill.Spell(spell)
+                 .Priority(priority)
+                 .On(Targets.EnemiesCasting)
+                 .OffGcd() // interrupts must be able to fire during the GCD
+                 .Build();
+
+        /// <summary>
+        /// Ensure melee auto-attack is running on the current target (off the GCD). WRobot's own
+        /// fight engine usually does this, but the old rotations keep it as a safety net.
+        /// </summary>
+        public static RotationStep AutoAttack(float priority = 0.5f) =>
+            Skill.Spell("Auto Attack")
+                 .Priority(priority)
+                 .On(Targets.CurrentEnemy) // never start swinging at a friendly NPC
+                 .When(ctx => !ctx.Game.PlayerIsCasting && !ctx.Game.PlayerIsAutoAttacking)
+                 .OffGcd()
+                 .Build();
+
+        /// <summary>
+        /// Cast a self-defensive when the player's health drops below
+        /// <paramref name="healthPercent"/>.
+        /// </summary>
+        public static RotationStep DefensiveBelow(string spell, double healthPercent, float priority = 2f) =>
+            Skill.Spell(spell)
+                 .Priority(priority)
+                 .On(Targets.Self)
+                 .When(ctx => ctx.Me.HealthPercent < healthPercent)
+                 .Build();
+
+        /// <summary>
+        /// Keep a self-buff up (cast when missing). Useful for shouts, armors, auras, etc.
+        /// <paramref name="supersededBy"/> lists better/exclusive buffs that make this one
+        /// unnecessary (e.g. don't cast Battle Shout if a paladin's Greater Blessing of Might
+        /// is already up).
+        /// </summary>
+        public static RotationStep SelfBuff(string spell, float priority = 3f, params string[] supersededBy) =>
+            Skill.Spell(spell)
+                 .Priority(priority)
+                 .On(Targets.Self)
+                 .When(ctx => !ctx.Me.HasAura(spell) && !HasAnyAura(ctx, supersededBy))
+                 .Build();
+
+        private static bool HasAnyAura(CombatContext ctx, string[] names)
+        {
+            if (names == null) return false;
+            for (int i = 0; i < names.Length; i++)
+                if (ctx.Me.HasAura(names[i])) return true;
+            return false;
+        }
+    }
+}

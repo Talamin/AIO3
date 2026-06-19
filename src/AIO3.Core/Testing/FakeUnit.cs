@@ -1,0 +1,41 @@
+using System.Collections.Generic;
+using AIO3.Core.Game;
+
+namespace AIO3.Core.Testing
+{
+    /// <summary>A pure-data unit for offline tests and simulation.</summary>
+    public sealed class FakeUnit : IWowUnit
+    {
+        public ulong Guid { get; set; }
+        public string Name { get; set; } = "";
+        public bool IsAlive { get; set; } = true;
+        public double HealthPercent { get; set; } = 100;
+        public double PowerPercent { get; set; } = 100;
+        public int Rage { get; set; }
+        public float Distance { get; set; }
+        public bool IsCasting { get; set; }
+        public Reaction Reaction { get; set; } = Reaction.Hostile;
+        public bool IsTargetingMe { get; set; }
+        public bool IsAttackable { get; set; } = true;
+
+        public sealed class Aura
+        {
+            public int Stacks = 1;
+            public bool Mine;
+            public long TimeLeftMs;
+        }
+
+        public readonly Dictionary<string, Aura> Auras = new Dictionary<string, Aura>();
+
+        public FakeUnit WithAura(string name, int stacks = 1, bool mine = false, long timeLeftMs = 0)
+        {
+            Auras[name] = new Aura { Stacks = stacks, Mine = mine, TimeLeftMs = timeLeftMs };
+            return this;
+        }
+
+        public bool HasAura(string name) => Auras.ContainsKey(name);
+        public int AuraStacks(string name) => Auras.TryGetValue(name, out Aura a) ? a.Stacks : 0;
+        public bool HasMyAura(string name) => Auras.TryGetValue(name, out Aura a) && a.Mine;
+        public long MyAuraTimeLeftMs(string name) => Auras.TryGetValue(name, out Aura a) && a.Mine ? a.TimeLeftMs : 0;
+    }
+}

@@ -1,0 +1,25 @@
+<Project>
+
+  <!--
+    Shared build settings for all AIO3 projects.
+    Target framework matches the proven WRobot baseline (.NET Framework 4.7.2, x86 host).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Platforms>AnyCPU</Platforms>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Deterministic>true</Deterministic>
+    <Company>AIO3</Company>
+
+    <!--
+      Path to the WRobot 'Bin' folder (wManager.dll, robotManager.dll, MemoryRobot.dll ...).
+      Only the fightclass project (AIO3) references these. Override on the CLI with:
+        dotnet build -p:WRobotBin="D:\path\to\WRobot\Bin"
+    -->
+    <WRobotBin Condition="'$(WRobotBin)' == ''">E:\Games\Wrobot\BOT3.3.5\WRobot\Bin</WRobotBin>
+  </PropertyGroup>
+
+</Project>

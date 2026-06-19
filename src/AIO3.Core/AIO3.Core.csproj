@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Pure logic layer. Deliberately has NO reference to wManager / robotManager.
+    That missing reference is the architectural guarantee: nothing in here can
+    touch the WRobot API, so the whole assembly is unit-testable offline.
+  -->
+  <PropertyGroup>
+    <AssemblyName>AIO3.Core</AssemblyName>
+    <RootNamespace>AIO3.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>
