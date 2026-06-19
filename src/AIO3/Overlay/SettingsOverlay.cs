@@ -66,6 +66,14 @@ namespace AIO3.Overlay
             return changed;
         }
 
+        // Per-widget vertical footprint (px) used to lay rows out and size the frame.
+        private const int ToggleHeight = 26;
+        private const int ChoiceHeight = 30;
+        private const int SliderHeight = 46;
+
+        private static int WidgetHeight(Setting s) =>
+            s is IntSetting ? SliderHeight : s is ChoiceSetting ? ChoiceHeight : ToggleHeight;
+
         private string BuildFrameLua()
         {
             // Group settings by category, preserving first-seen order.
@@ -82,10 +90,16 @@ namespace AIO3.Overlay
                 list.Add(s);
             }
 
-            int maxRows = 0;
-            foreach (string cat in order) maxRows = System.Math.Max(maxRows, byCat[cat].Count);
-            int height = 56 + maxRows * 28 + 12;
-            int width = System.Math.Max(300, order.Count * 92 + 16);
+            // Frame is sized to the tallest tab. 28 = top+bottom padding inside the content inset.
+            int maxContent = 0;
+            foreach (string cat in order)
+            {
+                int h = 28;
+                foreach (Setting s in byCat[cat]) h += WidgetHeight(s);
+                maxContent = System.Math.Max(maxContent, h);
+            }
+            int height = maxContent + 60;                                  // 60 = header banner + tab row
+            int width = System.Math.Max(360, order.Count * 92 + 16);
 
             var sb = new StringBuilder();
             sb.Append("if AIO3Frame then AIO3Frame:Hide() end\n");
@@ -93,14 +107,23 @@ namespace AIO3.Overlay
             sb.Append("AIO3Frame = CreateFrame(\"Frame\",\"AIO3Frame\",UIParent)\n");
             sb.Append("AIO3Frame:SetWidth(").Append(width).Append(") AIO3Frame:SetHeight(").Append(height).Append(")\n");
             sb.Append("AIO3Frame:SetPoint(\"CENTER\",0,220)\n");
-            sb.Append("AIO3Frame:SetBackdrop(StaticPopup1:GetBackdrop())\n");
+            sb.Append("AIO3Frame:SetClampedToScreen(true)\n");
+            // Dark, slim panel: tooltip background + border, dark fill, subtle gold-tinted border.
+            sb.Append("AIO3Frame:SetBackdrop({bgFile=\"Interface\\\\Tooltips\\\\UI-Tooltip-Background\",edgeFile=\"Interface\\\\Tooltips\\\\UI-Tooltip-Border\",tile=true,tileSize=16,edgeSize=16,insets={left=4,right=4,top=4,bottom=4}})\n");
+            sb.Append("AIO3Frame:SetBackdropColor(0.05,0.06,0.09,0.95)\n");
+            sb.Append("AIO3Frame:SetBackdropBorderColor(0.85,0.7,0.35,1)\n");
             sb.Append("AIO3Frame:SetMovable(true) AIO3Frame:EnableMouse(true)\n");
             sb.Append("AIO3Frame:SetScript(\"OnMouseDown\",function() AIO3Frame:StartMoving() end)\n");
             sb.Append("AIO3Frame:SetScript(\"OnMouseUp\",function() AIO3Frame:StopMovingOrSizing() end)\n");
-            sb.Append("local title=AIO3Frame:CreateFontString(nil,\"OVERLAY\",\"GameFontNormal\") title:SetPoint(\"TOP\",0,-7) title:SetText(\"AIO3 - ").Append(Escape(_rotationName)).Append("\")\n");
+            // Gold ornate header banner with the title inscribed on it.
+            sb.Append("local header=AIO3Frame:CreateTexture(nil,\"ARTWORK\") header:SetTexture(\"Interface\\\\DialogFrame\\\\UI-DialogBox-Header\") header:SetWidth(230) header:SetHeight(64) header:SetPoint(\"TOP\",0,12)\n");
+            sb.Append("local title=AIO3Frame:CreateFontString(nil,\"OVERLAY\",\"GameFontNormal\") title:SetPoint(\"TOP\",header,\"TOP\",0,-15) title:SetText(\"AIO3 - ").Append(Escape(_rotationName)).Append("\")\n");
             sb.Append("local close=CreateFrame(\"Button\",nil,AIO3Frame,\"UIPanelCloseButton\") close:SetPoint(\"TOPRIGHT\",-2,-2)\n");
-            sb.Append("AIO3Frame.contents={}\n");
-            sb.Append("local function showTab(n) for k,c in pairs(AIO3Frame.contents) do if k==n then c:Show() else c:Hide() end end end\n");
+            sb.Append("AIO3Frame.contents={} AIO3Frame.tabs={}\n");
+            sb.Append("local function showTab(n)\n");
+            sb.Append("for k,c in pairs(AIO3Frame.contents) do if k==n then c:Show() else c:Hide() end end\n");
+            sb.Append("for k,t in pairs(AIO3Frame.tabs) do if k==n then t:LockHighlight() else t:UnlockHighlight() end end\n");
+            sb.Append("end\n");
 
             for (int ti = 0; ti < order.Count; ti++)
             {
@@ -109,14 +132,21 @@ namespace AIO3.Overlay
                 int tabX = 10 + ti * 92;
 
                 sb.Append("do\n");
+                // Recessed content panel for this tab.
                 sb.Append("local content=CreateFrame(\"Frame\",nil,AIO3Frame) content:SetPoint(\"TOPLEFT\",10,-50) content:SetPoint(\"BOTTOMRIGHT\",-10,10) content:Hide()\n");
+                sb.Append("content:SetBackdrop({bgFile=\"Interface\\\\Tooltips\\\\UI-Tooltip-Background\",edgeFile=\"Interface\\\\Tooltips\\\\UI-Tooltip-Border\",tile=true,tileSize=16,edgeSize=16,insets={left=3,right=3,top=3,bottom=3}})\n");
+                sb.Append("content:SetBackdropColor(0,0,0,0.35) content:SetBackdropBorderColor(0.4,0.4,0.45,0.8)\n");
                 sb.Append("AIO3Frame.contents[\"").Append(catEsc).Append("\"]=content\n");
                 sb.Append("local tab=CreateFrame(\"Button\",nil,AIO3Frame,\"UIPanelButtonTemplate\") tab:SetWidth(86) tab:SetHeight(22) tab:SetPoint(\"TOPLEFT\",").Append(tabX).Append(",-26) tab:SetText(\"").Append(catEsc).Append("\")\n");
+                sb.Append("AIO3Frame.tabs[\"").Append(catEsc).Append("\"]=tab\n");
                 sb.Append("tab:SetScript(\"OnClick\",function() showTab(\"").Append(catEsc).Append("\") end)\n");
 
-                List<Setting> list = byCat[cat];
-                for (int r = 0; r < list.Count; r++)
-                    AppendWidget(sb, list[r], -(6 + r * 28));
+                int y = -14;
+                foreach (Setting s in byCat[cat])
+                {
+                    AppendWidget(sb, s, y);
+                    y -= WidgetHeight(s);
+                }
 
                 sb.Append("end\n");
             }
@@ -134,22 +164,31 @@ namespace AIO3.Overlay
 
             if (s is IntSetting i)
             {
+                // Native Blizzard slider (OptionsSliderTemplate) — its $parentText/Low/High regions are
+                // addressed via the generated global name. Label + live value sit above the bar.
+                string name = "AIO3_sld_" + key;
                 sb.Append("do local key=\"").Append(key).Append("\"\n");
                 sb.Append("if AIO3Bridge[key]==nil then AIO3Bridge[key]=").Append(i.Value).Append(" end\n");
-                sb.Append("local fs=content:CreateFontString(nil,\"OVERLAY\",\"GameFontNormal\") fs:SetPoint(\"TOPLEFT\",content,\"TOPLEFT\",4,").Append(y).Append(")\n");
-                sb.Append("local function refresh() fs:SetText(\"").Append(label).Append(": \"..AIO3Bridge[key]) end refresh()\n");
-                sb.Append("local minus=CreateFrame(\"Button\",nil,content,\"UIPanelButtonTemplate\") minus:SetWidth(22) minus:SetHeight(18) minus:SetPoint(\"TOPRIGHT\",content,\"TOPRIGHT\",-44,").Append(y + 1).Append(") minus:SetText(\"-\")\n");
-                sb.Append("minus:SetScript(\"OnClick\",function() AIO3Bridge[key]=math.max(").Append(i.Min).Append(",AIO3Bridge[key]-").Append(i.Step).Append(") refresh() end)\n");
-                sb.Append("local plus=CreateFrame(\"Button\",nil,content,\"UIPanelButtonTemplate\") plus:SetWidth(22) plus:SetHeight(18) plus:SetPoint(\"TOPRIGHT\",content,\"TOPRIGHT\",-16,").Append(y + 1).Append(") plus:SetText(\"+\")\n");
-                sb.Append("plus:SetScript(\"OnClick\",function() AIO3Bridge[key]=math.min(").Append(i.Max).Append(",AIO3Bridge[key]+").Append(i.Step).Append(") refresh() end)\n");
+                sb.Append("local sld=CreateFrame(\"Slider\",\"").Append(name).Append("\",content,\"OptionsSliderTemplate\")\n");
+                sb.Append("sld:SetWidth(200) sld:SetHeight(16) sld:SetPoint(\"TOPLEFT\",content,\"TOPLEFT\",16,").Append(y - 18).Append(")\n");
+                sb.Append("sld:SetMinMaxValues(").Append(i.Min).Append(',').Append(i.Max).Append(") sld:SetValueStep(").Append(i.Step).Append(")\n");
+                // Min/max end labels (nil-guarded) and clear the template's own centred text — we draw our own.
+                sb.Append("local lo=getglobal(\"").Append(name).Append("Low\") if lo then lo:SetText(\"").Append(i.Min).Append("\") end\n");
+                sb.Append("local hi=getglobal(\"").Append(name).Append("High\") if hi then hi:SetText(\"").Append(i.Max).Append("\") end\n");
+                sb.Append("local tx=getglobal(\"").Append(name).Append("Text\") if tx then tx:SetText(\"\") end\n");
+                // Our own descriptive label above the slider (the template's $parentText is unreliable here).
+                sb.Append("local lbl=content:CreateFontString(nil,\"OVERLAY\",\"GameFontHighlightSmall\") lbl:SetPoint(\"BOTTOMLEFT\",sld,\"TOPLEFT\",0,2)\n");
+                sb.Append("local function refresh() lbl:SetText(\"").Append(label).Append(": \"..AIO3Bridge[key]) end\n");
+                sb.Append("sld:SetScript(\"OnValueChanged\",function(self) local v=math.floor(self:GetValue()+0.5) AIO3Bridge[key]=v refresh() end)\n");
+                sb.Append("sld:SetValue(AIO3Bridge[key]) refresh()\n");
                 sb.Append("end\n");
             }
             else if (s is ToggleSetting t)
             {
                 sb.Append("do local key=\"").Append(key).Append("\"\n");
                 sb.Append("if AIO3Bridge[key]==nil then AIO3Bridge[key]=").Append(t.Value ? "true" : "false").Append(" end\n");
-                sb.Append("local cb=CreateFrame(\"CheckButton\",nil,content,\"UICheckButtonTemplate\") cb:SetWidth(22) cb:SetHeight(22) cb:SetPoint(\"TOPLEFT\",content,\"TOPLEFT\",2,").Append(y + 2).Append(") cb:SetChecked(AIO3Bridge[key])\n");
-                sb.Append("local lbl=content:CreateFontString(nil,\"OVERLAY\",\"GameFontNormal\") lbl:SetPoint(\"LEFT\",cb,\"RIGHT\",2,0) lbl:SetText(\"").Append(label).Append("\")\n");
+                sb.Append("local cb=CreateFrame(\"CheckButton\",nil,content,\"UICheckButtonTemplate\") cb:SetWidth(22) cb:SetHeight(22) cb:SetPoint(\"TOPLEFT\",content,\"TOPLEFT\",14,").Append(y + 2).Append(") cb:SetChecked(AIO3Bridge[key])\n");
+                sb.Append("local lbl=content:CreateFontString(nil,\"OVERLAY\",\"GameFontHighlight\") lbl:SetPoint(\"LEFT\",cb,\"RIGHT\",4,0) lbl:SetText(\"").Append(label).Append("\")\n");
                 sb.Append("cb:SetScript(\"OnClick\",function() AIO3Bridge[key]=cb:GetChecked() and true or false end)\n");
                 sb.Append("end\n");
             }
@@ -164,7 +203,7 @@ namespace AIO3.Overlay
                     sb.Append('"').Append(Escape(c.Options[o])).Append('"');
                 }
                 sb.Append("}\n");
-                sb.Append("local btn=CreateFrame(\"Button\",nil,content,\"UIPanelButtonTemplate\") btn:SetWidth(150) btn:SetHeight(20) btn:SetPoint(\"TOPLEFT\",content,\"TOPLEFT\",4,").Append(y).Append(")\n");
+                sb.Append("local btn=CreateFrame(\"Button\",nil,content,\"UIPanelButtonTemplate\") btn:SetWidth(170) btn:SetHeight(22) btn:SetPoint(\"TOPLEFT\",content,\"TOPLEFT\",14,").Append(y).Append(")\n");
                 sb.Append("local function refresh() btn:SetText(\"").Append(label).Append(": \"..AIO3Bridge[key]) end refresh()\n");
                 sb.Append("btn:SetScript(\"OnClick\",function() local cur=AIO3Bridge[key] local idx=1 for n=1,#opts do if opts[n]==cur then idx=n break end end idx=idx % #opts + 1 AIO3Bridge[key]=opts[idx] refresh() end)\n");
                 sb.Append("end\n");
