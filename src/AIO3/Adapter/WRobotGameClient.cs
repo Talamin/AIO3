@@ -111,6 +111,8 @@ namespace AIO3.Adapter
 
         public bool PlayerIsMounted => ObjectManager.Me.IsMounted;
 
+        public bool PlayerInCombat => ObjectManager.Me.InCombat;
+
         public bool PlayerIsAutoAttacking =>
             Lua.LuaDoString<bool>("return IsCurrentSpell('Auto Attack') == 1 or IsCurrentSpell('Auto Attack') == true");
 

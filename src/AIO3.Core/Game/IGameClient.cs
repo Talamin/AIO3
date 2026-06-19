@@ -54,6 +54,7 @@ namespace AIO3.Core.Game
         bool PlayerIsCasting { get; }
         bool PlayerIsMoving { get; }
         bool PlayerIsMounted { get; }
+        bool PlayerInCombat { get; }
 
         /// <summary>True if the player is currently auto-attacking (melee swing toggle on).</summary>
         bool PlayerIsAutoAttacking { get; }

@@ -26,11 +26,15 @@ namespace AIO3.Core.Rotations.Warrior
         public readonly ToggleSetting UseHamstring =
             new ToggleSetting("hamstring", "Hamstring fleeing targets", value: true);
 
+        /// <summary>Automatically spend talent points using the active spec's default build.</summary>
+        public readonly ToggleSetting AutoAssignTalents =
+            new ToggleSetting("autoTalents", "Auto-assign talents", value: true);
+
         private readonly Setting[] _all;
 
         public WarriorSettings()
         {
-            _all = new Setting[] { HeroicStrikeRageReserve, AoeThreshold, UseGapClosers, UseHamstring };
+            _all = new Setting[] { HeroicStrikeRageReserve, AoeThreshold, UseGapClosers, UseHamstring, AutoAssignTalents };
         }
 
         public IReadOnlyList<Setting> All => _all;

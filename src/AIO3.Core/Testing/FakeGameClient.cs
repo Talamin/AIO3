@@ -28,6 +28,7 @@ namespace AIO3.Core.Testing
         public bool Casting;
         public bool Moving;
         public bool Mounted;
+        public bool InCombatFlag;
         public bool AutoAttacking;
         public WowClass Class = WowClass.None;
         public int TalentTab; // highest talent tab (0 = none)
@@ -51,6 +52,7 @@ namespace AIO3.Core.Testing
         public bool PlayerIsCasting => Casting;
         public bool PlayerIsMoving => Moving;
         public bool PlayerIsMounted => Mounted;
+        public bool PlayerInCombat => InCombatFlag;
         public bool PlayerIsAutoAttacking => AutoAttacking;
 
         public CastResult Cast(string spell, IWowUnit target, bool force = false)

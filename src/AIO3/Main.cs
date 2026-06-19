@@ -11,6 +11,7 @@ using AIO3.Core.Rotations.Warrior;
 using AIO3.Core.Settings;
 using AIO3.Overlay;
 using AIO3.Persistence;
+using AIO3.Talents;
 using robotManager.Helpful;
 using wManager.Wow.Helpers;
 using wManager.Wow.ObjectManager;
@@ -27,6 +28,7 @@ public class Main : ICustomClass
     private RotationEngine _engine;
     private SettingsOverlay _overlay;
     private SettingsStore _store;
+    private TalentTrainer _talentTrainer;
     private CancellationTokenSource _cts;
 
     // Warrior wiring (only class implemented so far).
@@ -55,6 +57,7 @@ public class Main : ICustomClass
             _store.Load(); // apply persisted values (incl. the saved spec override) before running
 
             _overlay = new SettingsOverlay("Warrior", list);
+            _talentTrainer = new TalentTrainer();
 
             // Initial engine; Reconcile() in the loop swaps to the actually-resolved spec.
             _activeSpec = WarriorSpec.Fury;
@@ -102,6 +105,7 @@ public class Main : ICustomClass
         var sinceLastLog = Stopwatch.StartNew();
         var overlayPoll = Stopwatch.StartNew();
         var reconcile = Stopwatch.StartNew();
+        var talentTimer = Stopwatch.StartNew();
 
         while (!token.IsCancellationRequested)
         {
@@ -145,6 +149,16 @@ public class Main : ICustomClass
                 // Persist outside the frame lock (file I/O) when the player changed a setting.
                 if (settingsChanged)
                     _store?.Save();
+
+                // Auto-assign talents out of combat (blocking via LearnTalent, so never mid-fight).
+                if (_isWarrior && _talentTrainer != null && _activeSpec.HasValue
+                    && _warriorSettings.AutoAssignTalents.Value
+                    && !_game.PlayerInCombat
+                    && talentTimer.ElapsedMilliseconds > 15000)
+                {
+                    talentTimer.Restart();
+                    _talentTrainer.Apply(WarriorTalents.For(_activeSpec.Value));
+                }
 
                 if (fired != null)
                 {
