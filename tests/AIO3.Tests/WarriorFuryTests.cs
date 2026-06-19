@@ -44,7 +44,7 @@ namespace AIO3.Tests
         [Fact]
         public void Heroic_Strike_reserve_setting_is_respected()
         {
-            var fs = new FurySettings();
+            var fs = new WarriorSettings();
             fs.HeroicStrikeRageReserve.Value = 40;
             FakeGameClient game = WarriorGame();
             game.Gcd = 1000;        // only off-GCD steps eligible
@@ -56,7 +56,7 @@ namespace AIO3.Tests
         [Fact]
         public void AoE_threshold_setting_is_respected()
         {
-            var fs = new FurySettings();
+            var fs = new WarriorSettings();
             fs.AoeThreshold.Value = 3; // require 3 enemies
             FakeGameClient game = WarriorGame();
             game.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 6 });
@@ -72,7 +72,7 @@ namespace AIO3.Tests
         [Fact]
         public void Gap_closers_can_be_disabled_via_setting()
         {
-            var fs = new FurySettings();
+            var fs = new WarriorSettings();
             fs.UseGapClosers.Value = false;
             FakeGameClient game = WarriorGame();
             game.TargetUnit.Distance = 15;

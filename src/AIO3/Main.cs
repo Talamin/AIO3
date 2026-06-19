@@ -31,7 +31,7 @@ public class Main : ICustomClass
 
     // Warrior wiring (only class implemented so far).
     private bool _isWarrior;
-    private FurySettings _furySettings;
+    private WarriorSettings _warriorSettings;
     private ChoiceSetting _specSetting;
     private WarriorSpec? _activeSpec;
 
@@ -43,12 +43,12 @@ public class Main : ICustomClass
 
         if (_isWarrior)
         {
-            _furySettings = new FurySettings();
+            _warriorSettings = new WarriorSettings();
             _specSetting = new ChoiceSetting("spec", "Spec", WarriorSpecs.Auto, WarriorSpecs.Choices);
 
-            // Panel/persistence cover the spec selector plus the active spec's tunables.
+            // Panel/persistence cover the spec selector plus the shared warrior tunables.
             var list = new List<Setting> { _specSetting };
-            list.AddRange(_furySettings.All);
+            list.AddRange(_warriorSettings.All);
 
             string profile = ObjectManager.Me.Name;
             _store = new SettingsStore(string.IsNullOrEmpty(profile) ? "default" : profile, list);
@@ -58,7 +58,7 @@ public class Main : ICustomClass
 
             // Initial engine; Reconcile() in the loop swaps to the actually-resolved spec.
             _activeSpec = WarriorSpec.Fury;
-            _engine = new RotationEngine(new SoloFury(_furySettings).BuildSteps());
+            _engine = new RotationEngine(new SoloFury(_warriorSettings).BuildSteps());
             Logging.Write("[AIO3] Loaded: Warrior (spec auto-selected from talents; /aio3 to override).");
         }
         else
@@ -89,12 +89,9 @@ public class Main : ICustomClass
     {
         switch (spec)
         {
-            case WarriorSpec.Fury:
-                return new SoloFury(_furySettings);
-            default:
-                // Arms / Protection not implemented yet — fall back so the bot still functions.
-                Logging.Write($"[AIO3] {spec} rotation not implemented yet — using Solo Fury as fallback.");
-                return new SoloFury(_furySettings);
+            case WarriorSpec.Arms: return new SoloArms(_warriorSettings);
+            case WarriorSpec.Protection: return new SoloProtection(_warriorSettings);
+            default: return new SoloFury(_warriorSettings);
         }
     }
 
