@@ -24,6 +24,7 @@ namespace AIO3.Core.Dsl
         private Func<CombatContext, IWowUnit, bool> _when = (ctx, t) => true;
         private Exclusive _exclusive;
         private bool _ignoreGcd;
+        private int _recastDelayMs;
 
         public SpellStep(string spell) => _spell = spell;
 
@@ -39,6 +40,10 @@ namespace AIO3.Core.Dsl
         public SpellStep WithToken(Exclusive exclusive) { _exclusive = exclusive; return this; }
 
         public SpellStep OffGcd() { _ignoreGcd = true; return this; }
+
+        /// <summary>Throttle: once fired, don't fire again for <paramref name="ms"/> (e.g. Charge, so it
+        /// isn't re-issued every tick during its leap before the cooldown registers).</summary>
+        public SpellStep RecastDelay(int ms) { _recastDelayMs = ms; return this; }
 
         public RotationStep Build()
         {
@@ -58,7 +63,8 @@ namespace AIO3.Core.Dsl
                 },
                 action: (ctx, t) => ctx.Game.Cast(spell, t),
                 exclusive: _exclusive,
-                ignoreGcd: _ignoreGcd);
+                ignoreGcd: _ignoreGcd,
+                recastDelayMs: _recastDelayMs);
         }
 
         /// <summary>Implicit build so a SpellStep can be dropped straight into a step list.</summary>

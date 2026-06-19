@@ -19,9 +19,16 @@ namespace AIO3.Core.Rotations.Warrior
         public readonly IntSetting AoeThreshold =
             new IntSetting("aoeCount", "AoE: min enemies", value: 2, min: 2, max: 10, step: 1);
 
-        /// <summary>Use the Charge / Intercept gap-closers.</summary>
+        /// <summary>Combat distance reported to WRobot (ICustomClass.Range) — how close the bot stands to
+        /// the target. Tune if the bot ends up inside the mob instead of in front of it.</summary>
+        public readonly IntSetting CombatRange =
+            new IntSetting("combatRange", "Combat range (yd)", value: 5, min: 3, max: 15, step: 1);
+
+        /// <summary>Use the Charge / Intercept gap-closers. Off by default: Charge can interfere with the
+        /// product's own movement on engage (it aborts the fight on some setups). Enable to try it — it's
+        /// throttled so it isn't re-issued mid-leap.</summary>
         public readonly ToggleSetting UseGapClosers =
-            new ToggleSetting("useGapClosers", "Use Charge / Intercept", value: true);
+            new ToggleSetting("useGapClosers", "Use Charge / Intercept", value: false);
 
         /// <summary>Hamstring fleeing targets below 40% health.</summary>
         public readonly ToggleSetting UseHamstring =
@@ -61,6 +68,7 @@ namespace AIO3.Core.Rotations.Warrior
             // Tab assignment for the in-game overlay.
             HeroicStrikeRageReserve.Category = "Rotation";
             AoeThreshold.Category = "Rotation";
+            CombatRange.Category = "Rotation";
             AutoAssignTalents.Category = "Spec";
             UseGapClosers.Category = "General";
             UseHamstring.Category = "General";
@@ -72,7 +80,7 @@ namespace AIO3.Core.Rotations.Warrior
 
             _all = new Setting[]
             {
-                HeroicStrikeRageReserve, AoeThreshold, UseGapClosers, UseHamstring,
+                HeroicStrikeRageReserve, AoeThreshold, CombatRange, UseGapClosers, UseHamstring,
                 AutoAssignTalents, UseRacials, InterruptMode, UseTargetSelection,
                 UseCooldowns, EmergencyHealthPercent
             };

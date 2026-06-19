@@ -32,16 +32,21 @@ namespace AIO3.Core.Rotations.Warrior
                  .When(ctx => s.UseCooldowns.Value && ctx.HasEnemyTarget
                               && (ctx.Target.IsBoss() || ctx.Target.IsElite || ctx.EnemiesWithin(8f) >= 3)).OffGcd();
 
+        /// <summary>In-combat gap-closer (Berserker stance). The host only runs the rotation while the
+        /// product is fighting, so this closes distance during a committed fight, not during navigation.</summary>
         public static RotationStep Intercept(WarriorSettings s, float priority) =>
             Skill.Spell("Intercept").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => s.UseGapClosers.Value
-                              && ctx.Me.Rage > 10 && ctx.Target.Distance > 8f && ctx.Target.Distance <= 25f);
+                              && ctx.Me.Rage > 10 && ctx.Target.Distance > 8f && ctx.Target.Distance <= 25f)
+                 .RecastDelay(1000); // don't re-issue mid-leap (mirrors the old AIO's forcedTimerMS)
 
+        /// <summary>Opener gap-closer (Battle stance), used only until Intercept is learned.</summary>
         public static RotationStep Charge(WarriorSettings s, float priority) =>
             Skill.Spell("Charge").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => s.UseGapClosers.Value
                               && ctx.Target.Distance > 8f && ctx.Target.Distance <= 25f
-                              && !ctx.Game.IsSpellKnown("Intercept"));
+                              && !ctx.Game.IsSpellKnown("Intercept"))
+                 .RecastDelay(1000); // don't re-issue mid-leap (mirrors the old AIO's forcedTimerMS)
 
         /// <summary>Slow a fleeing humanoid below 40% (snare; humanoids are the ones that flee).</summary>
         public static RotationStep Hamstring(WarriorSettings s, float priority) =>

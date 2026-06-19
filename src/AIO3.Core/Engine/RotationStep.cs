@@ -17,6 +17,13 @@ namespace AIO3.Core.Engine
         private readonly Func<CombatContext, IWowUnit, bool> _condition;
         private readonly Func<CombatContext, IWowUnit, CastResult> _action;
 
+        // Optional per-step recast throttle (like the old AIO's forcedTimerMS): once this step fires, it
+        // won't fire again for _recastDelayMs. Prevents re-issuing a spell every tick while it resolves
+        // (e.g. Charge during its leap, before the cooldown registers — which fights WRobot's movement).
+        private readonly int _recastDelayMs;
+        private int _lastFiredTick;
+        private bool _hasFired;
+
         public string Name { get; }
         public float Priority { get; }
         public Exclusive Exclusive { get; }
@@ -31,7 +38,8 @@ namespace AIO3.Core.Engine
             Func<CombatContext, IWowUnit, bool> condition,
             Func<CombatContext, IWowUnit, CastResult> action,
             Exclusive exclusive = null,
-            bool ignoreGcd = false)
+            bool ignoreGcd = false,
+            int recastDelayMs = 0)
         {
             Name = name;
             Priority = priority;
@@ -40,6 +48,7 @@ namespace AIO3.Core.Engine
             _action = action;
             Exclusive = exclusive;
             IgnoreGcd = ignoreGcd;
+            _recastDelayMs = recastDelayMs;
         }
 
         /// <summary>
@@ -48,6 +57,11 @@ namespace AIO3.Core.Engine
         /// </summary>
         public bool TryExecute(CombatContext ctx, ExclusiveSet exclusives)
         {
+            // Recast throttle: skip while still within the cooldown window since this step last fired.
+            if (_recastDelayMs > 0 && _hasFired
+                && unchecked(Environment.TickCount - _lastFiredTick) < _recastDelayMs)
+                return false;
+
             foreach (IWowUnit target in _targets(ctx))
             {
                 if (target == null) continue;
@@ -61,7 +75,12 @@ namespace AIO3.Core.Engine
                 if (Exclusive != null) exclusives.Add(target, Exclusive);
 
                 CastResult result = _action(ctx, target);
-                if (result == CastResult.Success) return true;
+                if (result == CastResult.Success)
+                {
+                    _lastFiredTick = Environment.TickCount;
+                    _hasFired = true;
+                    return true;
+                }
 
                 // Cast did not go through — release the slot for other steps.
                 if (Exclusive != null) exclusives.Remove(target, Exclusive);

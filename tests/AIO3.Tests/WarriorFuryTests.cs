@@ -159,23 +159,42 @@ namespace AIO3.Tests
         [Fact]
         public void Charges_a_distant_target_when_Intercept_is_unlearned()
         {
+            var fs = new WarriorSettings();
+            fs.UseGapClosers.Value = true; // opt-in (off by default; Charge can fight the product's movement)
             FakeGameClient game = WarriorGame();
             game.TargetUnit.Distance = 15;
             // Only Charge is known (so Intercept counts as unlearned).
             game.KnownSpells.Add("Charge");
 
-            Assert.Equal("Charge", Fire(game)?.Name);
+            Assert.Equal("Charge", Fire(game, new SoloFury(fs))?.Name);
         }
 
         [Fact]
         public void Intercepts_a_distant_target_when_learned_and_rage_available()
         {
+            var fs = new WarriorSettings();
+            fs.UseGapClosers.Value = true;
             FakeGameClient game = WarriorGame();
             game.TargetUnit.Distance = 15;
             game.MeUnit.Rage = 50;
             game.KnownSpells.Add("Intercept"); // learned → Intercept wins over Charge
 
-            Assert.Equal("Intercept", Fire(game)?.Name);
+            Assert.Equal("Intercept", Fire(game, new SoloFury(fs))?.Name);
+        }
+
+        [Fact]
+        public void Charge_is_throttled_against_an_immediate_refire()
+        {
+            var fs = new WarriorSettings();
+            fs.UseGapClosers.Value = true;
+            FakeGameClient game = WarriorGame();
+            game.TargetUnit.Distance = 15;
+            game.KnownSpells.Add("Charge");
+
+            // Same engine across ticks so the step keeps its recast-throttle state.
+            var engine = new RotationEngine(new SoloFury(fs).BuildSteps());
+            Assert.Equal("Charge", engine.Tick(CombatContext.Capture(game))?.Name); // first fires
+            Assert.Null(engine.Tick(CombatContext.Capture(game)));                  // throttled within 1s
         }
 
         [Fact]
