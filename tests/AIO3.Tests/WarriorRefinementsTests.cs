@@ -1,6 +1,7 @@
 using AIO3.Core.Combat;
 using AIO3.Core.Engine;
 using AIO3.Core.Game;
+using AIO3.Core.Library;
 using AIO3.Core.Rotations.Warrior;
 using AIO3.Core.Testing;
 using Xunit;
@@ -72,6 +73,21 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Rend_refreshes_before_expiry_but_not_while_fresh()
+        {
+            FakeGameClient g = Game();
+            g.TargetUnit.CreatureType = "Beast";
+
+            // Fresh (plenty of time left) → don't refresh.
+            g.TargetUnit.WithAura("Rend", mine: true, timeLeftMs: 8000);
+            Assert.Null(Fire(g, WarriorCommon.Rend(1f)));
+
+            // About to expire → refresh.
+            g.TargetUnit.WithAura("Rend", mine: true, timeLeftMs: 1500);
+            Assert.Equal("Rend", Fire(g, WarriorCommon.Rend(1f))?.Name);
+        }
+
+        [Fact]
         public void Heroic_Strike_is_not_requeued_while_already_pending()
         {
             FakeGameClient g = Game();
@@ -82,6 +98,21 @@ namespace AIO3.Tests
 
             g.CurrentSpells.Add("Heroic Strike"); // already queued on next swing
             Assert.Null(Fire(g, hs));
+        }
+
+        [Fact]
+        public void MaintainMyDebuff_casts_when_missing_or_expiring_but_not_while_fresh()
+        {
+            FakeGameClient g = Game();
+            RotationStep step = CombatBlocks.MaintainMyDebuff("Rend", minMsLeft: 3000, priority: 1f);
+
+            Assert.Equal("Rend", Fire(g, step)?.Name); // missing
+
+            g.TargetUnit.WithAura("Rend", mine: true, timeLeftMs: 1000);
+            Assert.Equal("Rend", Fire(g, step)?.Name); // expiring
+
+            g.TargetUnit.WithAura("Rend", mine: true, timeLeftMs: 9000);
+            Assert.Null(Fire(g, step)); // fresh
         }
 
         [Fact]

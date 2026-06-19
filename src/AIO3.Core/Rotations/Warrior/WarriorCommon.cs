@@ -54,10 +54,10 @@ namespace AIO3.Core.Rotations.Warrior
         public static RotationStep VictoryRush(float priority) =>
             Skill.Spell("Victory Rush").Priority(priority).On(Targets.CurrentEnemy);
 
-        /// <summary>Keep Rend up — but not on bleed-immune creatures (Elemental/Mechanical).</summary>
+        /// <summary>Keep Rend up (refresh when under ~3s left) — but not on bleed-immune creatures.</summary>
         public static RotationStep Rend(float priority) =>
             Skill.Spell("Rend").Priority(priority).On(Targets.CurrentEnemy)
-                 .When(ctx => !ctx.Target.HasMyAura("Rend")
+                 .When(ctx => (!ctx.Target.HasMyAura("Rend") || ctx.Target.MyAuraTimeLeftMs("Rend") < 3000)
                               && ctx.Target.CreatureType != "Elemental"
                               && ctx.Target.CreatureType != "Mechanical");
 

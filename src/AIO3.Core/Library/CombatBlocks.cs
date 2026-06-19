@@ -60,6 +60,16 @@ namespace AIO3.Core.Library
                  .When(ctx => !ctx.Me.HasAura(spell) && !HasAnyAura(ctx, supersededBy))
                  .Build();
 
+        /// <summary>
+        /// Keep our own debuff up on the current enemy: cast when it is missing OR about to expire
+        /// (less than <paramref name="minMsLeft"/> remaining). Reusable by any DoT/debuff spec.
+        /// </summary>
+        public static RotationStep MaintainMyDebuff(string spell, int minMsLeft, float priority) =>
+            Skill.Spell(spell)
+                 .Priority(priority)
+                 .On(Targets.CurrentEnemy)
+                 .When(ctx => !ctx.Target.HasMyAura(spell) || ctx.Target.MyAuraTimeLeftMs(spell) < minMsLeft);
+
         private static bool HasAnyAura(CombatContext ctx, string[] names)
         {
             if (names == null) return false;

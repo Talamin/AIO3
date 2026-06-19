@@ -61,7 +61,7 @@ namespace AIO3.Tests
             FakeGameClient game = WarriorGame();
             game.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 6 });
             game.SpellsOnCooldown.Add("Victory Rush");
-            game.TargetUnit.WithAura("Rend", mine: true);
+            game.TargetUnit.WithAura("Rend", mine: true, timeLeftMs: 99999);
 
             RotationStep fired = Fire(game, new SoloFury(fs)); // only 2 enemies → below threshold
             Assert.NotEqual("Thunder Clap", fired?.Name);
@@ -194,7 +194,7 @@ namespace AIO3.Tests
             game.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 6 });
             // Neutralise the higher-priority single-target catches so AoE is reached.
             game.SpellsOnCooldown.Add("Victory Rush");
-            game.TargetUnit.WithAura("Rend", mine: true);
+            game.TargetUnit.WithAura("Rend", mine: true, timeLeftMs: 99999);
 
             Assert.Equal("Thunder Clap", Fire(game)?.Name);
         }
