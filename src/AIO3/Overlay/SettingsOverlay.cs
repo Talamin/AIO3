@@ -152,6 +152,36 @@ namespace AIO3.Overlay
             }
 
             sb.Append("showTab(\"").Append(Escape(order[0])).Append("\")\n");
+
+            // Start minimized; open via the minimap button (or /aio3). The minimap button is a standard
+            // Blizzard Button parented to the Minimap — an icon on the ring, draggable, with a tooltip,
+            // toggling the panel. Created once (guarded) so a product reload doesn't stack duplicates.
+            sb.Append(@"
+AIO3Frame:Hide()
+local function AIO3Toggle() if AIO3Frame:IsShown() then AIO3Frame:Hide() else AIO3Frame:Show() end end
+if Minimap and not AIO3MinimapButton then
+  local mb = CreateFrame(""Button"", ""AIO3MinimapButton"", Minimap)
+  mb:SetFrameStrata(""MEDIUM"") mb:SetFrameLevel(8) mb:SetWidth(31) mb:SetHeight(31)
+  mb:RegisterForClicks(""LeftButtonUp"") mb:RegisterForDrag(""LeftButton"")
+  local icon = mb:CreateTexture(nil, ""BACKGROUND"")
+  icon:SetTexture([[Interface\Icons\INV_Misc_Gear_01]])
+  icon:SetWidth(20) icon:SetHeight(20) icon:SetPoint(""CENTER"", 0, 1)
+  icon:SetTexCoord(0.07,0.93,0.07,0.93)
+  local border = mb:CreateTexture(nil, ""OVERLAY"")
+  border:SetWidth(53) border:SetHeight(53) border:SetPoint(""TOPLEFT"")
+  border:SetTexture([[Interface\Minimap\MiniMap-TrackingBorder]])
+  local angle = 200
+  local function place() local a = math.rad(angle) mb:SetPoint(""CENTER"", Minimap, ""CENTER"", 80*math.cos(a), 80*math.sin(a)) end
+  place()
+  mb:SetScript(""OnDragStart"", function() mb:SetScript(""OnUpdate"", function()
+    local mx, my = Minimap:GetCenter() local px, py = GetCursorPosition() local s = Minimap:GetEffectiveScale()
+    angle = math.deg(math.atan2(py/s - my, px/s - mx)) place() end) end)
+  mb:SetScript(""OnDragStop"", function() mb:SetScript(""OnUpdate"", nil) end)
+  mb:SetScript(""OnEnter"", function() GameTooltip:SetOwner(mb, ""ANCHOR_LEFT"") GameTooltip:AddLine(""AIO3"") GameTooltip:AddLine(""Click to open settings"", 1, 1, 1) GameTooltip:Show() end)
+  mb:SetScript(""OnLeave"", function() GameTooltip:Hide() end)
+  mb:SetScript(""OnClick"", AIO3Toggle)
+end
+");
             sb.Append("SLASH_AIO31=\"/aio3\" SlashCmdList[\"AIO3\"]=function() if AIO3Frame:IsShown() then AIO3Frame:Hide() else AIO3Frame:Show() end end\n");
             return sb.ToString();
         }

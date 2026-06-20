@@ -69,8 +69,9 @@ but **not** bundled (`Private=false`) and are resolved from the WRobot `Bin` fol
 ### In-game settings + spec selection
 
 - Settings are typed (`ToggleSetting`, `IntSetting`, `ChoiceSetting`) and exposed by each rotation.
-- `SettingsOverlay` auto-generates a movable WoW UI panel from that list (checkboxes, `[-]/[+]`,
-  cycle buttons) — adding a setting needs no UI code. Toggle the panel with **`/aio3`**.
+- `SettingsOverlay` auto-generates a dark, movable, tabbed WoW UI panel from that list (sliders,
+  checkboxes, cycle buttons) — adding a setting needs no UI code. It starts minimized; open it from a
+  draggable **minimap button** or with **`/aio3`**. Built with Blizzard's own UI, so no addon libraries.
 - Edits flow Lua → C# through a small `AIO3Bridge` table and take effect live; values are saved
   per character under `<WRobot>\Settings\AIO3\<Character>.conf`.
 - **Spec selection** combines talent auto-detection with a manual override (the `Spec` dropdown):
