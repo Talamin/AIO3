@@ -69,11 +69,10 @@ namespace AIO3.Core.Rotations.Warrior
             WarriorCommon.DemoralizingShout(_settings, priority: 6.8f),
 
             // --- threat / damage core (fills in with level) ---
-            // Shield Slam: fires on the Sword and Board proc and on cooldown (IsSpellReady gates it).
-            Skill.Spell("Shield Slam").Priority(7f).On(Targets.CurrentEnemy),
-            // Revenge: usable in its proc window (after block/dodge/parry); attempted off-cooldown and
-            // fails through harmlessly when the proc isn't up (IsSpellReady no longer checks usability).
-            Skill.Spell("Revenge").Priority(8f).On(Targets.CurrentEnemy),
+            // Shield Slam and Revenge are both cooldown strikes. With damage learning on, cast whichever
+            // hits harder on this server; otherwise the hand order (Shield Slam first) applies. Both are
+            // attempted off-cooldown and fail through harmlessly when not usable (e.g. Revenge's proc).
+            CombatBlocks.BestDamage(7f, ctx => _settings.UseDamageLearning.Value, "Shield Slam", "Revenge"),
             // Execute as a sub-20% finisher (cheap HP gate avoids wasted attempts).
             WarriorCommon.Execute(priority: 8.5f),
 

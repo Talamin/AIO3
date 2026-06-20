@@ -25,13 +25,18 @@ namespace AIO3.Core.Combat
         /// <summary>Shared interrupt learner (lives across ticks; supplied by the host).</summary>
         public InterruptTracker Interrupts { get; }
 
+        /// <summary>Shared damage learner (lives across ticks; supplied by the host). Used by the
+        /// BestDamage block to rank interchangeable strikes by learned damage.</summary>
+        public DamageTracker Damage { get; }
+
         public CombatContext(
             IGameClient game,
             IWowUnit me,
             IWowUnit target,
             IReadOnlyList<IWowUnit> enemies,
             IReadOnlyList<IWowUnit> party,
-            InterruptTracker interrupts = null)
+            InterruptTracker interrupts = null,
+            DamageTracker damage = null)
         {
             Game = game;
             Me = me;
@@ -39,16 +44,18 @@ namespace AIO3.Core.Combat
             Enemies = enemies;
             Party = party;
             Interrupts = interrupts ?? new InterruptTracker();
+            Damage = damage ?? new DamageTracker();
         }
 
         /// <summary>Take a snapshot of the current game state.</summary>
-        public static CombatContext Capture(IGameClient game, InterruptTracker interrupts = null) => new CombatContext(
+        public static CombatContext Capture(IGameClient game, InterruptTracker interrupts = null, DamageTracker damage = null) => new CombatContext(
             game,
             game.Me,
             game.Target,
             game.Enemies.ToArray(),
             game.Party.ToArray(),
-            interrupts);
+            interrupts,
+            damage);
 
         // --- shared, computed-once world facts ---
 

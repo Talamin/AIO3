@@ -112,6 +112,46 @@ namespace AIO3.Core.Library
             Skill.Spell(spell).Priority(priority).On(Targets.Self)
                  .When(ctx => enabled(ctx) && ctx.Game.PlayerInCombat && ctx.HasEnemyTarget).OffGcd();
 
+        // Minimum recorded hits before a candidate's learned damage is trusted (else it's explored).
+        private const int MinDamageSamples = 5;
+
+        /// <summary>
+        /// Cast the highest-damage ready strike among interchangeable <paramref name="candidates"/>, using
+        /// what the <see cref="DamageTracker"/> has learned. With <paramref name="useLearning"/> off it
+        /// falls back to the given (hand-tuned) order, so it is safe before any data exists. With learning
+        /// on, candidates with fewer than a handful of recorded hits are explored first (so every option
+        /// gets measured), then the best learned average per hit wins. List candidates highest-priority
+        /// first so the fallback order matches the intended hand priority.
+        /// </summary>
+        public static RotationStep BestDamage(float priority, Func<CombatContext, bool> useLearning, params string[] candidates) =>
+            new RotationStep(
+                name: "Best damage",
+                priority: priority,
+                targets: Targets.CurrentEnemy,
+                condition: (ctx, t) => Choose(ctx, useLearning, candidates) != null,
+                action: (ctx, t) =>
+                {
+                    string spell = Choose(ctx, useLearning, candidates);
+                    return spell != null ? ctx.Game.Cast(spell, t) : CastResult.Failed;
+                });
+
+        private static string Choose(CombatContext ctx, Func<CombatContext, bool> useLearning, string[] candidates)
+        {
+            bool learn = useLearning != null && useLearning(ctx);
+            string firstReady = null, best = null;
+            double bestDamage = -1;
+            foreach (string c in candidates)
+            {
+                if (!ctx.Game.IsSpellKnown(c) || !ctx.Game.IsSpellReady(c)) continue;
+                if (firstReady == null) firstReady = c;
+                if (!learn) continue;
+                if (ctx.Damage.HitCount(c) < MinDamageSamples) return c; // explore an unmeasured option
+                double d = ctx.Damage.AveragePerHit(c);
+                if (d > bestDamage) { bestDamage = d; best = c; }
+            }
+            return learn ? (best ?? firstReady) : firstReady;
+        }
+
         private static bool HasAnyAura(CombatContext ctx, string[] names)
         {
             if (names == null) return false;

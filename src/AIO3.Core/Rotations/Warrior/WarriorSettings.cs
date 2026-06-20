@@ -55,6 +55,11 @@ namespace AIO3.Core.Rotations.Warrior
         public readonly ToggleSetting AutoSwitchTarget =
             new ToggleSetting("targetSelect", "Auto target switching", value: false);
 
+        /// <summary>Let the learned per-ability damage (DamageTracker) choose between interchangeable
+        /// strikes (advisory). Off = use the hand-tuned order. Safe either way.</summary>
+        public readonly ToggleSetting UseDamageLearning =
+            new ToggleSetting("dmgLearn", "Use damage learning", value: false);
+
         /// <summary>Use major offensive cooldowns (e.g. Recklessness) on elites/bosses/packs.</summary>
         public readonly ToggleSetting UseCooldowns =
             new ToggleSetting("cooldowns", "Use cooldowns", value: true);
@@ -82,6 +87,7 @@ namespace AIO3.Core.Rotations.Warrior
             UseRacials.Category = "General";
             InterruptMode.Category = "General";
             AutoSwitchTarget.Category = "General";
+            UseDamageLearning.Category = "General";
             UseCooldowns.Category = "General";
             EmergencyHealthPercent.Category = "General";
             DebugProfiling.Category = "General";
@@ -89,7 +95,7 @@ namespace AIO3.Core.Rotations.Warrior
             _all = new Setting[]
             {
                 HeroicStrikeRageReserve, AoeThreshold, CombatRange, UseGapClosers, UseHamstring,
-                AutoAssignTalents, UseRacials, InterruptMode, AutoSwitchTarget,
+                AutoAssignTalents, UseRacials, InterruptMode, AutoSwitchTarget, UseDamageLearning,
                 UseCooldowns, EmergencyHealthPercent, DebugProfiling
             };
         }

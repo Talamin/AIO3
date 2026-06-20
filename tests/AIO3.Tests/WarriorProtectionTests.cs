@@ -53,8 +53,13 @@ namespace AIO3.Tests
         public void Shield_Slam_is_the_threat_core()
         {
             FakeGameClient game = ProtGame();
+            game.CastLog.Clear();
 
-            Assert.Equal("Shield Slam", Fire(game)?.Name);
+            // The threat core is now the BestDamage block; with damage learning off (default) it casts
+            // the hand-order first — Shield Slam.
+            Fire(game);
+
+            Assert.Contains("Shield Slam", game.CastLog);
         }
 
         [Fact]

@@ -105,6 +105,7 @@ A successful build copies `AIO3.dll` into the WRobot `FightClass` folder (overri
 See [ROADMAP.md](ROADMAP.md) for the class order (Warrior ✓ → Paladin → Hunter → Mage → Warlock → …)
 and the cross-cutting systems built alongside them. In progress:
 
-- **Empirical damage learning** — a combat-log-fed `DamageTracker` that learns per-ability damage. It is
-  in *measure-only* mode now (records + logs); next it becomes *advisory* — re-ordering the damage filler
-  and refining the target-selection time-to-kill estimate. The hand-tuned APL stays as the prior/fallback.
+- **Empirical damage learning** — a combat-log-fed `DamageTracker` learns per-ability damage. It both
+  *measures* (records + logs) and is now *advisory*: the `BestDamage` block picks the highest learned-
+  damage strike among interchangeable options (behind the "Use damage learning" toggle, hand order as the
+  fallback). Still to do: feed the learned damage into the target-selection time-to-kill estimate.

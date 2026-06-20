@@ -170,7 +170,7 @@ public class Main : ICustomClass
                 if (!mounted)
                 {
                     CombatContext ctx = null;
-                    _game.RunLocked(() => ctx = CombatContext.Capture(_game, _interrupts));
+                    _game.RunLocked(() => ctx = CombatContext.Capture(_game, _interrupts, _damageTracker));
 
                     if (ctx != null)
                     {
