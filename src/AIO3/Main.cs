@@ -124,6 +124,7 @@ public class Main : ICustomClass
         var overlayPoll = Stopwatch.StartNew();
         var reconcile = Stopwatch.StartNew();
         var talentTimer = Stopwatch.StartNew();
+        var profileTimer = Stopwatch.StartNew();
 
         while (!token.IsCancellationRequested)
         {
@@ -220,6 +221,16 @@ public class Main : ICustomClass
                 Logging.WriteError($"[AIO3] {e.Message}\n{e.StackTrace}");
             }
 
+            // Drain the engine's rolling timing every few seconds (resets the window even when not
+            // logging) and log it while the debug toggle is on — a dev aid to spot timing regressions.
+            if (profileTimer.ElapsedMilliseconds > 3000)
+            {
+                profileTimer.Restart();
+                string profile = _engine?.DrainProfile();
+                if (profile != null && _isWarrior && _warriorSettings.DebugProfiling.Value)
+                    Logging.Write($"[AIO3] perf: {profile}");
+            }
+
             // Sleep is at the end but ALWAYS reached (the old OOC spin-loop burned a core here).
             Thread.Sleep(50);
         }
@@ -233,6 +244,7 @@ public class Main : ICustomClass
             EventsLuaWithArgs.OnEventsLuaStringWithArgs -= _interruptLearner.OnCombatLog;
             _interruptLearner.Save();
         }
+        (_game as IDisposable)?.Dispose(); // unsubscribe the object-manager pulse handler
         Logging.Write("[AIO3] Disposed.");
     }
 

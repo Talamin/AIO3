@@ -61,6 +61,10 @@ namespace AIO3.Core.Rotations.Warrior
         public readonly IntSetting EmergencyHealthPercent =
             new IntSetting("emergencyHp", "Emergency item below HP%", value: 30, min: 0, max: 90, step: 5);
 
+        /// <summary>Dev aid: periodically log the rotation tick time + most expensive steps.</summary>
+        public readonly ToggleSetting DebugProfiling =
+            new ToggleSetting("debugPerf", "Log rotation timing", value: false);
+
         private readonly Setting[] _all;
 
         public WarriorSettings()
@@ -77,12 +81,13 @@ namespace AIO3.Core.Rotations.Warrior
             UseTargetSelection.Category = "General";
             UseCooldowns.Category = "General";
             EmergencyHealthPercent.Category = "General";
+            DebugProfiling.Category = "General";
 
             _all = new Setting[]
             {
                 HeroicStrikeRageReserve, AoeThreshold, CombatRange, UseGapClosers, UseHamstring,
                 AutoAssignTalents, UseRacials, InterruptMode, UseTargetSelection,
-                UseCooldowns, EmergencyHealthPercent
+                UseCooldowns, EmergencyHealthPercent, DebugProfiling
             };
         }
 

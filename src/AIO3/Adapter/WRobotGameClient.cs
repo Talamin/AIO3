@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using AIO3.Core.Game;
+using wManager.Events;
 using wManager.Wow.Class;
 using wManager.Wow.Helpers;
 using wManager.Wow.ObjectManager;
@@ -13,12 +15,72 @@ namespace AIO3.Adapter
     /// Layer 0 — the only class that talks to wManager. Implements <see cref="IGameClient"/>
     /// so everything above it stays WRobot-agnostic and testable.
     /// </summary>
-    internal sealed class WRobotGameClient : IGameClient
+    internal sealed class WRobotGameClient : IGameClient, IDisposable
     {
         private const float ScanRange = 50f;
 
         private readonly Dictionary<string, Spell> _spellCache = new Dictionary<string, Spell>();
         private readonly WRobotCooldowns _cooldowns = new WRobotCooldowns();
+
+        // Enemy/party lists are rebuilt on WRobot's ObjectManager pulse (~100ms) rather than every tick:
+        // the underlying unit data only refreshes on that pulse, so per-tick rebuilds were wasted work.
+        // The reference swap is atomic and the field is volatile, so the tick thread always reads a
+        // complete list. Wrappers are live, so unit properties (distance/auras) stay current between pulses.
+        private volatile IReadOnlyList<IWowUnit> _enemiesCache = Array.Empty<IWowUnit>();
+        private volatile IReadOnlyList<IWowUnit> _partyCache = Array.Empty<IWowUnit>();
+        private readonly Stopwatch _sinceRebuild = Stopwatch.StartNew();
+        private bool _rebuiltOnce;
+
+        public WRobotGameClient()
+        {
+            ObjectManagerEvents.OnObjectManagerPulsed += OnObjectManagerPulsed;
+        }
+
+        public void Dispose()
+        {
+            ObjectManagerEvents.OnObjectManagerPulsed -= OnObjectManagerPulsed;
+        }
+
+        // Runs on WRobot's object-manager thread after each pulse. Must never throw (would break the OM).
+        private void OnObjectManagerPulsed()
+        {
+            // Cap the rebuild rate in case the pulse is faster than ~100ms; no point going quicker.
+            if (_rebuiltOnce && _sinceRebuild.ElapsedMilliseconds < 80) return;
+            _sinceRebuild.Restart();
+            _rebuiltOnce = true;
+
+            try
+            {
+                var enemies = new List<IWowUnit>();
+                foreach (WoWUnit u in ObjectManager.GetObjectWoWUnit())
+                {
+                    if (u.IsValid && u.IsAlive && u.IsAttackable
+                        && u.Reaction <= WReaction.Neutral
+                        && u.GetDistance <= ScanRange)
+                    {
+                        enemies.Add(new WRobotUnit(u));
+                    }
+                }
+                _enemiesCache = enemies;
+
+                var me = ObjectManager.Me;
+                var party = new List<IWowUnit> { new WRobotUnit(me) };
+                // Raid-aware: GetParty() is 5-man only; use the raid roster when in a raid.
+                List<WoWPlayer> group = wManager.Wow.Helpers.Party.GetRaidMemberCount() > 0
+                    ? wManager.Wow.Helpers.Party.GetRaidMembers()
+                    : wManager.Wow.Helpers.Party.GetParty();
+                foreach (WoWPlayer p in group)
+                {
+                    if (p.Guid != me.Guid)
+                        party.Add(new WRobotUnit(p));
+                }
+                _partyCache = party;
+            }
+            catch
+            {
+                // Ignore a bad pulse (e.g. mid zone transition); the next pulse refreshes the lists.
+            }
+        }
 
         private Spell GetSpell(string name)
         {
@@ -55,42 +117,10 @@ namespace AIO3.Adapter
             }
         }
 
-        public IReadOnlyList<IWowUnit> Enemies
-        {
-            get
-            {
-                var result = new List<IWowUnit>();
-                foreach (WoWUnit u in ObjectManager.GetObjectWoWUnit())
-                {
-                    if (u.IsValid && u.IsAlive && u.IsAttackable
-                        && u.Reaction <= WReaction.Neutral
-                        && u.GetDistance <= ScanRange)
-                    {
-                        result.Add(new WRobotUnit(u));
-                    }
-                }
-                return result;
-            }
-        }
+        // Rebuilt on the object-manager pulse (see OnObjectManagerPulsed), not per tick.
+        public IReadOnlyList<IWowUnit> Enemies => _enemiesCache;
 
-        public IReadOnlyList<IWowUnit> Party
-        {
-            get
-            {
-                var me = ObjectManager.Me;
-                var result = new List<IWowUnit> { new WRobotUnit(me) };
-                // Raid-aware: GetParty() is 5-man only; use the raid roster when in a raid.
-                List<WoWPlayer> group = wManager.Wow.Helpers.Party.GetRaidMemberCount() > 0
-                    ? wManager.Wow.Helpers.Party.GetRaidMembers()
-                    : wManager.Wow.Helpers.Party.GetParty();
-                foreach (WoWPlayer p in group)
-                {
-                    if (p.Guid != me.Guid)
-                        result.Add(new WRobotUnit(p));
-                }
-                return result;
-            }
-        }
+        public IReadOnlyList<IWowUnit> Party => _partyCache;
 
         public bool IsSpellKnown(string spell) => GetSpell(spell).KnownSpell;
 
