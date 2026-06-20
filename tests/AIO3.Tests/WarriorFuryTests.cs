@@ -61,11 +61,12 @@ namespace AIO3.Tests
             FakeGameClient game = WarriorGame();
             game.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 6 });
             game.SpellsOnCooldown.Add("Victory Rush");
+            game.SpellsOnCooldown.Add("Whirlwind"); // Whirlwind is also a single-target filler; isolate the AoE-gated steps
             game.TargetUnit.WithAura("Rend", mine: true, timeLeftMs: 99999);
 
             RotationStep fired = Fire(game, new SoloFury(fs)); // only 2 enemies → below threshold
             Assert.NotEqual("Thunder Clap", fired?.Name);
-            Assert.NotEqual("Whirlwind", fired?.Name);
+            Assert.NotEqual("Piercing Howl", fired?.Name);
             Assert.NotEqual("Cleave", fired?.Name);
         }
 
@@ -135,7 +136,7 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Bloodthirst_fires_with_rage_and_below_80_percent_hp()
+        public void Bloodthirst_fires_with_rage_when_wounded()
         {
             FakeGameClient game = WarriorGame();
             game.MeUnit.Rage = 50;
@@ -145,28 +146,50 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Bloodthirst_is_skipped_at_full_hp_due_to_old_quirk()
+        public void Bloodthirst_fires_at_full_hp_with_rage()
         {
-            // Documents the suspicious <=80% gate carried over from the old rotation:
-            // at full health Bloodthirst is skipped, so the next step (Death Wish) wins.
+            // The old rotation gated Bloodthirst on HealthPercent <= 80 (a carried-over quirk that
+            // cost DPS at full health). With the gate removed it now fires on cooldown with rage,
+            // even at full health — it is Fury's top DPS strike and feeds the Bloodsurge proc.
             FakeGameClient game = WarriorGame();
             game.MeUnit.Rage = 50;
+            game.MeUnit.HealthPercent = 100;
+
+            Assert.Equal("Bloodthirst", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Bloodthirst_is_skipped_without_rage()
+        {
+            // Below the rage gate (> 30) Bloodthirst is held, so Death Wish (rage > 10) wins instead.
+            FakeGameClient game = WarriorGame();
+            game.MeUnit.Rage = 25;
             game.MeUnit.HealthPercent = 100;
 
             Assert.Equal("Death Wish", Fire(game)?.Name);
         }
 
         [Fact]
-        public void Charges_a_distant_target_when_Intercept_is_unlearned()
+        public void Charge_opener_dances_to_battle_stance_then_charges()
         {
             var fs = new WarriorSettings();
-            fs.UseGapClosers.Value = true; // opt-in (off by default; Charge can fight the product's movement)
-            FakeGameClient game = WarriorGame();
+            fs.UseGapClosers.Value = true; // opt-in (off by default)
+            FakeGameClient game = WarriorGame(); // Berserker stance (Fury home)
             game.TargetUnit.Distance = 15;
-            // Only Charge is known (so Intercept counts as unlearned).
-            game.KnownSpells.Add("Charge");
+            game.KnownSpells.Add("Charge"); // Intercept unlearned
 
-            Assert.Equal("Charge", Fire(game, new SoloFury(fs))?.Name);
+            var engine = new RotationEngine(new SoloFury(fs).BuildSteps());
+
+            // Not in Battle Stance yet → the dance switches to Battle Stance first (it doesn't Charge).
+            Assert.Equal("Charge", engine.Tick(CombatContext.Capture(game))?.Name);
+            Assert.Contains("Battle Stance", game.CastLog);
+            Assert.DoesNotContain("Charge", game.CastLog);
+
+            // Now in Battle Stance → it actually Charges (and out-prioritises EnsureStance reverting).
+            game.StanceName = "Battle Stance";
+            game.CastLog.Clear();
+            engine.Tick(CombatContext.Capture(game));
+            Assert.Contains("Charge", game.CastLog);
         }
 
         [Fact]
@@ -183,18 +206,19 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Charge_is_throttled_against_an_immediate_refire()
+        public void Intercept_is_throttled_against_an_immediate_refire()
         {
             var fs = new WarriorSettings();
             fs.UseGapClosers.Value = true;
             FakeGameClient game = WarriorGame();
             game.TargetUnit.Distance = 15;
-            game.KnownSpells.Add("Charge");
+            game.MeUnit.Rage = 50;
+            game.KnownSpells.Add("Intercept");
 
             // Same engine across ticks so the step keeps its recast-throttle state.
             var engine = new RotationEngine(new SoloFury(fs).BuildSteps());
-            Assert.Equal("Charge", engine.Tick(CombatContext.Capture(game))?.Name); // first fires
-            Assert.Null(engine.Tick(CombatContext.Capture(game)));                  // throttled within 1s
+            Assert.Equal("Intercept", engine.Tick(CombatContext.Capture(game))?.Name); // first fires
+            Assert.Null(engine.Tick(CombatContext.Capture(game)));                      // throttled within 1s
         }
 
         [Fact]
@@ -211,11 +235,48 @@ namespace AIO3.Tests
         {
             FakeGameClient game = WarriorGame();
             game.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 6 });
-            // Neutralise the higher-priority single-target catches so AoE is reached.
+            // Neutralise the higher-priority single-target catches (incl. Whirlwind filler) so AoE is reached.
+            game.SpellsOnCooldown.Add("Victory Rush");
+            game.SpellsOnCooldown.Add("Whirlwind");
+            game.TargetUnit.WithAura("Rend", mine: true, timeLeftMs: 99999);
+            game.TargetUnit.WithAura("Demoralizing Shout"); // already debuffed → don't pre-empt with the shout
+
+            Assert.Equal("Thunder Clap", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Whirlwind_is_a_single_target_filler()
+        {
+            // No proc/strike up and no rage for Bloodthirst/Death Wish → Whirlwind fills the gap,
+            // even against a lone target (it is a solid instant on its own cooldown).
+            FakeGameClient game = WarriorGame();
+            game.SpellsOnCooldown.Add("Bloodthirst");
             game.SpellsOnCooldown.Add("Victory Rush");
             game.TargetUnit.WithAura("Rend", mine: true, timeLeftMs: 99999);
 
-            Assert.Equal("Thunder Clap", Fire(game)?.Name);
+            Assert.Equal("Whirlwind", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Demoralizing_Shout_fires_on_an_elite_when_missing()
+        {
+            // Free the higher-priority strikes/cooldowns so the survival-debuff slot is reached.
+            FakeGameClient game = WarriorGame();
+            game.SpellsOnCooldown.Add("Bloodthirst");
+            game.SpellsOnCooldown.Add("Recklessness"); // elite would otherwise trigger the DPS cooldown first
+            game.TargetUnit.IsElite = true;
+
+            Assert.Equal("Demoralizing Shout", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Demoralizing_Shout_is_skipped_on_lone_trash()
+        {
+            // Single non-elite, non-boss below the AoE threshold → not worth a global.
+            FakeGameClient game = WarriorGame();
+            game.SpellsOnCooldown.Add("Bloodthirst");
+
+            Assert.NotEqual("Demoralizing Shout", Fire(game)?.Name);
         }
 
         [Fact]

@@ -40,13 +40,30 @@ namespace AIO3.Core.Rotations.Warrior
                               && ctx.Me.Rage > 10 && ctx.Target.Distance > 8f && ctx.Target.Distance <= 25f)
                  .RecastDelay(1000); // don't re-issue mid-leap (mirrors the old AIO's forcedTimerMS)
 
-        /// <summary>Opener gap-closer (Battle stance), used only until Intercept is learned.</summary>
-        public static RotationStep Charge(WarriorSettings s, float priority) =>
-            Skill.Spell("Charge").Priority(priority).On(Targets.CurrentEnemy)
-                 .When(ctx => s.UseGapClosers.Value
-                              && ctx.Target.Distance > 8f && ctx.Target.Distance <= 25f
-                              && !ctx.Game.IsSpellKnown("Intercept"))
-                 .RecastDelay(1000); // don't re-issue mid-leap (mirrors the old AIO's forcedTimerMS)
+        /// <summary>
+        /// Opener gap-closer (Battle stance), used only until Intercept is learned — with a stance dance:
+        /// Charge requires Battle Stance, so if we're in another stance we switch to Battle first, then
+        /// Charge; EnsureStance restores our home stance on the next tick (once Charge is on cooldown /
+        /// we're in combat, this step goes quiet). Stateless: the dance ends on its own via the range /
+        /// in-combat / cooldown gates. MUST sit at a HIGHER priority than EnsureStance (smaller number)
+        /// so EnsureStance doesn't revert the stance mid-dance.
+        /// </summary>
+        public static RotationStep ChargeWithStanceDance(WarriorSettings s, float priority) =>
+            new RotationStep(
+                name: "Charge",
+                priority: priority,
+                targets: Targets.CurrentEnemy,
+                condition: (ctx, t) =>
+                    s.UseGapClosers.Value
+                    && !ctx.Game.PlayerInCombat                // Charge is an out-of-combat opener
+                    && !ctx.Game.IsSpellKnown("Intercept")     // Intercept replaces Charge once learned
+                    && ctx.Game.IsSpellReady("Charge")         // also ends the dance once Charge goes on cooldown
+                    && t.Distance > 8f && t.Distance <= 25f,
+                action: (ctx, t) =>
+                    ctx.Game.ActiveStanceName != "Battle Stance"
+                        ? ctx.Game.Cast("Battle Stance", ctx.Me)   // stance dance: switch to Battle first...
+                        : ctx.Game.Cast("Charge", t),               // ...then Charge
+                ignoreGcd: true);
 
         /// <summary>Slow a fleeing humanoid below 40% (snare; humanoids are the ones that flee).</summary>
         public static RotationStep Hamstring(WarriorSettings s, float priority) =>
@@ -60,6 +77,21 @@ namespace AIO3.Core.Rotations.Warrior
         public static RotationStep Execute(float priority) =>
             Skill.Spell("Execute").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.HealthPercent < 20);
+
+        /// <summary>
+        /// Demoralizing Shout: enemy attack-power reduction (survival). Self-cast AoE debuff, so it is
+        /// gated on the current target to avoid spamming: only refresh when the target is missing it
+        /// (neither Demoralizing Shout nor the druid Demoralizing Roar) and is durable enough to be
+        /// worth a global — a tougher fight (elite/boss) or a pack. Trash that dies in a few swings
+        /// isn't worth the rage/GCD.
+        /// </summary>
+        public static RotationStep DemoralizingShout(WarriorSettings s, float priority) =>
+            Skill.Spell("Demoralizing Shout").Priority(priority).On(Targets.Self)
+                 .When(ctx => ctx.HasEnemyTarget
+                              && !ctx.Target.HasAura("Demoralizing Shout")
+                              && !ctx.Target.HasAura("Demoralizing Roar")
+                              && (ctx.Target.IsBoss() || ctx.Target.IsElite
+                                  || ctx.EnemiesWithin(10f) >= s.AoeThreshold.Value));
 
         /// <summary>Usable only after a killing blow; IsSpellReady gates the proc window.</summary>
         public static RotationStep VictoryRush(float priority) =>

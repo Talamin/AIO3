@@ -8,9 +8,14 @@ using AIO3.Core.Settings;
 namespace AIO3.Core.Rotations.Warrior
 {
     /// <summary>
-    /// Solo Arms warrior. Mortal Strike is the signature ability; Overpower fires on its proc
-    /// window (gated by IsSpellUsable). Composes the shared WarriorCommon blocks. Ported from the
-    /// old Combat/Warrior/SoloArms.cs (boss/spread-Rend specifics deferred).
+    /// Solo Arms warrior (leveling/grinding, 10-80). Battle-stance burst: Mortal Strike is the
+    /// signature strike, Overpower fires in its proc window, Rend keeps the bleed up and Slam fills
+    /// the gaps; Sweeping Strikes + Whirlwind / Bladestorm cleave a pack. Thin: composes the shared
+    /// <see cref="WarriorCommon"/> / Layer 3 blocks and adds only the Arms-specific filler in priority
+    /// order. Ported from the old Combat/Warrior/SoloArms.cs (boss/spread-Rend specifics deferred).
+    ///
+    /// Unknown/unusable spells are skipped automatically (IsSpellKnown), so this single priority list
+    /// fills in as the player levels — list high-level abilities freely; they simply don't fire yet.
     /// </summary>
     public sealed class SoloArms : IRotation
     {
@@ -35,6 +40,9 @@ namespace AIO3.Core.Rotations.Warrior
             WarriorCommon.Recklessness(_settings, priority: 4.3f),
 
             // --- baseline / upkeep ---
+            // Charge opener with a stance dance (Arms' home is already Battle Stance, so it charges
+            // directly; only active out of combat at range while gap-closers are enabled).
+            WarriorCommon.ChargeWithStanceDance(_settings, priority: 0.08f),
             WarriorCommon.EnsureStance("Battle Stance", priority: 0.1f),
             CombatBlocks.AutoAttack(priority: 1f),
             CombatBlocks.Interrupt("Pummel", priority: 2f, mode: ctx => _settings.InterruptMode.Value),
@@ -43,27 +51,36 @@ namespace AIO3.Core.Rotations.Warrior
             CombatBlocks.DefensiveBelow("Enraged Regeneration", healthPercent: 50, priority: 4.5f),
             WarriorCommon.Bloodrage(priority: 5f),
 
+            // --- survival debuff: enemy attack-power reduction on tougher fights / packs ---
+            WarriorCommon.DemoralizingShout(_settings, priority: 5.5f),
+
             // --- single target ---
-            // Overpower: usable only in its proc window (after a dodge / Taste for Blood).
-            Skill.Spell("Overpower").Priority(6f).On(Targets.CurrentEnemy),
-            WarriorCommon.Execute(priority: 7f),
+            // Execute: cheap sub-20% finisher (HP gate avoids wasted attempts).
+            WarriorCommon.Execute(priority: 6f),
             // Mortal Strike: the Arms core strike, on cooldown.
-            Skill.Spell("Mortal Strike").Priority(8f).On(Targets.CurrentEnemy),
+            Skill.Spell("Mortal Strike").Priority(7f).On(Targets.CurrentEnemy),
+            // Overpower: usable only in its proc window (after a dodge / Taste for Blood). Attempted
+            // off-cooldown and fails through harmlessly when the proc isn't up — IsSpellReady checks
+            // known + off-cooldown only, not usability, so no Lua/usable gate is needed here.
+            Skill.Spell("Overpower").Priority(8f).On(Targets.CurrentEnemy),
             WarriorCommon.Rend(priority: 9f),
             WarriorCommon.VictoryRush(priority: 10f),
             // Slam filler when we have spare rage (cast-while-moving is blocked by the adapter).
             Skill.Spell("Slam").Priority(11f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Me.Rage > 20),
 
-            // --- gap-closers + utility ---
+            // --- gap-closers + utility (Charge opener handled high up via the stance dance) ---
             WarriorCommon.Intercept(_settings, priority: 12f),
-            WarriorCommon.Charge(_settings, priority: 13f),
             WarriorCommon.Hamstring(_settings, priority: 13.5f),
 
-            // --- AoE ---
+            // --- AoE (>= AoeThreshold enemies within 10y) ---
+            // Sweeping Strikes (off the GCD) so the next strikes/Whirlwind cleave a second target.
             Skill.Spell("Sweeping Strikes").Priority(14f).On(Targets.Self)
                  .When(ctx => ctx.EnemiesWithin(10f) >= _settings.AoeThreshold.Value).OffGcd(),
             Skill.Spell("Bladestorm").Priority(15f).On(Targets.CurrentEnemy)
+                 .When(ctx => ctx.EnemiesWithin(10f) >= _settings.AoeThreshold.Value),
+            // Whirlwind: Arms' instant cleave, paired with Sweeping Strikes for an extra target.
+            Skill.Spell("Whirlwind").Priority(15.5f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.EnemiesWithin(10f) >= _settings.AoeThreshold.Value),
             Skill.Spell("Thunder Clap").Priority(16f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.EnemiesWithin(10f) >= _settings.AoeThreshold.Value),
