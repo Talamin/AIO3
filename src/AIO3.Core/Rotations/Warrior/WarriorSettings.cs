@@ -47,11 +47,13 @@ namespace AIO3.Core.Rotations.Warrior
         public readonly ChoiceSetting InterruptMode =
             new ChoiceSetting("interrupt", "Interrupt", InterruptModes.Smart, InterruptModes.All);
 
-        /// <summary>Manage adds when fighting several enemies (switch to an attacker if the current
-        /// target isn't one). Never pulls or starts a fight — the product owns the opener. Off by
-        /// default so it does not fight a WRobot product that already owns target selection.</summary>
-        public readonly ToggleSetting UseTargetSelection =
-            new ToggleSetting("targetSelect", "Manage adds (multi-target)", value: false);
+        /// <summary>Auto target switching: when several enemies are attacking, switch the current target
+        /// to an attacker if it isn't already one. This is ONLY about which target we hit — it never
+        /// pulls or starts a fight (the product owns the opener). Off by default so it doesn't fight a
+        /// product that owns targeting. NOTE: other multi-enemy concerns (multi-target damage, defending
+        /// against several attackers) will become their own separate settings later.</summary>
+        public readonly ToggleSetting AutoSwitchTarget =
+            new ToggleSetting("targetSelect", "Auto target switching", value: false);
 
         /// <summary>Use major offensive cooldowns (e.g. Recklessness) on elites/bosses/packs.</summary>
         public readonly ToggleSetting UseCooldowns =
@@ -78,7 +80,7 @@ namespace AIO3.Core.Rotations.Warrior
             UseHamstring.Category = "General";
             UseRacials.Category = "General";
             InterruptMode.Category = "General";
-            UseTargetSelection.Category = "General";
+            AutoSwitchTarget.Category = "General";
             UseCooldowns.Category = "General";
             EmergencyHealthPercent.Category = "General";
             DebugProfiling.Category = "General";
@@ -86,7 +88,7 @@ namespace AIO3.Core.Rotations.Warrior
             _all = new Setting[]
             {
                 HeroicStrikeRageReserve, AoeThreshold, CombatRange, UseGapClosers, UseHamstring,
-                AutoAssignTalents, UseRacials, InterruptMode, UseTargetSelection,
+                AutoAssignTalents, UseRacials, InterruptMode, AutoSwitchTarget,
                 UseCooldowns, EmergencyHealthPercent, DebugProfiling
             };
         }

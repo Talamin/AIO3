@@ -167,8 +167,8 @@ public class Main : ICustomClass
 
                     if (ctx != null)
                     {
-                        // Optional add-management only (off by default; never pulls — product owns the opener).
-                        if (_isWarrior && _warriorSettings.UseTargetSelection.Value)
+                        // Optional auto target-switching only (off by default; never pulls — product owns the opener).
+                        if (_isWarrior && _warriorSettings.AutoSwitchTarget.Value)
                         {
                             IWowUnit desired = TargetSelector.Pick(ctx);
                             if (desired != null && (ctx.Target == null || desired.Guid != ctx.Target.Guid))
