@@ -4,9 +4,10 @@ AIO3 is a ground-up rework of the [Talamin/AIO-Public](https://github.com/Talami
 WRobot fightclass. It keeps the proven **Action Priority List (APL)** model from the original
 but rebuilds the foundation to be **layered, testable, and configurable in-game**.
 
-> Status: early but functional. The Warrior **Solo Fury** rotation runs end-to-end in-game,
-> with an in-game settings overlay, per-character persistence, and runtime spec selection.
-> Other classes/specs are not implemented yet.
+> Status: functional and in active use. All three **Warrior** solo specs — **Fury, Arms, Protection** —
+> run end-to-end in-game as full leveling APLs (10–80), with talent auto-assign, an in-game settings
+> overlay, per-character persistence, runtime spec selection, empirical interrupt learning, and a tuned
+> performance path. Other classes are not implemented yet (the foundation is built to add them).
 
 ## Design goals
 
@@ -14,10 +15,28 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
   condition holds and whose target is valid casts. This matches how WoW rotations are reasoned about.
 - **One hard boundary** — only a single adapter touches the WRobot API; everything above it is
   WRobot-agnostic and unit-testable offline. The boundary is *compiler-enforced* (see below).
-- **No drift** — cross-cutting behaviour (interrupts, defensives, buffs, auto-attack, gap-closers)
-  lives in a shared library that every spec composes, instead of being copy-pasted per spec.
+- **No drift** — cross-cutting behaviour (interrupts, defensives, buffs, auto-attack, gap-closers,
+  Demoralizing Shout) lives in a shared library that every spec composes, instead of being copy-pasted.
 - **Configure in-game** — settings are typed objects rendered as a clickable WoW UI panel (`/aio3`),
   edited live, and persisted per character.
+- **Coexist with WRobot products** — any behaviour a product might also do (target selection, interrupts)
+  is disableable via a setting so the fightclass and the product never fight each other.
+- **Trust measurement over assumptions** — on a private server the API can lie (e.g. the "interruptible"
+  flag). Where it matters, AIO3 *learns from the combat log* instead of trusting the flag.
+
+## What's implemented
+
+- **Warrior — Fury / Arms / Protection**, each a single solo leveling APL that fills in as you level
+  (unknown spells auto-skip). Talent points are auto-assigned per spec out of combat.
+- **Interrupts** — `Smart` / `Always` / `Never`. `Smart` empirically learns which casts are actually
+  (non-)interruptible from the combat log and persists that per character (the API flag is unreliable).
+- **Target selection ("Manage adds")** — optional, **off by default**. Only re-targets among enemies
+  already attacking you and only with several of them — it never pulls or starts a fight (the product
+  owns the opener).
+- **Performance** — cooldowns/GCD are read in one memory pass per tick (not a slow API call per spell);
+  the enemy/party lists are rebuilt on the object-manager pulse, not per tick; the WRobot frame lock is
+  held only around the unit snapshot. A toggle logs per-tick / per-step timing for development.
+- **Content** — the curated boss list is ported from the old project.
 
 ## Architecture
 
@@ -80,7 +99,10 @@ A successful build copies `AIO3.dll` into the WRobot `FightClass` folder (overri
 
 ## Roadmap
 
-- Warrior: Arms and Protection specs; settings-gated utilities (Hamstring, Piercing Howl).
-- Port curated content from the old project (boss list, talent builds, important debuffs).
-- More classes/specs; richer shared library (cooldowns, time-to-die, incoming damage).
-- CI (build + tests) and distributing the compiled DLL via GitHub Releases.
+- **Empirical damage learning** — a combat-log-fed `DamageTracker` that learns damage-per-GCD / -per-rage
+  per ability and lets it re-order the damage filler (the hand-tuned APL stays as the prior/fallback).
+- **More classes** — starting with a DoT/caster class (Warlock/Priest); the engine already targets
+  multiple enemies and the adapter can cast on a secondary target, so a `SpreadDot` shared block is the
+  main missing piece. Caster-first add selection is a small follow-up.
+- Port more curated content from the old project (important debuffs, dispels, special spells).
+- Richer shared library (time-to-die, incoming damage); CI (build + tests) and DLL releases.
