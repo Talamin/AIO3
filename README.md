@@ -102,10 +102,9 @@ A successful build copies `AIO3.dll` into the WRobot `FightClass` folder (overri
 
 ## Roadmap
 
-- **Empirical damage learning** — a combat-log-fed `DamageTracker` that learns damage-per-GCD / -per-rage
-  per ability and lets it re-order the damage filler (the hand-tuned APL stays as the prior/fallback).
-- **More classes** — starting with a DoT/caster class (Warlock/Priest); the engine already targets
-  multiple enemies and the adapter can cast on a secondary target, so a `SpreadDot` shared block is the
-  main missing piece. Caster-first add selection is a small follow-up.
-- Port more curated content from the old project (important debuffs, dispels, special spells).
-- Richer shared library (time-to-die, incoming damage); CI (build + tests) and DLL releases.
+See [ROADMAP.md](ROADMAP.md) for the class order (Warrior ✓ → Paladin → Hunter → Mage → Warlock → …)
+and the cross-cutting systems built alongside them. In progress:
+
+- **Empirical damage learning** — a combat-log-fed `DamageTracker` that learns per-ability damage. It is
+  in *measure-only* mode now (records + logs); next it becomes *advisory* — re-ordering the damage filler
+  and refining the target-selection time-to-kill estimate. The hand-tuned APL stays as the prior/fallback.
