@@ -43,6 +43,7 @@ public class Main : ICustomClass
     private WarriorSettings _warriorSettings;
     private ChoiceSetting _specSetting;
     private WarriorSpec? _activeSpec;
+    private string _activeMode;
 
     // Combat distance reported to WRobot. Tunable live via the warrior settings so we can dial in the
     // melee stop distance (default 5, same as the old AIO). Falls back to 5 before settings exist.
@@ -99,22 +100,28 @@ public class Main : ICustomClass
         Task.Factory.StartNew(() => Loop(_cts.Token), _cts.Token);
     }
 
-    /// <summary>Resolve the desired warrior spec (override or talent auto-detect) and swap the engine if it changed.</summary>
+    /// <summary>Resolve the desired warrior spec + mode (Solo/Group) and swap the engine if either changed.</summary>
     private void Reconcile()
     {
         if (!_isWarrior) return;
 
         WarriorSpec desired = WarriorSpecs.Resolve(_specSetting.Value, _game.HighestTalentTab);
-        if (_activeSpec == desired) return;
+        string mode = _warriorSettings.ContentMode.Value;
+        if (_activeSpec == desired && _activeMode == mode) return;
         _activeSpec = desired;
+        _activeMode = mode;
 
-        IRotation rotation = BuildWarriorRotation(desired);
+        IRotation rotation = BuildWarriorRotation(desired, mode);
         _engine = new RotationEngine(rotation.BuildSteps());
-        Logging.Write($"[AIO3] Active spec: {desired} ({rotation.Name})");
+        Logging.Write($"[AIO3] Active: {mode} {desired} ({rotation.Name})");
     }
 
-    private IRotation BuildWarriorRotation(WarriorSpec spec)
+    private IRotation BuildWarriorRotation(WarriorSpec spec, string mode)
     {
+        // Only Solo rotations exist today; Group is a UI placeholder that falls back to Solo for now.
+        if (mode == "Group")
+            Logging.Write("[AIO3] Group rotations aren't implemented yet — running the Solo rotation.");
+
         switch (spec)
         {
             case WarriorSpec.Arms: return new SoloArms(_warriorSettings);

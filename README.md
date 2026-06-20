@@ -77,7 +77,8 @@ but **not** bundled (`Private=false`) and are resolved from the WRobot `Bin` fol
   per character under `<WRobot>\Settings\AIO3\<Character>.conf`.
 - **Spec selection** combines talent auto-detection with a manual override (the `Spec` dropdown):
   `Auto` picks the spec from the highest talent tree; below level 10 it falls back to a sensible
-  default. The active rotation is swapped at runtime when the spec changes.
+  default. A `Mode` selector (Solo / Group) chooses the rotation set — only Solo exists today; Group is
+  a placeholder for later. The active rotation is swapped at runtime when the spec or mode changes.
 
 ## Project layout
 

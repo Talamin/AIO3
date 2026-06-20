@@ -34,6 +34,11 @@ namespace AIO3.Core.Rotations.Warrior
         public readonly ToggleSetting UseHamstring =
             new ToggleSetting("hamstring", "Hamstring fleeing targets", value: true);
 
+        /// <summary>Which rotation set to run. Only Solo (questing/grinding) exists today; Group is here so
+        /// the selector is ready when group/dungeon rotations are added (it falls back to Solo until then).</summary>
+        public readonly ChoiceSetting ContentMode =
+            new ChoiceSetting("mode", "Mode", "Solo", new[] { "Solo", "Group" });
+
         /// <summary>Automatically spend talent points using the active spec's default build.</summary>
         public readonly ToggleSetting AutoAssignTalents =
             new ToggleSetting("autoTalents", "Auto-assign talents", value: true);
@@ -81,6 +86,7 @@ namespace AIO3.Core.Rotations.Warrior
             HeroicStrikeRageReserve.Category = "Rotation";
             AoeThreshold.Category = "Rotation";
             CombatRange.Category = "Rotation";
+            ContentMode.Category = "Spec";
             AutoAssignTalents.Category = "Spec";
             UseGapClosers.Category = "General";
             UseHamstring.Category = "General";
@@ -95,8 +101,8 @@ namespace AIO3.Core.Rotations.Warrior
             _all = new Setting[]
             {
                 HeroicStrikeRageReserve, AoeThreshold, CombatRange, UseGapClosers, UseHamstring,
-                AutoAssignTalents, UseRacials, InterruptMode, AutoSwitchTarget, UseDamageLearning,
-                UseCooldowns, EmergencyHealthPercent, DebugProfiling
+                ContentMode, AutoAssignTalents, UseRacials, InterruptMode, AutoSwitchTarget,
+                UseDamageLearning, UseCooldowns, EmergencyHealthPercent, DebugProfiling
             };
         }
 
