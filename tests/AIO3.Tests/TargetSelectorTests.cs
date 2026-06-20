@@ -7,12 +7,12 @@ namespace AIO3.Tests
 {
     public class TargetSelectorTests
     {
-        private static FakeUnit Enemy(ulong guid, float distance, bool targetingMe = false) => new FakeUnit
+        private static FakeUnit Enemy(ulong guid, float distance, bool targetingMe = false, double hp = 100) => new FakeUnit
         {
             Guid = guid,
             Reaction = Reaction.Hostile,
             IsAttackable = true,
-            HealthPercent = 100,
+            HealthPercent = hp,
             Distance = distance,
             IsTargetingMe = targetingMe
         };
@@ -79,6 +79,45 @@ namespace AIO3.Tests
             g.EnemyList.Add(a);
 
             Assert.Same(a, Pick(g));
+        }
+
+        [Fact]
+        public void Switches_to_a_much_lower_health_attacker_in_melee()
+        {
+            // Both in melee (no travel cost) → the one that dies sooner (low health) wins.
+            var g = new FakeGameClient();
+            g.TargetUnit = Enemy(1, distance: 5, targetingMe: true, hp: 80);
+            FakeUnit dying = Enemy(2, distance: 5, targetingMe: true, hp: 20);
+            g.EnemyList.Add(g.TargetUnit);
+            g.EnemyList.Add(dying);
+
+            Assert.Same(dying, Pick(g));
+        }
+
+        [Fact]
+        public void Does_not_thrash_for_a_marginally_lower_health_target()
+        {
+            // 50% vs 45% in melee — too close to be worth switching (hysteresis), so keep the current.
+            var g = new FakeGameClient();
+            g.TargetUnit = Enemy(1, distance: 5, targetingMe: true, hp: 50);
+            g.EnemyList.Add(g.TargetUnit);
+            g.EnemyList.Add(Enemy(2, distance: 5, targetingMe: true, hp: 45));
+
+            Assert.Null(Pick(g));
+        }
+
+        [Fact]
+        public void Keeps_a_nearer_target_when_the_run_up_to_a_low_health_one_costs_more()
+        {
+            // No current target; a 60%-health attacker in melee vs a 20%-health one 30y away. The run-up
+            // (no damage dealt while closing) makes the near one die sooner overall → pick it.
+            var g = new FakeGameClient();
+            FakeUnit near = Enemy(1, distance: 5, targetingMe: true, hp: 60);
+            FakeUnit farDying = Enemy(2, distance: 30, targetingMe: true, hp: 20);
+            g.EnemyList.Add(near);
+            g.EnemyList.Add(farDying);
+
+            Assert.Same(near, Pick(g));
         }
 
         [Fact]

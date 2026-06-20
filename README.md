@@ -30,9 +30,10 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
   (unknown spells auto-skip). Talent points are auto-assigned per spec out of combat.
 - **Interrupts** — `Smart` / `Always` / `Never`. `Smart` empirically learns which casts are actually
   (non-)interruptible from the combat log and persists that per character (the API flag is unreliable).
-- **Target selection ("Manage adds")** — optional, **off by default**. Only re-targets among enemies
-  already attacking you and only with several of them — it never pulls or starts a fight (the product
-  owns the opener).
+- **Auto target switching** — optional, **off by default**. Among enemies already attacking you (it
+  never pulls — the product owns the opener, and it only acts with several attackers), it focuses the
+  one with the lowest estimated *time-to-kill* (low health wins, minus the run-up cost of distant
+  targets), with hysteresis to avoid thrashing. Casters are handled by the interrupt system.
 - **Performance** — cooldowns/GCD are read in one memory pass per tick (not a slow API call per spell);
   the enemy/party lists are rebuilt on the object-manager pulse, not per tick; the WRobot frame lock is
   held only around the unit snapshot; and the handful of per-tick Lua reads (stance, auto-attack,
