@@ -33,6 +33,8 @@ public class Main : ICustomClass
     private TalentTrainer _talentTrainer;
     private InterruptTracker _interrupts;
     private InterruptLearner _interruptLearner;
+    private DamageTracker _damageTracker;     // measure-only for now: learns per-ability damage from the log
+    private DamageLearner _damageLearner;
     private CancellationTokenSource _cts;
     private volatile bool _applyingTalents; // talents run off-thread so they never freeze the rotation
 
@@ -54,6 +56,11 @@ public class Main : ICustomClass
         // so just removing that line didn't undo it. With our ObjectManager.Locker the Lua mover can
         // contend and freeze the rotation during combat, so force it back to the default (off).
         wManager.wManagerSetting.CurrentSetting.UseLuaToMove = false;
+
+        // Damage learning (measure-only): record per-ability damage from the combat log for every class.
+        _damageTracker = new DamageTracker();
+        _damageLearner = new DamageLearner(_damageTracker);
+        EventsLuaWithArgs.OnEventsLuaStringWithArgs += _damageLearner.OnCombatLog;
 
         if (_isWarrior)
         {
@@ -221,14 +228,18 @@ public class Main : ICustomClass
                 Logging.WriteError($"[AIO3] {e.Message}\n{e.StackTrace}");
             }
 
-            // Drain the engine's rolling timing every few seconds (resets the window even when not
-            // logging) and log it while the debug toggle is on — a dev aid to spot timing regressions.
+            // Every few seconds drain the engine's rolling timing (resets the window even when not
+            // logging); while the debug toggle is on, log it plus the learned per-ability damage.
             if (profileTimer.ElapsedMilliseconds > 3000)
             {
                 profileTimer.Restart();
                 string profile = _engine?.DrainProfile();
-                if (profile != null && _isWarrior && _warriorSettings.DebugProfiling.Value)
-                    Logging.Write($"[AIO3] perf: {profile}");
+                if (_isWarrior && _warriorSettings.DebugProfiling.Value)
+                {
+                    if (profile != null) Logging.Write($"[AIO3] perf: {profile}");
+                    string dmg = _damageTracker?.Report();
+                    if (dmg != null) Logging.Write($"[AIO3] {dmg}");
+                }
             }
 
             // Sleep is at the end but ALWAYS reached (the old OOC spin-loop burned a core here).
@@ -239,6 +250,8 @@ public class Main : ICustomClass
     public void Dispose()
     {
         _cts?.Cancel();
+        if (_damageLearner != null)
+            EventsLuaWithArgs.OnEventsLuaStringWithArgs -= _damageLearner.OnCombatLog;
         if (_interruptLearner != null)
         {
             EventsLuaWithArgs.OnEventsLuaStringWithArgs -= _interruptLearner.OnCombatLog;

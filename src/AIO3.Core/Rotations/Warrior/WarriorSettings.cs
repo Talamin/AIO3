@@ -63,9 +63,10 @@ namespace AIO3.Core.Rotations.Warrior
         public readonly IntSetting EmergencyHealthPercent =
             new IntSetting("emergencyHp", "Emergency item below HP%", value: 30, min: 0, max: 90, step: 5);
 
-        /// <summary>Dev aid: periodically log the rotation tick time + most expensive steps.</summary>
+        /// <summary>Dev aid: periodically log the rotation tick time + most expensive steps, and the
+        /// learned per-ability damage (the DamageTracker, measure-only for now).</summary>
         public readonly ToggleSetting DebugProfiling =
-            new ToggleSetting("debugPerf", "Log rotation timing", value: false);
+            new ToggleSetting("debugPerf", "Debug logging", value: false);
 
         private readonly Setting[] _all;
 
