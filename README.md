@@ -35,7 +35,8 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
   owns the opener).
 - **Performance** — cooldowns/GCD are read in one memory pass per tick (not a slow API call per spell);
   the enemy/party lists are rebuilt on the object-manager pulse, not per tick; the WRobot frame lock is
-  held only around the unit snapshot. A toggle logs per-tick / per-step timing for development.
+  held only around the unit snapshot; and the handful of per-tick Lua reads (stance, auto-attack,
+  usability) are cached. A toggle logs per-tick / per-step timing for development.
 - **Content** — the curated boss list is ported from the old project.
 
 ## Architecture

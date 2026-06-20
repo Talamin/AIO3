@@ -31,6 +31,20 @@ namespace AIO3.Adapter
         private readonly Stopwatch _sinceRebuild = Stopwatch.StartNew();
         private bool _rebuiltOnce;
 
+        // Cheap caches for the handful of per-tick Lua reads — WRobot's Lua.LuaDoString costs ~15-40ms
+        // each and the rotation calls these every tick (stance, auto-attack, IsCurrentSpell, IsSpellUsable
+        // on fire-and-fail). Short TTLs keep them correct; only the rotation loop touches them (no locks).
+        private const int LuaCacheMs = 150;
+        private string _stance;
+        private int _stanceAt;
+        private bool _autoAttacking, _autoAttackingKnown;
+        private int _autoAttackingAt;
+        private int _itemScanAt;
+        private readonly Dictionary<string, (bool value, int at)> _usableCache = new Dictionary<string, (bool, int)>();
+        private readonly Dictionary<string, (bool value, int at)> _currentSpellCache = new Dictionary<string, (bool, int)>();
+
+        private static int Now => Environment.TickCount;
+
         public WRobotGameClient()
         {
             ObjectManagerEvents.OnObjectManagerPulsed += OnObjectManagerPulsed;
@@ -103,10 +117,20 @@ namespace AIO3.Adapter
                 "for i=1,GetNumTalentTabs() do local _,_,p=GetTalentTabInfo(i) if p and p>bp then bp=p best=i end end " +
                 "if bp<=0 then return 0 end return best");
 
-        public string ActiveStanceName =>
-            Lua.LuaDoString<string>(
-                "for i=1,10 do local _, name, isActive = GetShapeshiftFormInfo(i); " +
-                "if name ~= nil and isActive then return name; end end return '';");
+        public string ActiveStanceName
+        {
+            get
+            {
+                // Stance changes only on a (deliberate) shapeshift — cache it; Cast invalidates this when
+                // it casts a stance, so a stance dance still reacts immediately.
+                if (_stance != null && unchecked(Now - _stanceAt) < 250) return _stance;
+                _stance = Lua.LuaDoString<string>(
+                    "for i=1,10 do local _, name, isActive = GetShapeshiftFormInfo(i); " +
+                    "if name ~= nil and isActive then return name; end end return '';") ?? "";
+                _stanceAt = Now;
+                return _stance;
+            }
+        }
 
         public IWowUnit Target
         {
@@ -126,8 +150,13 @@ namespace AIO3.Adapter
 
         public float SpellRange(string spell) => GetSpell(spell).MaxRange;
 
-        public bool IsCurrentSpell(string spell) =>
-            Lua.LuaDoString<bool>($"return IsCurrentSpell('{spell}') == 1 or IsCurrentSpell('{spell}') == true");
+        public bool IsCurrentSpell(string spell)
+        {
+            if (_currentSpellCache.TryGetValue(spell, out var c) && unchecked(Now - c.at) < LuaCacheMs) return c.value;
+            bool v = Lua.LuaDoString<bool>($"return IsCurrentSpell('{spell}') == 1 or IsCurrentSpell('{spell}') == true");
+            _currentSpellCache[spell] = (v, Now);
+            return v;
+        }
 
         public bool IsSpellReady(string spell)
         {
@@ -153,8 +182,28 @@ namespace AIO3.Adapter
         // AIO gated its combat rotation, so we only act when the product has committed to a target.
         public bool ProductIsFighting => Fight.InFight;
 
-        public bool PlayerIsAutoAttacking =>
-            Lua.LuaDoString<bool>("return IsCurrentSpell('Auto Attack') == 1 or IsCurrentSpell('Auto Attack') == true");
+        public bool PlayerIsAutoAttacking
+        {
+            get
+            {
+                if (_autoAttackingKnown && unchecked(Now - _autoAttackingAt) < 400) return _autoAttacking;
+                _autoAttacking = Lua.LuaDoString<bool>(
+                    "return IsCurrentSpell('Auto Attack') == 1 or IsCurrentSpell('Auto Attack') == true");
+                _autoAttackingKnown = true;
+                _autoAttackingAt = Now;
+                return _autoAttacking;
+            }
+        }
+
+        // Cached IsSpellUsable (Lua). Proc abilities (Victory Rush/Revenge/Overpower) reach Cast every
+        // tick and fail here when not usable, so caching this avoids a per-tick Lua call per such step.
+        private bool IsUsable(Spell s)
+        {
+            if (_usableCache.TryGetValue(s.Name, out var c) && unchecked(Now - c.at) < LuaCacheMs) return c.value;
+            bool v = s.IsSpellUsable;
+            _usableCache[s.Name] = (v, Now);
+            return v;
+        }
 
         public CastResult Cast(string spell, IWowUnit target, bool force = false)
         {
@@ -164,18 +213,27 @@ namespace AIO3.Adapter
 
             if (unit == null || !unit.IsValid || unit.IsDead) return CastResult.NoTarget;
             if (!s.KnownSpell) return CastResult.NotKnown;
-            if (!s.IsSpellUsable) return CastResult.NotUsable;
+            if (!IsUsable(s)) return CastResult.NotUsable;
             if (s.CastTime > 0.0 && ObjectManager.Me.GetMove) return CastResult.Moving;
             if (!force && ObjectManager.Me.IsCast) return CastResult.Busy;
 
             if (force) Lua.LuaDoString("SpellStopCasting();");
 
             SpellManager.CastSpellByNameOn(s.Name, LuaUnitId(unit));
+
+            // Keep the caches honest right after we change state ourselves.
+            if (spell == "Auto Attack") { _autoAttacking = true; _autoAttackingKnown = true; _autoAttackingAt = Now; }
+            if (spell.EndsWith("Stance")) { _stance = null; _usableCache.Clear(); } // stance affects usability
             return CastResult.Success;
         }
 
         public bool UseFirstReadyItem(IReadOnlyList<string> names)
         {
+            // Throttle the bag scan: it runs every tick while low on HP (the emergency-item step keeps
+            // firing) and Bag.GetBagItem() is ~15-20ms. Items have long cooldowns, so ~750ms is plenty.
+            if (unchecked(Now - _itemScanAt) < 750) return false;
+            _itemScanAt = Now;
+
             foreach (WoWItem item in Bag.GetBagItem())
             {
                 if (!names.Contains(item.Name)) continue;
