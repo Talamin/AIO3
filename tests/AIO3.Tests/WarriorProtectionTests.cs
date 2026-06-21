@@ -212,5 +212,56 @@ namespace AIO3.Tests
             Assert.Equal("Emergency heal", Fire(game)?.Name);
             Assert.Contains("Healthstone", game.UsedItems);
         }
+
+        [Fact]
+        public void Taunt_pulls_a_distant_target_to_start_the_fight()
+        {
+            FakeGameClient game = ProtGame();   // Defensive Stance
+            game.TargetUnit.Distance = 20;      // at range, out of combat, not yet on us
+
+            Assert.Equal("Taunt", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Taunt_pull_is_skipped_in_combat()
+        {
+            FakeGameClient game = ProtGame();
+            game.TargetUnit.Distance = 20;
+            game.InCombatFlag = true; // it's an opener, not a mid-fight peel
+
+            Assert.NotEqual("Taunt", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Taunt_pull_is_skipped_when_the_target_is_already_on_us()
+        {
+            FakeGameClient game = ProtGame();
+            game.TargetUnit.Distance = 20;
+            game.TargetUnit.IsTargetingMe = true; // already coming for us → no pull needed
+
+            Assert.NotEqual("Taunt", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Taunt_pull_is_skipped_outside_Defensive_Stance()
+        {
+            // Taunt needs Defensive Stance, so a Fury/Arms warrior (other stance) never pulls with it.
+            FakeGameClient game = ProtGame();
+            game.TargetUnit.Distance = 20;
+            game.StanceName = "Battle Stance";
+
+            Assert.NotEqual("Taunt", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Taunt_pull_respects_its_toggle()
+        {
+            var fs = new WarriorSettings();
+            fs.UseTauntPull.Value = false;
+            FakeGameClient game = ProtGame();
+            game.TargetUnit.Distance = 20;
+
+            Assert.NotEqual("Taunt", Fire(game, fs)?.Name);
+        }
     }
 }

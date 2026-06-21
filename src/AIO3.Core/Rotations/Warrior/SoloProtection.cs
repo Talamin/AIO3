@@ -45,6 +45,8 @@ namespace AIO3.Core.Rotations.Warrior
             // EnsureStance so it can hold Battle long enough; only active out of combat at range when
             // gap-closers are enabled.
             WarriorCommon.ChargeWithStanceDance(_settings, priority: 0.08f),
+            // Tank engage when Charge isn't ready: Taunt the target to it run to us (Defensive Stance only).
+            WarriorCommon.TauntPull(_settings, priority: 0.09f),
             WarriorCommon.EnsureStance("Defensive Stance", priority: 0.1f),
             CombatBlocks.AutoAttack(priority: 1f),
 

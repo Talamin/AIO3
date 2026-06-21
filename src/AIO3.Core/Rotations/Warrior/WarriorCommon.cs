@@ -95,6 +95,23 @@ namespace AIO3.Core.Rotations.Warrior
                         : ctx.Game.Cast("Charge", t),               // ...then Charge
                 ignoreGcd: true);
 
+        /// <summary>
+        /// Tank opener: in Defensive Stance, Taunt the target at range to make it run to us so the fight
+        /// starts sooner. Taunt requires Defensive Stance, so this only fires while tanking (Protection) —
+        /// it won't touch Fury/Arms, who use Charge/Intercept. Out of combat only and on the product's
+        /// current target (it never selects one), on a target that isn't already coming for us. Sits just
+        /// below the Charge dance in priority, so a ready Charge is preferred and this is the fallback for
+        /// "no Charge available". Throttled so it isn't re-issued while the mob runs in.
+        /// </summary>
+        public static RotationStep TauntPull(WarriorSettings s, float priority) =>
+            Skill.Spell("Taunt").Priority(priority).On(Targets.CurrentEnemy)
+                 .When(ctx => s.UseTauntPull.Value
+                              && !ctx.Game.PlayerInCombat
+                              && ctx.Game.ActiveStanceName == "Defensive Stance"
+                              && !ctx.Target.IsTargetingMe
+                              && ctx.Target.Distance > 8f && ctx.Target.Distance <= 25f)
+                 .RecastDelay(1500);
+
         /// <summary>Slow a fleeing humanoid below 40% (snare; humanoids are the ones that flee).</summary>
         public static RotationStep Hamstring(WarriorSettings s, float priority) =>
             Skill.Spell("Hamstring").Priority(priority).On(Targets.CurrentEnemy)

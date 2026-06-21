@@ -30,6 +30,13 @@ namespace AIO3.Core.Rotations.Warrior
         public readonly ToggleSetting UseGapClosers =
             new ToggleSetting("useGapClosers", "Use Charge / Intercept", value: false);
 
+        /// <summary>Tank opener: in Defensive Stance, Taunt a target at range to pull it to you when you
+        /// can't Charge, so the fight starts sooner. Only acts out of combat on the product's current target
+        /// (never selects one) and only in Defensive Stance, so it is a Protection tool — Fury/Arms keep
+        /// Charge/Intercept. It pulls, so it is a toggle (turn off if a product owns pulling).</summary>
+        public readonly ToggleSetting UseTauntPull =
+            new ToggleSetting("tauntPull", "Taunt to pull (tank opener)", value: true);
+
         /// <summary>Hamstring fleeing targets below 40% health.</summary>
         public readonly ToggleSetting UseHamstring =
             new ToggleSetting("hamstring", "Hamstring fleeing targets", value: true);
@@ -91,6 +98,7 @@ namespace AIO3.Core.Rotations.Warrior
             AoeThreshold.Category = "Rotation";
             CombatRange.Category = "Rotation";
             UseGapClosers.Category = "Rotation";
+            UseTauntPull.Category = "Rotation";
             UseHamstring.Category = "Rotation";
             UseRacials.Category = "Rotation";
             InterruptMode.Category = "Rotation";
@@ -107,7 +115,7 @@ namespace AIO3.Core.Rotations.Warrior
             _all = new Setting[]
             {
                 // Rotation
-                HeroicStrikeRageReserve, AoeThreshold, CombatRange, UseGapClosers, UseHamstring,
+                HeroicStrikeRageReserve, AoeThreshold, CombatRange, UseGapClosers, UseTauntPull, UseHamstring,
                 UseRacials, InterruptMode, UseCooldowns, EmergencyHealthPercent,
                 // Spec
                 ContentMode, AutoAssignTalents,

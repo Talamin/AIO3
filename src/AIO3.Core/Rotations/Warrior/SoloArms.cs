@@ -43,6 +43,8 @@ namespace AIO3.Core.Rotations.Warrior
             // Charge opener with a stance dance (Arms' home is already Battle Stance, so it charges
             // directly; only active out of combat at range while gap-closers are enabled).
             WarriorCommon.ChargeWithStanceDance(_settings, priority: 0.08f),
+            // Tank-only fallback (fires only in Defensive Stance, so inert for Arms/Battle).
+            WarriorCommon.TauntPull(_settings, priority: 0.09f),
             WarriorCommon.EnsureStance("Battle Stance", priority: 0.1f),
             CombatBlocks.AutoAttack(priority: 1f),
             CombatBlocks.Interrupt("Pummel", priority: 2f, mode: ctx => _settings.InterruptMode.Value),
