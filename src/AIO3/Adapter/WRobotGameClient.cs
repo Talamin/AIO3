@@ -303,13 +303,19 @@ namespace AIO3.Adapter
 
             // Back up with a held key-press, NOT MovementManager.MoveTo: a running WRobot product owns the
             // MoveTo pathing and overrides it on the next frame (the reported "backpedal doesn't work"), and
-            // a MoveTo turns the character around to run away — which looks bad and loses the ranged facing.
-            // A backpedal key-press keeps us facing the mob and physically steps back. We then SLEEP the same
-            // duration so the rotation pauses (no melee/cast mid-step) — a clean "step back a bit, then
-            // resume" instead of casting while sliding backwards. The loop holds no frame lock here.
-            int ms = System.Math.Min(1500, (int)(yards / 5f * 1000f));
-            Move.Backward(Move.MoveAction.PressKey, ms);
-            System.Threading.Thread.Sleep(ms);
+            // MoveTo also turns the character around to run away — which looks bad and loses the ranged
+            // facing. A backpedal key-press keeps us facing the mob and physically steps back.
+            //
+            // Hold the key and POLL our actual displacement, releasing once we've moved `yards`. Measuring
+            // real distance (instead of a fixed timer) makes the configured distance meaningful regardless of
+            // backpedal speed or a product nudging us — so 7yd really steps further than 4yd. The poll loop
+            // pauses the rotation (no slide-casting); a hard cap bounds it if a product fights the move.
+            Vector3 start = pos;
+            Move.Backward(Move.MoveAction.PressKey, 2500);
+            var sw = Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < 2500 && ObjectManager.Me.Position.DistanceTo2D(start) < yards)
+                System.Threading.Thread.Sleep(50);
+            Move.Backward(Move.MoveAction.UpKey); // release as soon as we've gone far enough
             return true;
         }
 

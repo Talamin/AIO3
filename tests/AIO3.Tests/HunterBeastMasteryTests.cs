@@ -133,7 +133,7 @@ namespace AIO3.Tests
             g.TargetUnit.IsTargetingMyPet = true;  // but the pet is tanking it → safe to back up
 
             Assert.Equal("Backpedal", Fire(g)?.Name);
-            Assert.Contains(4f, g.StepBackLog);
+            Assert.Contains(7f, g.StepBackLog);
         }
 
         [Fact]
@@ -157,7 +157,7 @@ namespace AIO3.Tests
             g.StepBackResult = false; // adapter found no safe spot (ledge) → must refuse
 
             Assert.NotEqual("Backpedal", Fire(g)?.Name); // doesn't claim the move...
-            Assert.Contains(4f, g.StepBackLog);          // ...but it did ask (and was refused)
+            Assert.Contains(7f, g.StepBackLog);          // ...but it did ask (and was refused)
         }
 
         [Fact]

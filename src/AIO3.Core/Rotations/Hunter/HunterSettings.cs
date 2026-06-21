@@ -31,10 +31,11 @@ namespace AIO3.Core.Rotations.Hunter
         public readonly ToggleSetting UseBackpedal =
             new ToggleSetting("backpedal", "Step back to range (pet tanking)", value: true);
 
-        /// <summary>How far to step back when regaining ranged distance — a short hop (a few steps), not a
-        /// run. The rotation pauses for the step so it doesn't slide-cast.</summary>
+        /// <summary>How far to step back when regaining ranged distance — a short hop, not a run. Defaults
+        /// to 7 so it clears mobs with a big hitbox (4 isn't always enough). The rotation pauses for the step
+        /// so it doesn't slide-cast.</summary>
         public readonly IntSetting BackpedalYards =
-            new IntSetting("backpedalYards", "Step back distance (yd)", value: 4, min: 3, max: 10, step: 1);
+            new IntSetting("backpedalYards", "Step back distance (yd)", value: 7, min: 3, max: 12, step: 1);
 
         // --- Rotation ---
 
