@@ -66,9 +66,10 @@ namespace AIO3.Core.Rotations.Warrior
         public readonly ToggleSetting UseDamageLearning =
             new ToggleSetting("dmgLearn", "Use damage learning", value: false);
 
-        /// <summary>Use major offensive cooldowns (e.g. Recklessness) on elites/bosses/packs.</summary>
+        /// <summary>Use the major offensive cooldown on elites/bosses/packs. For the warrior this is
+        /// Recklessness (Fury/Arms) — the label names it so it isn't a mystery toggle.</summary>
         public readonly ToggleSetting UseCooldowns =
-            new ToggleSetting("cooldowns", "Use cooldowns", value: true);
+            new ToggleSetting("cooldowns", "Use cooldowns (Recklessness)", value: true);
 
         /// <summary>Use an emergency healthstone/potion below this health %. 0 disables it.</summary>
         public readonly IntSetting EmergencyHealthPercent =
@@ -83,27 +84,35 @@ namespace AIO3.Core.Rotations.Warrior
 
         public WarriorSettings()
         {
-            // Tab assignment for the in-game overlay.
+            // Tab assignment for the in-game overlay. Rotation = anything that changes what/how the
+            // rotation fights; Spec = spec/mode/talents; General = meta toggles only (targeting policy,
+            // damage-learning advisory, dev logging) that don't change which abilities the rotation casts.
             HeroicStrikeRageReserve.Category = "Rotation";
             AoeThreshold.Category = "Rotation";
             CombatRange.Category = "Rotation";
+            UseGapClosers.Category = "Rotation";
+            UseHamstring.Category = "Rotation";
+            UseRacials.Category = "Rotation";
+            InterruptMode.Category = "Rotation";
+            UseCooldowns.Category = "Rotation";
+            EmergencyHealthPercent.Category = "Rotation";
+
             ContentMode.Category = "Spec";
             AutoAssignTalents.Category = "Spec";
-            UseGapClosers.Category = "General";
-            UseHamstring.Category = "General";
-            UseRacials.Category = "General";
-            InterruptMode.Category = "General";
+
             AutoSwitchTarget.Category = "General";
             UseDamageLearning.Category = "General";
-            UseCooldowns.Category = "General";
-            EmergencyHealthPercent.Category = "General";
             DebugProfiling.Category = "General";
 
             _all = new Setting[]
             {
+                // Rotation
                 HeroicStrikeRageReserve, AoeThreshold, CombatRange, UseGapClosers, UseHamstring,
-                ContentMode, AutoAssignTalents, UseRacials, InterruptMode, AutoSwitchTarget,
-                UseDamageLearning, UseCooldowns, EmergencyHealthPercent, DebugProfiling
+                UseRacials, InterruptMode, UseCooldowns, EmergencyHealthPercent,
+                // Spec
+                ContentMode, AutoAssignTalents,
+                // General
+                AutoSwitchTarget, UseDamageLearning, DebugProfiling
             };
         }
 

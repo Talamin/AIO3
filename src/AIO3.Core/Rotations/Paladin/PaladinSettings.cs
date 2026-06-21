@@ -111,7 +111,9 @@ namespace AIO3.Core.Rotations.Paladin
 
         public PaladinSettings()
         {
-            // Tab assignment for the in-game overlay.
+            // Tab assignment for the in-game overlay. Rotation = anything that changes what/how the
+            // rotation fights; General = meta toggles only (targeting policy, dev logging) that don't
+            // change which abilities we cast.
             Seal.Category = "Buffs";
             Aura.Category = "Buffs";
             Blessing.Category = "Buffs";
@@ -119,6 +121,9 @@ namespace AIO3.Core.Rotations.Paladin
 
             AoeThreshold.Category = "Rotation";
             CombatRange.Category = "Rotation";
+            UseRacials.Category = "Rotation";
+            InterruptMode.Category = "Rotation";
+            UseCooldowns.Category = "Rotation";
 
             SelfHealPercent.Category = "Survival";
             ArtOfWarHealPercent.Category = "Survival";
@@ -130,20 +135,22 @@ namespace AIO3.Core.Rotations.Paladin
             ContentMode.Category = "Spec";
             AutoAssignTalents.Category = "Spec";
 
-            UseRacials.Category = "General";
-            InterruptMode.Category = "General";
             AutoSwitchTarget.Category = "General";
-            UseCooldowns.Category = "General";
             DebugProfiling.Category = "General";
 
             _all = new Setting[]
             {
+                // Buffs
                 Seal, Aura, Blessing, Judgement,
-                AoeThreshold, CombatRange,
+                // Rotation
+                AoeThreshold, CombatRange, UseRacials, InterruptMode, UseCooldowns,
+                // Survival
                 SelfHealPercent, ArtOfWarHealPercent, LayOnHandsPercent, UseDivineProtection,
                 DivinePleaManaPercent, EmergencyHealthPercent,
+                // Spec
                 ContentMode, AutoAssignTalents,
-                UseRacials, InterruptMode, AutoSwitchTarget, UseCooldowns, DebugProfiling
+                // General
+                AutoSwitchTarget, DebugProfiling
             };
         }
 
