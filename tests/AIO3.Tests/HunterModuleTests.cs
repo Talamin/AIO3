@@ -39,6 +39,21 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Auto_resolves_marksmanship_and_survival_from_talents()
+        {
+            Assert.Contains("Marksmanship", new HunterModule().ResolveRotation(2).Name); // tab 2
+            Assert.Contains("Survival", new HunterModule().ResolveRotation(3).Name);     // tab 3
+        }
+
+        [Fact]
+        public void Override_resolves_the_chosen_spec()
+        {
+            var m = new HunterModule();
+            Choice(m, "spec").Value = "Survival";
+            Assert.Contains("Survival", m.ResolveRotation(1).Name); // talents say BM, override wins
+        }
+
+        [Fact]
         public void Range_reports_the_combat_range()
         {
             var m = new HunterModule();

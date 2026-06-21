@@ -5,7 +5,7 @@ WRobot fightclass. It keeps the proven **Action Priority List (APL)** model from
 but rebuilds the foundation to be **layered, testable, and configurable in-game**.
 
 > Status: functional and in active use. **Warrior** (Fury / Arms / Protection), **Paladin**
-> (Retribution / Protection) and **Hunter** (Beast Mastery) run end-to-end in-game as solo leveling APLs
+> (Retribution / Protection) and **Hunter** (Beast Mastery / Marksmanship / Survival) run end-to-end in-game as solo leveling APLs
 > (10–80), with talent auto-assign, an in-game settings overlay, per-character persistence, runtime spec
 > selection, empirical interrupt learning, and a tuned performance path. Each class is a self-contained
 > **module** (`IClassModule`) so the entry point is class-agnostic — adding the next class is dropping in a

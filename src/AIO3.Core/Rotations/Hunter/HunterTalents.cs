@@ -2,12 +2,19 @@ namespace AIO3.Core.Rotations.Hunter
 {
     /// <summary>
     /// Default talent build per hunter spec, ported verbatim from the old AIO TalentsManager. The trainer
-    /// applies the progression in order, spending points as they become available while leveling. Only the
-    /// Beast Mastery build is wired in today; Marksmanship / Survival land with their specs.
+    /// applies the progression in order, spending points as they become available while leveling.
     /// </summary>
     public static class HunterTalents
     {
-        public static string[] For(HunterSpec spec) => BeastMastery;
+        public static string[] For(HunterSpec spec)
+        {
+            switch (spec)
+            {
+                case HunterSpec.Marksmanship: return Marksmanship;
+                case HunterSpec.Survival: return Survival;
+                default: return BeastMastery;
+            }
+        }
 
         // Beast Mastery (old Hunter_SoloBeastMastery)
         private static readonly string[] BeastMastery =
@@ -17,6 +24,27 @@ namespace AIO3.Core.Rotations.Hunter
             "052012015250120531005010000000000000000000000000000000000000000000000000000000000",
             "152012015250120531005310510050052000000000000000000000000000000000000000000000000",
             "152012015250120531305310510052052300000000000000000000000000000000000000000000000"
+        };
+
+        // Marksmanship (old Hunter_SoloMarksmanship)
+        private static readonly string[] Marksmanship =
+        {
+            "000000000000000000000000000320050312300000000000000000000000000000000000000000000",
+            "000000000000000000000000000321050312300130000000000000000000000000000000000000000",
+            "000000000000000000000000000322050312300132301300000000000000000000000000000000000",
+            "000000000000000000000000000323050312300132301350010000000000000000000000000000000",
+            "000000000000000000000000000323050312300132301350311510000000000000000000000000000",
+            "000000000000000000000000000353050312300132301350313510000000000000000000000000000",
+            "000000000000000000000000000353050312300132301350313515000002000000000000000000000",
+            "500002000000000000000000000353050312300132301350313515000002000000000000000000000",
+            "501002000000000000000000000353050312300132301350313515000002000000000000000000000"
+        };
+
+        // Survival (old Hunter_SoloSurvival)
+        private static readonly string[] Survival =
+        {
+            "000000000000000000000000000000000000000000000000000005000032500033330523134301331",
+            "000000000000000000000000000053051010000000000000000005000032500033330523134301331"
         };
     }
 }

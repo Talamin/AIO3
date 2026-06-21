@@ -9,10 +9,11 @@ casters → DoT-spreading — and then fills in the remaining classes.
 - [x] **Paladin** — hybrid melee. *(Retribution / Protection solo leveling specs, 10–80; Holy is not a
       solo leveling spec here.)* Brought the seal / aura / blessing / judgement buff system (`PaladinCommon`)
       and the class-module abstraction (`IClassModule`) that makes Main class-agnostic.
-- [x] **Hunter** — first pet class. *(Beast Mastery solo leveling spec.)* Built the shared, class-agnostic
-      **pet controller** (`PetControl`: summon / revive / heal / attack / **taunt**) — keyed on the pet
-      actually existing (never on level), so a petless hunter plays ranged-only and any pet without a given
-      ability (e.g. a taunt) is handled automatically. Marksmanship / Survival still to come.
+- [x] **Hunter** — first pet class. *(Beast Mastery / Marksmanship / Survival solo leveling specs.)* Built
+      the shared, class-agnostic **pet controller** (`PetControl`: summon / revive / heal / attack / **taunt**) —
+      keyed on the pet actually existing (never on level), so a petless hunter plays ranged-only and any pet
+      without a given ability (e.g. a taunt) is handled automatically. The pet peels adds off the owner, and
+      a cliff-safe backpedal regains ranged distance.
 - [ ] **Mage** — first pure caster: mana, cast-while-stationary, kiting (the caster baseline).
 - [ ] **Warlock** — caster + permanent pet + DoTs: reuses the pet controller and builds the
       **`SpreadDot`** shared block.

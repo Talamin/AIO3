@@ -66,6 +66,12 @@ namespace AIO3.Core.Rotations.Hunter
             Skill.Spell("Kill Shot").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.Distance >= RangedMin && ctx.Target.HealthPercent < 20);
 
+        /// <summary>Kill Command: a focus dump that makes the pet hit harder — needs an alive pet.
+        /// Baseline, so Beast Mastery and Survival both use it.</summary>
+        public static RotationStep KillCommand(float priority) =>
+            Skill.Spell("Kill Command").Priority(priority).On(Targets.CurrentEnemy)
+                 .When(ctx => ctx.Pet != null && ctx.Pet.IsAlive);
+
         /// <summary>Hand the pet threat with Misdirection (solo) when something is on us and the pet is up.</summary>
         public static RotationStep Misdirection(HunterSettings s, float priority) =>
             Skill.Spell("Misdirection").Priority(priority).On(Targets.Pet)

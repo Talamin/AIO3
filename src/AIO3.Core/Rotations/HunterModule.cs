@@ -47,13 +47,22 @@ namespace AIO3.Core.Rotations
             _activeSpec = desired;
             _activeMode = mode;
             _rotation = Build(desired);
-            // Only Beast Mastery (Solo) exists; everything else falls back to it (reflected in the label).
-            string spec = desired == HunterSpec.BeastMastery ? "Beast Mastery" : desired + "→Beast Mastery";
-            ActiveLabel = (mode == "Group" ? "Group→Solo " : "Solo ") + spec;
+            ActiveLabel = (mode == "Group" ? "Group→Solo " : "Solo ") + Display(desired);
             return _rotation;
         }
 
-        private IRotation Build(HunterSpec spec) => new SoloBeastMastery(_settings);
+        private IRotation Build(HunterSpec spec)
+        {
+            switch (spec)
+            {
+                case HunterSpec.Marksmanship: return new SoloMarksmanship(_settings);
+                case HunterSpec.Survival: return new SoloSurvival(_settings);
+                default: return new SoloBeastMastery(_settings);
+            }
+        }
+
+        private static string Display(HunterSpec spec) =>
+            spec == HunterSpec.BeastMastery ? "Beast Mastery" : spec.ToString();
 
         public string[] DesiredTalentBuild() =>
             _settings.AutoAssignTalents.Value && _activeSpec.HasValue

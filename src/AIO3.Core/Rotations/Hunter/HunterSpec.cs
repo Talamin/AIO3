@@ -10,15 +10,13 @@ namespace AIO3.Core.Rotations.Hunter
     /// <summary>
     /// Resolves which hunter spec to run, combining a manual override with talent auto-detection.
     /// Talent tab order follows WoW's (1 = Beast Mastery, 2 = Marksmanship, 3 = Survival; 0 = none yet).
-    /// Only Beast Mastery is implemented today (the pet-leveling spec); Marksmanship / Survival still
-    /// resolve so the dropdown can grow, but the module falls them back to Beast Mastery for now — which
-    /// is why the selectable <see cref="Choices"/> are just Auto + Beast Mastery.
+    /// All three are solo leveling specs (each levels with a pet), so all are selectable.
     /// </summary>
     public static class HunterSpecs
     {
         public const string Auto = "Auto";
 
-        public static readonly string[] Choices = { Auto, "Beast Mastery" };
+        public static readonly string[] Choices = { Auto, "Beast Mastery", "Marksmanship", "Survival" };
 
         public static HunterSpec Resolve(string choice, int highestTalentTab)
         {
