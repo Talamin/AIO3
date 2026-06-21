@@ -124,12 +124,21 @@ namespace AIO3.Core.Testing
 
         public bool PetHasAbility(string name) => PetAbilities.Contains(name);
 
+        /// <summary>Pet abilities currently on cooldown (so PetAbilityReady returns false for them).</summary>
+        public readonly HashSet<string> PetAbilitiesOnCooldown = new HashSet<string>();
+
+        public bool PetAbilityReady(string name) => PetAbilities.Contains(name) && !PetAbilitiesOnCooldown.Contains(name);
+
         public bool CastPetAbility(string name)
         {
             if (!PetAbilities.Contains(name)) return false;
             PetCastLog.Add(name);
             return true;
         }
+
+        /// <summary>Set by tests to exercise the host's "pause while repositioning" gate.</summary>
+        public bool Repositioning;
+        public bool ServiceReposition() => Repositioning;
 
         public void RunLocked(Action action) => action();
     }

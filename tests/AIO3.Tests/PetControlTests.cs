@@ -76,6 +76,28 @@ namespace AIO3.Tests
             Assert.Null(Fire(g, PetControl.Summon(Off, "Call Pet", "Revive Pet", 1f)));
         }
 
+        [Fact]
+        public void Summon_waits_before_re_summoning_a_pet_that_suddenly_vanished()
+        {
+            // A pet we already had disappears (we just mounted) — the grace must stop us from instantly
+            // casting Call Pet into the mount-up (which would dismount us on a loop).
+            RotationStep step = PetControl.Summon(On, "Call Pet", "Revive Pet", 1f);
+            FakeGameClient g = Game(Pet()); // pet present
+            Fire(g, step);                  // the step sees the pet
+            g.PetUnit = null;               // pet vanished (mounted)
+
+            Assert.Null(Fire(g, step));     // grace → no immediate re-summon
+            Assert.DoesNotContain("Call Pet", g.CastLog);
+        }
+
+        [Fact]
+        public void Summon_skipped_while_mounted()
+        {
+            FakeGameClient g = Game(pet: null);
+            g.Mounted = true;
+            Assert.Null(Fire(g, PetControl.Summon(On, "Call Pet", "Revive Pet", 1f)));
+        }
+
         // --- Heal ---
 
         [Fact]
@@ -191,6 +213,42 @@ namespace AIO3.Tests
 
             Fire(g, PetControl.Attack(On, 1f));
             Assert.Contains(2ul, g.PetAttackLog); // pet redirected to the add on the owner, not the main target
+        }
+
+        // --- UseAbility (pet special abilities) ---
+
+        [Fact]
+        public void UseAbility_casts_a_ready_pet_ability()
+        {
+            FakeGameClient g = Game(Pet());
+            g.PetAbilities.Add("Furious Howl"); // on the bar and off cooldown
+            Fire(g, PetControl.UseAbility(On, "Furious Howl", 1f));
+            Assert.Contains("Furious Howl", g.PetCastLog);
+        }
+
+        [Fact]
+        public void UseAbility_skips_an_ability_on_cooldown()
+        {
+            FakeGameClient g = Game(Pet());
+            g.PetAbilities.Add("Furious Howl");
+            g.PetAbilitiesOnCooldown.Add("Furious Howl");
+            Assert.Null(Fire(g, PetControl.UseAbility(On, "Furious Howl", 1f)));
+            Assert.Empty(g.PetCastLog);
+        }
+
+        [Fact]
+        public void UseAbility_auto_skips_a_pet_without_the_ability()
+        {
+            FakeGameClient g = Game(Pet()); // no Furious Howl on this pet's bar
+            Assert.Null(Fire(g, PetControl.UseAbility(On, "Furious Howl", 1f)));
+        }
+
+        [Fact]
+        public void UseAbility_respects_the_when_gate()
+        {
+            FakeGameClient g = Game(Pet());
+            g.PetAbilities.Add("Dash");
+            Assert.Null(Fire(g, PetControl.UseAbility(On, "Dash", 1f, when: ctx => false)));
         }
 
         [Fact]

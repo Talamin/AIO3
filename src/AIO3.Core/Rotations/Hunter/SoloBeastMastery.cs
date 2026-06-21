@@ -30,7 +30,7 @@ namespace AIO3.Core.Rotations.Hunter
 
         public IReadOnlyList<Setting> Settings => _settings.All;
 
-        public IReadOnlyList<RotationStep> BuildSteps() => new List<RotationStep>
+        public IReadOnlyList<RotationStep> BuildSteps() => HunterCommon.WithPetSpecials(_settings, new List<RotationStep>
         {
             // --- emergency survival ---
             CombatBlocks.UseItems("Emergency heal", Consumables.HealthItems,
@@ -95,6 +95,6 @@ namespace AIO3.Core.Rotations.Hunter
             Skill.Spell("Raptor Strike").Priority(13f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.Distance < HunterCommon.RangedMin),
             HunterCommon.Disengage(_settings, priority: 13.5f),
-        };
+        });
     }
 }

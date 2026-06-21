@@ -20,16 +20,39 @@ namespace AIO3.Core.Library
     /// </summary>
     public static class PetControl
     {
-        /// <summary>Keep a pet up: summon it with <paramref name="callSpell"/> when none exists, or revive
-        /// it with <paramref name="reviveSpell"/> when it is dead. Out of combat only (both are slow casts).</summary>
-        public static RotationStep Summon(Func<CombatContext, bool> enabled, string callSpell, string reviveSpell, float priority) =>
-            new RotationStep(
+        // Grace after a pet we had suddenly vanishes before we re-summon it — long enough to outlast a
+        // mount-up cast (mounting dismisses the pet, and casting Call Pet into it cancels the mount).
+        private const int SummonGraceMs = 2000;
+
+        /// <summary>Keep a pet up: summon it with <paramref name="callSpell"/> when none exists, or revive it
+        /// with <paramref name="reviveSpell"/> when it is dead. Out of combat / not mounted. If a pet we
+        /// already had suddenly disappears (almost always because we just mounted), wait out a short grace
+        /// before re-summoning — otherwise we'd cast Call Pet into the mount-up and dismount ourselves on a
+        /// loop. A pet we never had (fresh login) is summoned immediately.</summary>
+        public static RotationStep Summon(Func<CombatContext, bool> enabled, string callSpell, string reviveSpell, float priority)
+        {
+            bool petSeen = false;
+            int vanishedAt = 0;
+            return new RotationStep(
                 name: "Pet summon",
                 priority: priority,
                 targets: Targets.Self,
                 condition: (ctx, t) =>
                 {
-                    if (!enabled(ctx) || ctx.Game.PlayerInCombat) return false;
+                    if (ctx.Pet != null)
+                    {
+                        petSeen = true;
+                        vanishedAt = 0;
+                        if (ctx.Pet.IsAlive) return false; // alive → nothing to do
+                        // dead → fall through to revive (no grace)
+                    }
+                    else if (petSeen)
+                    {
+                        if (vanishedAt == 0) vanishedAt = Environment.TickCount;
+                        if (unchecked(Environment.TickCount - vanishedAt) < SummonGraceMs) return false;
+                    }
+
+                    if (!enabled(ctx) || ctx.Game.PlayerInCombat || ctx.Game.PlayerIsMounted) return false;
                     string spell = SummonSpell(ctx, callSpell, reviveSpell);
                     return spell != null && ctx.Game.IsSpellKnown(spell) && ctx.Game.IsSpellReady(spell);
                 },
@@ -38,6 +61,7 @@ namespace AIO3.Core.Library
                     string spell = SummonSpell(ctx, callSpell, reviveSpell);
                     return spell != null ? ctx.Game.Cast(spell, ctx.Me) : CastResult.Failed;
                 });
+        }
 
         /// <summary>Heal the pet with <paramref name="mendSpell"/> when it is alive and below the
         /// <paramref name="belowPercent"/> threshold (and not already being mended). The threshold is read
@@ -93,6 +117,23 @@ namespace AIO3.Core.Library
                 recastDelayMs: 500);
 
         private const int TauntReuseMs = 5000;
+
+        /// <summary>Cast a named pet ability (e.g. "Bite", "Furious Howl", "Dash") when it's on the bar and
+        /// off cooldown — auto-skipping any pet that doesn't have it. <paramref name="when"/> adds the
+        /// situational gate (in combat, has focus, …). The throttle limits cast-spam for no-cooldown
+        /// abilities (e.g. the focus-dump Bite); cooldown abilities are already gated by readiness.</summary>
+        public static RotationStep UseAbility(Func<CombatContext, bool> enabled, string ability, float priority,
+            Func<CombatContext, bool> when = null, int recastDelayMs = 500) =>
+            new RotationStep(
+                name: "Pet " + ability,
+                priority: priority,
+                targets: Targets.Self,
+                condition: (ctx, t) => enabled(ctx) && ctx.Pet != null && ctx.Pet.IsAlive
+                                       && (when == null || when(ctx))
+                                       && ctx.Game.PetAbilityReady(ability),
+                action: (ctx, t) => ctx.Game.CastPetAbility(ability) ? CastResult.Success : CastResult.Failed,
+                ignoreGcd: true,
+                recastDelayMs: recastDelayMs);
 
         /// <summary>The unit the pet should be on: lowest-HP mob attacking the owner (peel), else lowest-HP
         /// mob attacking the pet (hold), else the owner's current target.</summary>

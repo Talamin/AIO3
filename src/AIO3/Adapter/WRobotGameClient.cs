@@ -52,6 +52,14 @@ namespace AIO3.Adapter
         private int _petBarAt;
         private HashSet<string> _petAbilities = new HashSet<string>();
 
+        // Pet abilities currently OFF cooldown — one Lua scan per ~500ms (not per ability) so a step can gate
+        // a pet-ability cast on readiness without spamming Lua while it recharges.
+        private int _petReadyAt;
+        private HashSet<string> _petReady = new HashSet<string>();
+
+        // End tick of the current backpedal hop (see StepBack / IsRepositioning).
+        private int _repositionUntil;
+
         private static int Now => Environment.TickCount;
 
         public WRobotGameClient()
@@ -301,22 +309,35 @@ namespace AIO3.Adapter
             var bottom = new Vector3(dest.X, dest.Y, pos.Z - 5f, "None"); // 5y = max tolerated drop
             if (!TraceLine.TraceLineGo(top, bottom, HitFlags.HitTestGroundAndStructures, out _)) return false;
 
-            // Back up with a held key-press, NOT MovementManager.MoveTo: a running WRobot product owns the
-            // MoveTo pathing and overrides it on the next frame (the reported "backpedal doesn't work"), and
-            // MoveTo also turns the character around to run away — which looks bad and loses the ranged
-            // facing. A backpedal key-press keeps us facing the mob and physically steps back.
-            //
-            // Hold the key and POLL our actual displacement, releasing once we've moved `yards`. Measuring
-            // real distance (instead of a fixed timer) makes the configured distance meaningful regardless of
-            // backpedal speed or a product nudging us — so 7yd really steps further than 4yd. The poll loop
-            // pauses the rotation (no slide-casting); a hard cap bounds it if a product fights the move.
-            Vector3 start = pos;
-            Move.Backward(Move.MoveAction.PressKey, 2500);
-            var sw = Stopwatch.StartNew();
-            while (sw.ElapsedMilliseconds < 2500 && ObjectManager.Me.Position.DistanceTo2D(start) < yards)
-                System.Threading.Thread.Sleep(50);
-            Move.Backward(Move.MoveAction.UpKey); // release as soon as we've gone far enough
+            // Open a reposition window; the host drives the key via ServiceReposition each tick. We HOLD the
+            // back key down for the window rather than tapping it: a single tap fizzles (the product re-issues
+            // its own movement each frame and overrides ours), and re-tapping every tick is the jerky stop-go
+            // the user saw — so instead we keep the key DOWN (re-affirmed, never released mid-hop) for smooth,
+            // continuous backpedal, then release once at the end. Keeps us facing the mob. Backpedal ~4.5 yd/s.
+            _repositionUntil = unchecked(Now + System.Math.Min(2500, (int)(yards / 4.5f * 1000f)));
             return true;
+        }
+
+        private bool _backKeyDown;
+
+        /// <summary>Drive an in-progress backpedal each tick (the host calls this every loop). While the hop's
+        /// window is open it holds the back key DOWN (re-affirmed so the product can't steal the movement, but
+        /// never released mid-hop → smooth, not the jerky tap-tap of repeated presses) and returns true so the
+        /// host pauses casting; when the window ends it releases the key once and returns false.</summary>
+        public bool ServiceReposition()
+        {
+            if (unchecked(Now - _repositionUntil) < 0)
+            {
+                Move.Backward(Move.MoveAction.DownKey); // press/hold (idempotent while already down)
+                _backKeyDown = true;
+                return true;
+            }
+            if (_backKeyDown)
+            {
+                Move.Backward(Move.MoveAction.UpKey); // release at the end of the hop
+                _backKeyDown = false;
+            }
+            return false;
         }
 
         public void PetAttack(IWowUnit target)
@@ -342,6 +363,31 @@ namespace AIO3.Adapter
         }
 
         public bool PetHasAbility(string name) => PetAbilities().Contains(name);
+
+        public bool PetAbilityReady(string name) => PetReadySet().Contains(name);
+
+        // Names of pet abilities that are on the bar AND off cooldown, scanned in one pass (500ms TTL).
+        private HashSet<string> PetReadySet()
+        {
+            WoWUnit pet = ObjectManager.Pet;
+            if (pet == null || !pet.IsValid)
+            {
+                if (_petReady.Count != 0) _petReady = new HashSet<string>();
+                return _petReady;
+            }
+            if (unchecked(Now - _petReadyAt) < 500) return _petReady;
+
+            string raw = Lua.LuaDoString<string>(
+                "local t='' for i=1,10 do local n=GetPetActionInfo(i) if n then local s,d=GetPetActionCooldown(i) " +
+                "if (d-(GetTime()-s))<=0 then t=t..n..'|' end end end return t");
+            var set = new HashSet<string>();
+            if (!string.IsNullOrEmpty(raw))
+                foreach (string n in raw.Split('|'))
+                    if (n.Length > 0) set.Add(n);
+            _petReady = set;
+            _petReadyAt = Now;
+            return _petReady;
+        }
 
         public bool CastPetAbility(string name)
         {

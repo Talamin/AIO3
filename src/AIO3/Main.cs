@@ -150,7 +150,11 @@ public class Main : ICustomClass
                 // object manager). The rotation's per-spell cooldown/known queries and the cast itself
                 // don't need it, so they run UNLOCKED — otherwise those slow queries pause the game's
                 // frame every tick (the stutter). Don't run while mounted/travelling.
-                if (!mounted)
+                // Drive any in-progress backpedal hop (holds the key down smoothly, releases at the end) and
+                // pause casting while it plays out — no per-tick re-pressing (which jerked) and no blocking.
+                bool repositioning = _game.ServiceReposition();
+
+                if (!mounted && !repositioning)
                 {
                     CombatContext ctx = null;
                     _game.RunLocked(() => ctx = CombatContext.Capture(_game, _interrupts, _damageTracker));

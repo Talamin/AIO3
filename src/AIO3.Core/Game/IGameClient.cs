@@ -45,6 +45,10 @@ namespace AIO3.Core.Game
         /// was cast. No-op (false) when the pet lacks the ability — so the same call is safe for any pet.</summary>
         bool CastPetAbility(string name);
 
+        /// <summary>Whether the named pet ability is on the bar AND off cooldown. Cheap (cached per pet), so a
+        /// step can gate on it without a per-tick scan and won't try to cast an ability that's recharging.</summary>
+        bool PetAbilityReady(string name);
+
         /// <summary>The local player's class (drives which rotation is selected).</summary>
         WowClass PlayerClass { get; }
 
@@ -94,9 +98,14 @@ namespace AIO3.Core.Game
         void SetTarget(IWowUnit unit);
 
         /// <summary>Step back roughly <paramref name="yards"/> yards (to regain ranged distance). Refuses and
-        /// returns false if the spot is blocked, unreachable, or over a ledge/cliff — so it never walks the
-        /// player off an edge. Returns true if a safe move was started.</summary>
+        /// returns false if the spot is over a ledge/cliff — so it never walks the player off an edge. Returns
+        /// true if the step was started; it plays out in the background while <see cref="IsRepositioning"/> holds.</summary>
         bool StepBack(float yards);
+
+        /// <summary>Drive an in-progress <see cref="StepBack"/> hop: the host calls this every loop. It holds
+        /// the backpedal key down for the hop's window (releasing it once at the end) and returns true while
+        /// the hop is in progress, so the host pauses casting without blocking the loop or starving movement.</summary>
+        bool ServiceReposition();
 
         /// <summary>Run an action under the WoW frame lock (consistent memory reads).</summary>
         void RunLocked(Action action);

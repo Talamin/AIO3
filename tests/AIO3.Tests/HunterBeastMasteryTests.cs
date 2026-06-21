@@ -174,6 +174,17 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Uses_a_ready_pet_cooldown_in_combat()
+        {
+            FakeGameClient g = Marked(HunterGame());
+            g.InCombatFlag = true;
+            g.PetAbilities.Add("Furious Howl"); // on the bar and ready
+
+            Assert.Equal("Pet Furious Howl", Fire(g)?.Name);
+            Assert.Contains("Furious Howl", g.PetCastLog);
+        }
+
+        [Fact]
         public void No_target_does_not_throw()
         {
             // With Bestial Wrath / Rapid Fire known (level 50+), the Self-cast cooldown steps are evaluated

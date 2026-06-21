@@ -1,7 +1,10 @@
+using System;
+using System.Collections.Generic;
 using AIO3.Core.Combat;
 using AIO3.Core.Dsl;
 using AIO3.Core.Engine;
 using AIO3.Core.Game;
+using AIO3.Core.Library;
 
 namespace AIO3.Core.Rotations.Hunter
 {
@@ -109,6 +112,44 @@ namespace AIO3.Core.Rotations.Hunter
         public static RotationStep Disengage(HunterSettings s, float priority) =>
             Skill.Spell("Disengage").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => s.UseDisengage.Value && ctx.Target.Distance < RangedMin && ctx.Target.IsTargetingMe);
+
+        /// <summary>
+        /// The pet's own special abilities, cast via its action bar — each auto-skips if THIS pet doesn't
+        /// have it (different families have different abilities). Covers the offensive cooldowns (Call of
+        /// the Wild / Furious Howl / Rabid), mobility (Dash / Dive), and the focus-dump damage (Bite / Claw
+        /// / Smack). Returned as a list so every hunter spec can splice the same set in.
+        /// </summary>
+        public static List<RotationStep> PetSpecials(HunterSettings s)
+        {
+            Func<CombatContext, bool> manage = ctx => s.ManagePet.Value;
+            Func<CombatContext, bool> hasTarget = ctx => ctx.HasEnemyTarget;
+            // Gate on HAVING AN ENEMY TARGET, not the player's in-combat flag: for a pet-tanking hunter the
+            // pet is what's fighting, so the owner's InCombat lags / never sets, which kept these from firing
+            // (Bite, gated only on a target, worked). PetAbilityReady still holds them to their cooldown.
+            Func<CombatContext, bool> cooldown = ctx => s.UseCooldowns.Value && ctx.HasEnemyTarget;
+            return new List<RotationStep>
+            {
+                // Offensive pet cooldowns.
+                PetControl.UseAbility(manage, "Call of the Wild", 0.92f, when: cooldown),
+                PetControl.UseAbility(manage, "Furious Howl", 0.93f, when: cooldown),
+                PetControl.UseAbility(manage, "Rabid", 0.94f, when: cooldown),
+                // Mobility so the pet sticks to its target.
+                PetControl.UseAbility(manage, "Dash", 0.95f, when: hasTarget),
+                PetControl.UseAbility(manage, "Dive", 0.95f, when: hasTarget),
+                // Focus-dump damage (no cooldown) — throttled so it isn't spammed.
+                PetControl.UseAbility(manage, "Bite", 0.96f, when: hasTarget, recastDelayMs: 1500),
+                PetControl.UseAbility(manage, "Claw", 0.96f, when: hasTarget, recastDelayMs: 1500),
+                PetControl.UseAbility(manage, "Smack", 0.96f, when: hasTarget, recastDelayMs: 1500),
+            };
+        }
+
+        /// <summary>Append <see cref="PetSpecials"/> to a spec's core step list (so every hunter spec gets
+        /// the pet's own abilities with one call).</summary>
+        public static IReadOnlyList<RotationStep> WithPetSpecials(HunterSettings s, List<RotationStep> coreSteps)
+        {
+            coreSteps.AddRange(PetSpecials(s));
+            return coreSteps;
+        }
 
         /// <summary>Slow a fleeing humanoid below 40% with Concussive Shot.</summary>
         public static RotationStep ConcussiveShot(float priority) =>
