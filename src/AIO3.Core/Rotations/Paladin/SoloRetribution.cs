@@ -1,0 +1,71 @@
+using System.Collections.Generic;
+using AIO3.Core.Data;
+using AIO3.Core.Dsl;
+using AIO3.Core.Engine;
+using AIO3.Core.Library;
+using AIO3.Core.Settings;
+
+namespace AIO3.Core.Rotations.Paladin
+{
+    /// <summary>
+    /// Solo Retribution paladin (leveling/grinding, 10-80). Melee hybrid: keep the seal/aura/blessing up,
+    /// judge on cooldown for mana + damage, and cycle Crusader Strike / Divine Storm with free Exorcism
+    /// procs, finishing sub-20% with Hammer of Wrath. Self-heals (Holy Light / Art of War Flash of Light)
+    /// and Divine Plea keep it sustainable while leveling without a healer.
+    ///
+    /// Thin: composes the shared <see cref="PaladinCommon"/> / Layer 3 blocks and adds only the
+    /// Ret-specific filler in priority order. Unknown/unusable spells are skipped automatically
+    /// (IsSpellKnown), so this single priority list fills in as the player levels.
+    /// </summary>
+    public sealed class SoloRetribution : IRotation
+    {
+        public string Name => "Paladin - Solo Retribution";
+
+        private readonly PaladinSettings _settings;
+
+        public SoloRetribution() : this(new PaladinSettings()) { }
+
+        public SoloRetribution(PaladinSettings settings) => _settings = settings;
+
+        public IReadOnlyList<Setting> Settings => _settings.All;
+
+        public IReadOnlyList<RotationStep> BuildSteps() => new List<RotationStep>
+        {
+            // --- emergency survival ---
+            CombatBlocks.UseItems("Emergency heal", Consumables.HealthItems,
+                ctx => _settings.EmergencyHealthPercent.Value > 0 && ctx.Me.HealthPercent < _settings.EmergencyHealthPercent.Value,
+                priority: 0.05f),
+            PaladinCommon.LayOnHands(_settings, priority: 0.1f),
+            PaladinCommon.DivineProtection(_settings, priority: 0.2f),
+            PaladinCommon.ArtOfWarFlash(_settings, priority: 0.4f),   // free instant heal from the proc
+            PaladinCommon.HolyLightSelf(_settings, priority: 0.5f),
+            PaladinCommon.DivinePlea(_settings, priority: 0.7f),
+
+            // --- baseline / upkeep (also maintained out of combat) ---
+            CombatBlocks.AutoAttack(priority: 1f),
+            CombatBlocks.Interrupt("Hammer of Justice", priority: 2f, mode: ctx => _settings.InterruptMode.Value),
+            PaladinCommon.Seal(PaladinSpec.Retribution, _settings, priority: 3f),
+            PaladinCommon.Aura(PaladinSpec.Retribution, _settings, priority: 3.1f),
+            PaladinCommon.Blessing(PaladinSpec.Retribution, _settings, priority: 3.2f),
+
+            // --- offensive racials + major cooldown ---
+            CombatBlocks.OffensiveRacial("Blood Fury", 4f, ctx => _settings.UseRacials.Value),
+            CombatBlocks.OffensiveRacial("Berserking", 4.01f, ctx => _settings.UseRacials.Value),
+            PaladinCommon.AvengingWrath(_settings, priority: 4.3f),
+
+            // --- single target priority ---
+            PaladinCommon.HammerOfWrath(priority: 6f),                  // ranged execute < 20%
+            PaladinCommon.Judgement(_settings, priority: 7f),          // on cooldown: mana return + damage
+            // Exorcism is free and instant during a "The Art of War" proc — use it promptly (no melee downtime).
+            Skill.Spell("Exorcism").Priority(7.5f).On(Targets.CurrentEnemy)
+                 .When(ctx => ctx.Me.HasAura("The Art of War")),
+            Skill.Spell("Divine Storm").Priority(8f).On(Targets.CurrentEnemy),
+            Skill.Spell("Crusader Strike").Priority(9f).On(Targets.CurrentEnemy),
+
+            // --- AoE (>= AoeThreshold enemies within 10y) ---
+            Skill.Spell("Consecration").Priority(12f).On(Targets.CurrentEnemy)
+                 .When(ctx => ctx.EnemiesWithin(10f) >= _settings.AoeThreshold.Value),
+            PaladinCommon.HolyWrath(_settings, priority: 13f),
+        };
+    }
+}

@@ -6,7 +6,9 @@ The order deliberately builds the big shared systems in a sensible sequence — 
 casters → DoT-spreading — and then fills in the remaining classes.
 
 - [x] **Warrior** — melee, rage, stances. *(Fury / Arms / Protection solo leveling specs, 10–80.)*
-- [ ] **Paladin** — hybrid melee (Ret); brings the seal / aura / blessing buff system.
+- [x] **Paladin** — hybrid melee. *(Retribution / Protection solo leveling specs, 10–80; Holy is not a
+      solo leveling spec here.)* Brought the seal / aura / blessing / judgement buff system (`PaladinCommon`)
+      and the class-module abstraction (`IClassModule`) that makes Main class-agnostic.
 - [ ] **Hunter** — first pet class: builds the **pet controller** + ranged + focus.
 - [ ] **Mage** — first pure caster: mana, cast-while-stationary, kiting (the caster baseline).
 - [ ] **Warlock** — caster + permanent pet + DoTs: reuses the pet controller and builds the

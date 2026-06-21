@@ -4,10 +4,12 @@ AIO3 is a ground-up rework of the [Talamin/AIO-Public](https://github.com/Talami
 WRobot fightclass. It keeps the proven **Action Priority List (APL)** model from the original
 but rebuilds the foundation to be **layered, testable, and configurable in-game**.
 
-> Status: functional and in active use. All three **Warrior** solo specs — **Fury, Arms, Protection** —
-> run end-to-end in-game as full leveling APLs (10–80), with talent auto-assign, an in-game settings
-> overlay, per-character persistence, runtime spec selection, empirical interrupt learning, and a tuned
-> performance path. Other classes are not implemented yet (the foundation is built to add them).
+> Status: functional and in active use. **Warrior** (Fury / Arms / Protection) and **Paladin**
+> (Retribution / Protection) run end-to-end in-game as full solo leveling APLs (10–80), with talent
+> auto-assign, an in-game settings overlay, per-character persistence, runtime spec selection, empirical
+> interrupt learning, and a tuned performance path. Each class is a self-contained **module**
+> (`IClassModule`) so the entry point is class-agnostic — adding the next class is dropping in a module.
+> The remaining classes are not implemented yet (the foundation is built to add them).
 
 ## Design goals
 
@@ -28,12 +30,18 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
 
 - **Warrior — Fury / Arms / Protection**, each a single solo leveling APL that fills in as you level
   (unknown spells auto-skip). Talent points are auto-assigned per spec out of combat.
+- **Paladin — Retribution / Protection**, the same single-APL-per-spec model. Brings the shared
+  **seal / aura / blessing / judgement** upkeep system (`PaladinCommon`): the buff choices are resolved
+  live (an `Auto` choice picks a spec-appropriate default and falls back as you learn better options).
+  Self-sustained while leveling (Holy Light / Art of War Flash of Light / Lay on Hands / Divine Plea).
+  Holy is intentionally absent — it is a healer, not a solo leveling spec.
 - **Interrupts** — `Smart` / `Always` / `Never`. `Smart` empirically learns which casts are actually
   (non-)interruptible from the combat log and persists that per character (the API flag is unreliable).
-- **Auto target switching** — optional, **off by default**. Among enemies already attacking you (it
-  never pulls — the product owns the opener, and it only acts with several attackers), it focuses the
-  one with the lowest estimated *time-to-kill* (low health wins, minus the run-up cost of distant
-  targets), with hysteresis to avoid thrashing. Casters are handled by the interrupt system.
+- **Auto target switching** — **on by default** (toggle per class). Among enemies already attacking you
+  (it never pulls — the product still owns the opener, and it only acts with several attackers), it
+  focuses the one with the lowest estimated *time-to-kill* (low health wins, minus the run-up cost of
+  distant targets), with hysteresis to avoid thrashing. Turn it off if a WRobot product owns targeting
+  and the two start fighting over the target. Casters are handled by the interrupt system.
 - **Performance** — cooldowns/GCD are read in one memory pass per tick (not a slow API call per spell);
   the enemy/party lists are rebuilt on the object-manager pulse, not per tick; the WRobot frame lock is
   held only around the unit snapshot; and the handful of per-tick Lua reads (stance, auto-attack,
@@ -79,6 +87,11 @@ but **not** bundled (`Private=false`) and are resolved from the WRobot `Bin` fol
   `Auto` picks the spec from the highest talent tree; below level 10 it falls back to a sensible
   default. A `Mode` selector (Solo / Group) chooses the rotation set — only Solo exists today; Group is
   a placeholder for later. The active rotation is swapped at runtime when the spec or mode changes.
+- **Class modules.** Each class is one `IClassModule` (e.g. `WarriorModule`, `PaladinModule`) that owns
+  its settings (spec/mode selectors included), resolves spec + mode → rotation, and supplies the talent
+  build. The WRobot entry point is class-agnostic: it looks the module up by the player's class, wires
+  its settings into the overlay/persistence, ticks the resolved rotation, and applies the talents. Adding
+  a class is writing a module and registering it in one factory.
 
 ## Project layout
 

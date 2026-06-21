@@ -8,7 +8,7 @@ using AIO3.Combat;
 using AIO3.Core.Combat;
 using AIO3.Core.Engine;
 using AIO3.Core.Game;
-using AIO3.Core.Rotations.Warrior;
+using AIO3.Core.Rotations;
 using AIO3.Core.Settings;
 using AIO3.Overlay;
 using AIO3.Persistence;
@@ -19,10 +19,11 @@ using wManager.Wow.Helpers;
 using wManager.Wow.ObjectManager;
 
 /// <summary>
-/// WRobot entry point (ICustomClass). Resolves the active spec (auto-detected from talents, with a
-/// manual override via the overlay) and runs a single-threaded loop that builds one CombatContext per
-/// tick and lets the engine cast one action. The active rotation is swapped at runtime when the spec
-/// changes (e.g. picking a spec at level 10, or respeccing).
+/// WRobot entry point (ICustomClass). Picks the class module for the player's class (Warrior, Paladin, …),
+/// wires its settings into the overlay/persistence, and runs a single-threaded loop that builds one
+/// CombatContext per tick and lets the engine cast one action. The active rotation is swapped at runtime
+/// when the module re-resolves it (e.g. picking a spec at level 10, respeccing, or changing the mode).
+/// Main itself is class-agnostic — all class-specific logic lives behind <see cref="IClassModule"/>.
 /// </summary>
 public class Main : ICustomClass
 {
@@ -38,21 +39,16 @@ public class Main : ICustomClass
     private CancellationTokenSource _cts;
     private volatile bool _applyingTalents; // talents run off-thread so they never freeze the rotation
 
-    // Warrior wiring (only class implemented so far).
-    private bool _isWarrior;
-    private WarriorSettings _warriorSettings;
-    private ChoiceSetting _specSetting;
-    private WarriorSpec? _activeSpec;
-    private string _activeMode;
+    // The active class implementation (null when the player's class isn't implemented yet → idle).
+    private IClassModule _class;
+    private IRotation _activeRotation;
 
-    // Combat distance reported to WRobot. Tunable live via the warrior settings so we can dial in the
-    // melee stop distance (default 5, same as the old AIO). Falls back to 5 before settings exist.
-    public float Range => _warriorSettings?.CombatRange.Value ?? 5f;
+    // Combat distance reported to WRobot. Tunable live via the class module (e.g. the warrior Combat range
+    // slider) so we can dial in the melee stop distance. Falls back to 5 before a module exists.
+    public float Range => _class?.Range ?? 5f;
 
     public void Initialize()
     {
-        _isWarrior = _game.PlayerClass == WowClass.Warrior;
-
         // An earlier build set this global WRobot setting to true; it persists in WRobot's saved config,
         // so just removing that line didn't undo it. With our ObjectManager.Locker the Lua mover can
         // contend and freeze the rotation during combat, so force it back to the default (off).
@@ -63,32 +59,30 @@ public class Main : ICustomClass
         _damageLearner = new DamageLearner(_damageTracker);
         EventsLuaWithArgs.OnEventsLuaStringWithArgs += _damageLearner.OnCombatLog;
 
-        if (_isWarrior)
+        _class = ClassModules.For(_game.PlayerClass);
+        if (_class != null)
         {
-            _warriorSettings = new WarriorSettings();
-            _specSetting = new ChoiceSetting("spec", "Spec", WarriorSpecs.Auto, WarriorSpecs.Choices) { Category = "Spec" };
-
-            // Panel/persistence cover the spec selector plus the shared warrior tunables.
-            var list = new List<Setting> { _specSetting };
-            list.AddRange(_warriorSettings.All);
+            // Panel/persistence cover the module's full setting set (spec/mode selectors first).
+            IReadOnlyList<Setting> list = _class.Settings;
 
             string profile = ObjectManager.Me.Name;
-            _store = new SettingsStore(string.IsNullOrEmpty(profile) ? "default" : profile, list);
+            if (string.IsNullOrEmpty(profile)) profile = "default";
+            _store = new SettingsStore(profile, list);
             _store.Load(); // apply persisted values (incl. the saved spec override) before running
 
-            _overlay = new SettingsOverlay("Warrior", list);
+            _overlay = new SettingsOverlay(_class.DisplayName, list);
             _talentTrainer = new TalentTrainer();
 
             // Empirical interrupt learner: feeds the tracker from the combat log (the API's
             // interruptible flag is unreliable). Blacklist persists per character.
             _interrupts = new InterruptTracker();
-            _interruptLearner = new InterruptLearner(_interrupts, string.IsNullOrEmpty(profile) ? "default" : profile);
+            _interruptLearner = new InterruptLearner(_interrupts, profile);
             EventsLuaWithArgs.OnEventsLuaStringWithArgs += _interruptLearner.OnCombatLog;
 
-            // Initial engine; Reconcile() in the loop swaps to the actually-resolved spec.
-            _activeSpec = WarriorSpec.Fury;
-            _engine = new RotationEngine(new SoloFury(_warriorSettings).BuildSteps());
-            Logging.Write("[AIO3] Loaded: Warrior (spec auto-selected from talents; /aio3 to override).");
+            // Initial engine; Reconcile() in the loop swaps to the actually-resolved spec/mode.
+            _activeRotation = _class.ResolveRotation(_game.HighestTalentTab);
+            _engine = new RotationEngine(_activeRotation.BuildSteps());
+            Logging.Write($"[AIO3] Loaded: {_class.DisplayName} (spec auto-selected from talents; /aio3 to override).");
         }
         else
         {
@@ -100,34 +94,16 @@ public class Main : ICustomClass
         Task.Factory.StartNew(() => Loop(_cts.Token), _cts.Token);
     }
 
-    /// <summary>Resolve the desired warrior spec + mode (Solo/Group) and swap the engine if either changed.</summary>
+    /// <summary>Re-resolve the rotation (spec + mode) via the class module and swap the engine if it changed.</summary>
     private void Reconcile()
     {
-        if (!_isWarrior) return;
+        if (_class == null) return;
 
-        WarriorSpec desired = WarriorSpecs.Resolve(_specSetting.Value, _game.HighestTalentTab);
-        string mode = _warriorSettings.ContentMode.Value;
-        if (_activeSpec == desired && _activeMode == mode) return;
-        _activeSpec = desired;
-        _activeMode = mode;
-
-        IRotation rotation = BuildWarriorRotation(desired, mode);
+        IRotation rotation = _class.ResolveRotation(_game.HighestTalentTab);
+        if (ReferenceEquals(rotation, _activeRotation)) return;
+        _activeRotation = rotation;
         _engine = new RotationEngine(rotation.BuildSteps());
-        Logging.Write($"[AIO3] Active: {mode} {desired} ({rotation.Name})");
-    }
-
-    private IRotation BuildWarriorRotation(WarriorSpec spec, string mode)
-    {
-        // Only Solo rotations exist today; Group is a UI placeholder that falls back to Solo for now.
-        if (mode == "Group")
-            Logging.Write("[AIO3] Group rotations aren't implemented yet — running the Solo rotation.");
-
-        switch (spec)
-        {
-            case WarriorSpec.Arms: return new SoloArms(_warriorSettings);
-            case WarriorSpec.Protection: return new SoloProtection(_warriorSettings);
-            default: return new SoloFury(_warriorSettings);
-        }
+        Logging.Write($"[AIO3] Active: {_class.ActiveLabel} ({rotation.Name})");
     }
 
     private void Loop(CancellationToken token)
@@ -182,7 +158,7 @@ public class Main : ICustomClass
                     if (ctx != null)
                     {
                         // Optional auto target-switching only (off by default; never pulls — product owns the opener).
-                        if (_isWarrior && _warriorSettings.AutoSwitchTarget.Value)
+                        if (_class != null && _class.AutoSwitchTargetEnabled)
                         {
                             IWowUnit desired = TargetSelector.Pick(ctx);
                             if (desired != null && (ctx.Target == null || desired.Guid != ctx.Target.Guid))
@@ -196,21 +172,23 @@ public class Main : ICustomClass
                 // Auto-assign talents out of combat. Runs on a background task because TalentTrainer
                 // sleeps between LearnTalent calls — doing it inline froze the whole rotation loop while
                 // spending points. Guarded so only one application runs at a time.
-                if (_isWarrior && _talentTrainer != null && _activeSpec.HasValue
-                    && _warriorSettings.AutoAssignTalents.Value
+                if (_class != null && _talentTrainer != null
                     && !_applyingTalents
                     && !_game.PlayerInCombat
                     && talentTimer.ElapsedMilliseconds > 15000)
                 {
-                    talentTimer.Restart();
-                    _applyingTalents = true;
-                    WarriorSpec spec = _activeSpec.Value;
-                    Task.Factory.StartNew(() =>
+                    string[] build = _class.DesiredTalentBuild();
+                    if (build != null)
                     {
-                        try { _talentTrainer.Apply(WarriorTalents.For(spec)); }
-                        catch (Exception ex) { Logging.WriteError($"[AIO3] talents: {ex.Message}"); }
-                        finally { _applyingTalents = false; }
-                    });
+                        talentTimer.Restart();
+                        _applyingTalents = true;
+                        Task.Factory.StartNew(() =>
+                        {
+                            try { _talentTrainer.Apply(build); }
+                            catch (Exception ex) { Logging.WriteError($"[AIO3] talents: {ex.Message}"); }
+                            finally { _applyingTalents = false; }
+                        });
+                    }
                 }
 
                 if (fired != null)
@@ -241,7 +219,7 @@ public class Main : ICustomClass
             {
                 profileTimer.Restart();
                 string profile = _engine?.DrainProfile();
-                if (_isWarrior && _warriorSettings.DebugProfiling.Value)
+                if (_class != null && _class.DebugLoggingEnabled)
                 {
                     if (profile != null) Logging.Write($"[AIO3] perf: {profile}");
                     string dmg = _damageTracker?.Report();
