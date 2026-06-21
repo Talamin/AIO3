@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using AIO3.Core.Game;
@@ -57,19 +58,21 @@ namespace AIO3.Adapter
         private int _petReadyAt;
         private HashSet<string> _petReady = new HashSet<string>();
 
-        // End tick of the current backpedal hop (see StepBack / IsRepositioning).
-        private int _repositionUntil;
+        // A backpedal hop runs on its own worker thread (see StepBack); true while it holds the back key.
+        private volatile bool _repositioning;
 
         private static int Now => Environment.TickCount;
 
         public WRobotGameClient()
         {
             ObjectManagerEvents.OnObjectManagerPulsed += OnObjectManagerPulsed;
+            wManager.Events.FightEvents.OnFightLoop += OnFightLoop; // backpedal runs here (see OnFightLoop)
         }
 
         public void Dispose()
         {
             ObjectManagerEvents.OnObjectManagerPulsed -= OnObjectManagerPulsed;
+            wManager.Events.FightEvents.OnFightLoop -= OnFightLoop;
         }
 
         // Runs on WRobot's object-manager thread after each pulse. Must never throw (would break the OM).
@@ -294,50 +297,73 @@ namespace AIO3.Adapter
             if (unit != null && unit.Guid != 0) ObjectManager.Me.Target = unit.Guid;
         }
 
+        private volatile float _pendingBackYards; // hand-off to the fight-loop thread (set here, consumed there)
+        private int _backpedalReadyAt;            // cooldown so we don't backpedal-spam (casting resumes between hops)
+
+        /// <summary>Request a backpedal of <paramref name="yards"/>. This does NOT move here — it validates
+        /// (cliff guard + cooldown) on the rotation thread and hands the request to the fight-loop thread, which
+        /// is the ONLY place a backpedal works: WRobot's fight loop keeps re-pathing us into combat range and its
+        /// StopMove brake releases our key every ~80ms, so a keypress on any other thread is stomped (the char
+        /// moved ~1yd despite the key being held the full duration). Returns true when the request is accepted
+        /// (the step "fired"); the actual hold happens in OnFightLoop.</summary>
         public bool StepBack(float yards)
         {
+            if (_repositioning) return false;                          // a hop is already running
+            if (unchecked(Now - _backpedalReadyAt) < 0) return false;  // throttled — let other steps cast
+
             var me = ObjectManager.Me;
             Vector3 pos = me.Position;
             // The spot we'd back into (Rotation is the facing in radians; +PI = directly behind).
             Vector3 dest = pos.InFrontOf(me.Rotation + (float)System.Math.PI, yards);
 
             // Cliff guard: probe straight DOWN at the destination — require solid ground within a safe drop,
-            // else it's a ledge and we refuse. This is what actually prevents walking off an edge (the old
-            // AIO only checked horizontally and could fall). One cheap trace; no PathFinder (it was the 20ms+
-            // tick spike) — a short straight backstep's real danger is a cliff right behind, which this catches.
+            // else it's a ledge and we refuse (let other steps run). This is what actually prevents walking off
+            // an edge (the old AIO only checked horizontally and could fall). One cheap trace; no PathFinder.
             var top = new Vector3(dest.X, dest.Y, pos.Z + 2f, "None");
             var bottom = new Vector3(dest.X, dest.Y, pos.Z - 5f, "None"); // 5y = max tolerated drop
             if (!TraceLine.TraceLineGo(top, bottom, HitFlags.HitTestGroundAndStructures, out _)) return false;
 
-            // Open a reposition window; the host drives the key via ServiceReposition each tick. We HOLD the
-            // back key down for the window rather than tapping it: a single tap fizzles (the product re-issues
-            // its own movement each frame and overrides ours), and re-tapping every tick is the jerky stop-go
-            // the user saw — so instead we keep the key DOWN (re-affirmed, never released mid-hop) for smooth,
-            // continuous backpedal, then release once at the end. Keeps us facing the mob. Backpedal ~4.5 yd/s.
-            _repositionUntil = unchecked(Now + System.Math.Min(2500, (int)(yards / 4.5f * 1000f)));
+            _pendingBackYards = yards; // picked up by OnFightLoop within ~80ms
             return true;
         }
 
-        private bool _backKeyDown;
+        private Vector3 _backStart;
+        private int _backStartTick;
 
-        /// <summary>Drive an in-progress backpedal each tick (the host calls this every loop). While the hop's
-        /// window is open it holds the back key DOWN (re-affirmed so the product can't steal the movement, but
-        /// never released mid-hop → smooth, not the jerky tap-tap of repeated presses) and returns true so the
-        /// host pauses casting; when the window ends it releases the key once and returns false.</summary>
-        public bool ServiceReposition()
+        /// <summary>True while a backpedal hop is playing out (the fight loop is blocked holding the back key).
+        /// The host calls this each loop and pauses casting while it returns true.</summary>
+        public bool ServiceReposition() => _repositioning;
+
+        /// <summary>Runs SYNCHRONOUSLY on WRobot's fight-loop thread (~every 80ms in combat). When a backpedal is
+        /// pending we set <c>cancelable.Cancel = true</c> (so WRobot exits this fight iteration instead of MoveTo-ing
+        /// us straight back into range) and then BLOCK this thread with one continuous Move.Backward(PressKey). Because
+        /// it's the same thread that does WRobot's range correction, nothing competes with the keypress — that's the
+        /// crux that makes the backpedal smooth (verified: off-thread keypresses get stomped to ~1yd). The rotation
+        /// is frozen for the hold, so the duration is short and a cooldown throttles re-triggers. Must never throw.</summary>
+        private void OnFightLoop(WoWUnit unit, CancelEventArgs cancelable)
         {
-            if (unchecked(Now - _repositionUntil) < 0)
+            float yards = _pendingBackYards;
+            if (yards <= 0f) return;
+            _pendingBackYards = 0f;
+            if (_repositioning || unchecked(Now - _backpedalReadyAt) < 0) return;
+
+            cancelable.Cancel = true; // skip WRobot's own move-to-range for this iteration so it doesn't undo us
+
+            int durationMs = (int)System.Math.Min(3500f, System.Math.Max(400f, yards / 4.0f * 1000f));
+            _backStart = ObjectManager.Me.Position;
+            _backStartTick = Now;
+            _repositioning = true;
+            DebugLog.Write($"StepBack: yards={yards:0.#}  dur={durationMs}ms (fightloop)");
+            try { Move.Backward(Move.MoveAction.PressKey, durationMs); }
+            catch { }
+            finally
             {
-                Move.Backward(Move.MoveAction.DownKey); // press/hold (idempotent while already down)
-                _backKeyDown = true;
-                return true;
+                float moved = ObjectManager.Me.Position.DistanceTo2D(_backStart);
+                int held = unchecked(Now - _backStartTick);
+                DebugLog.Write($"Backpedal end: held={held}ms  moved={moved:0.0}yd  speed={(held > 0 ? moved / held * 1000f : 0f):0.0}yd/s");
+                _backpedalReadyAt = unchecked(Now + 1200); // brief cooldown; cast between hops
+                _repositioning = false;
             }
-            if (_backKeyDown)
-            {
-                Move.Backward(Move.MoveAction.UpKey); // release at the end of the hop
-                _backKeyDown = false;
-            }
-            return false;
         }
 
         public void PetAttack(IWowUnit target)

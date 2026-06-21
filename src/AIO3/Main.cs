@@ -90,6 +90,8 @@ public class Main : ICustomClass
             Logging.Write($"[AIO3] No rotation for class {_game.PlayerClass} yet — running idle.");
         }
 
+        DebugLog.StartSession(_class != null ? _class.DisplayName : ("idle (" + _game.PlayerClass + ")"));
+
         _cts = new CancellationTokenSource();
         Task.Factory.StartNew(() => Loop(_cts.Token), _cts.Token);
     }
@@ -129,6 +131,10 @@ public class Main : ICustomClass
                 bool mounted = _game.PlayerIsMounted;
                 RotationStep fired = null;
                 bool settingsChanged = false;
+
+                // Mirror the "Debug logging" toggle to the on-disk debug log (read directly off disk for
+                // diagnosing behaviour like the backpedal, instead of scraping the in-game log window).
+                DebugLog.Enabled = _class != null && _class.DebugLoggingEnabled;
 
                 // Overlay polling and spec reconcile use Lua but DON'T need the frame lock — running them
                 // under it pauses the game's frame (stutter) for ~12 Lua reads. Keep them out of the lock.
@@ -197,6 +203,8 @@ public class Main : ICustomClass
 
                 if (fired != null)
                 {
+                    DebugLog.Write($"cast {fired.Name}"); // full trace on disk (not deduped)
+
                     // Log each distinct cast (dedupe consecutive identical within 2s to avoid spam).
                     if (fired.Name != lastFired || sinceLastLog.ElapsedMilliseconds > 2000)
                     {

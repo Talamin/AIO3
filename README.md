@@ -36,12 +36,20 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
   live (an `Auto` choice picks a spec-appropriate default and falls back as you learn better options).
   Self-sustained while leveling (Holy Light / Art of War Flash of Light / Lay on Hands / Divine Plea).
   Holy is intentionally absent — it is a healer, not a solo leveling spec.
-- **Hunter — Beast Mastery**, ranged + pet. Brings the shared, class-agnostic **pet controller**
-  (`PetControl`): keep the pet summoned / revived / healed, send it to the target, and **taunt** to pull
-  mobs back onto it. Everything pet-related keys on the pet *actually existing* (never on level), so a
-  petless hunter (below the taming level / untamed / a product owning the pet) plays as a clean ranged DPS
-  with the pet steps skipped — and a taunt is only used if that pet actually has one (an Imp has none).
-  The aspect (Viper ↔ Hawk/Dragonhawk) is managed by mana with hysteresis. Marksmanship / Survival are next.
+- **Hunter — Beast Mastery / Marksmanship / Survival**, ranged + pet. Brings the shared, class-agnostic
+  **pet controller** (`PetControl`): keep the pet summoned / revived / healed, send it to the target,
+  **peel** adds off you (it redirects to the lowest-HP mob attacking *you*, then a mob attacking the pet),
+  **taunt** (re-taunts whenever a mob switches back to you), and fire the pet's **special abilities**
+  (Bite/Claw, Dash/Dive, Call of the Wild, Furious Howl, Rabid) when they're on its bar. Everything
+  pet-related keys on the pet *actually existing* (never on level), so a petless hunter (below the taming
+  level / untamed / a product owning the pet) plays as a clean ranged DPS with the pet steps skipped — and
+  abilities a given pet lacks are skipped automatically. The aspect (Viper ↔ Hawk/Dragonhawk) is managed by
+  mana with hysteresis.
+- **Cliff-safe backpedal** — when a mob is in the hunter's face (on the pet, inside melee range), the
+  hunter steps back to restore ranged distance, refusing to move over a ledge (a downward trace guards the
+  destination). The hop runs *on WRobot's own fight-loop thread* and briefly cancels its move-to-range for
+  that iteration, so the one continuous keypress isn't fought by the product's path correction — it is a
+  single smooth motion, not a stutter. Toggle + distance are settings (default on, 7 yd).
 - **Interrupts** — `Smart` / `Always` / `Never`. `Smart` empirically learns which casts are actually
   (non-)interruptible from the combat log and persists that per character (the API flag is unreliable).
 - **Auto target switching** — **on by default** (toggle per class). Among enemies already attacking you
