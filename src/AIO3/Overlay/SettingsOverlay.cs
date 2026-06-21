@@ -18,6 +18,7 @@ namespace AIO3.Overlay
         private readonly string _rotationName;
         private readonly IReadOnlyList<Setting> _settings;
         private bool _created;
+        private int _lastAliveCheck;
 
         public SettingsOverlay(string rotationName, IReadOnlyList<Setting> settings)
         {
@@ -27,10 +28,29 @@ namespace AIO3.Overlay
 
         public void EnsureCreated()
         {
-            if (_created || _settings.Count == 0) return;
-            Lua.LuaDoString(BuildFrameLua());
-            _created = true;
-            Logging.Write("[AIO3] In-game settings overlay ready — type /aio3 to toggle.");
+            if (_settings.Count == 0) return;
+
+            if (!_created)
+            {
+                // (Re)build the frame. Each widget seeds the freshly-reset bridge from the CURRENT C# value
+                // (defaults + persisted + any live edits), so a rebuild after a reload restores the real
+                // values rather than defaults — no settings are lost.
+                Lua.LuaDoString(BuildFrameLua());
+                _created = true;
+                Logging.Write("[AIO3] In-game settings overlay ready — type /aio3 to toggle.");
+                return;
+            }
+
+            // A WoW UI reload (reconnect / /reload) wipes our Lua frame + bridge while WRobot keeps running,
+            // leaving the overlay gone and the bridge empty. WRobot's C# side is untouched, so detect the
+            // wipe (throttled — a Lua probe is ~15-40ms) and rebuild from the live C# values next pass.
+            if (unchecked(Environment.TickCount - _lastAliveCheck) < 1500) return;
+            _lastAliveCheck = Environment.TickCount;
+            if (!Lua.LuaDoString<bool>("return AIO3Frame ~= nil"))
+            {
+                _created = false; // gone → the next EnsureCreated rebuilds it
+                Logging.Write("[AIO3] Overlay was wiped by a UI reload — rebuilding.");
+            }
         }
 
         /// <summary>Mirror in-game edits into the settings. Returns true if anything changed.</summary>
