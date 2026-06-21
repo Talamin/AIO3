@@ -27,6 +27,24 @@ namespace AIO3.Core.Game
         IWowUnit Me { get; }
         IWowUnit Target { get; }
 
+        /// <summary>The player's pet, or null if none exists. Keyed on real existence (the pet object is
+        /// valid), NEVER on level — an untamed / dismissed / below-taming-level hunter reads null and plays
+        /// petless, and a pet present early on an unusual server just works. Captured into CombatContext.</summary>
+        IWowUnit Pet { get; }
+
+        /// <summary>Order the pet to attack the given unit. No-op if there is no pet. Instant; the pet then
+        /// auto-casts its own abilities. Callers throttle / only re-issue on a target change.</summary>
+        void PetAttack(IWowUnit target);
+
+        /// <summary>Whether the current pet has the named ability on its action bar (e.g. "Growl"). Cheap
+        /// (cached per pet) so a step can gate on it without a per-tick scan — and so a pet that simply
+        /// doesn't have the ability (an Imp has no taunt) is handled automatically: the step never fires.</summary>
+        bool PetHasAbility(string name);
+
+        /// <summary>Cast a pet ability by name if the pet has it and it is off cooldown. Returns true if it
+        /// was cast. No-op (false) when the pet lacks the ability — so the same call is safe for any pet.</summary>
+        bool CastPetAbility(string name);
+
         /// <summary>The local player's class (drives which rotation is selected).</summary>
         WowClass PlayerClass { get; }
 
@@ -74,6 +92,11 @@ namespace AIO3.Core.Game
 
         /// <summary>Set the player's current target (so WRobot's facing/movement follows it).</summary>
         void SetTarget(IWowUnit unit);
+
+        /// <summary>Step back roughly <paramref name="yards"/> yards (to regain ranged distance). Refuses and
+        /// returns false if the spot is blocked, unreachable, or over a ledge/cliff — so it never walks the
+        /// player off an edge. Returns true if a safe move was started.</summary>
+        bool StepBack(float yards);
 
         /// <summary>Run an action under the WoW frame lock (consistent memory reads).</summary>
         void RunLocked(Action action);

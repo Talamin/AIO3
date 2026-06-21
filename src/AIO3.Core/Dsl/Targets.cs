@@ -12,6 +12,11 @@ namespace AIO3.Core.Dsl
         public static readonly Func<CombatContext, IEnumerable<IWowUnit>> Self =
             ctx => ctx.Me != null ? new[] { ctx.Me } : Array.Empty<IWowUnit>();
 
+        /// <summary>The player's pet, if one exists (empty otherwise). For pet-targeted spells (Mend Pet,
+        /// Misdirection to pet).</summary>
+        public static readonly Func<CombatContext, IEnumerable<IWowUnit>> Pet =
+            ctx => ctx.Pet != null ? new[] { ctx.Pet } : Array.Empty<IWowUnit>();
+
         public static readonly Func<CombatContext, IEnumerable<IWowUnit>> Current =
             ctx => ctx.Target != null ? new[] { ctx.Target } : Array.Empty<IWowUnit>();
 

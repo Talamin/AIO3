@@ -18,6 +18,8 @@ namespace AIO3.Core.Testing
         public int CastingSpellId { get; set; }
         public Reaction Reaction { get; set; } = Reaction.Hostile;
         public bool IsTargetingMe { get; set; }
+        public bool IsTargetingMyPet { get; set; }
+        public ulong TargetGuid { get; set; }
         public bool IsAttackable { get; set; } = true;
         public bool IsElite { get; set; }
         public string CreatureType { get; set; } = "";

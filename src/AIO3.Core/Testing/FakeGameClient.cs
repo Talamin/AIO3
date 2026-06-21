@@ -13,8 +13,21 @@ namespace AIO3.Core.Testing
     {
         public FakeUnit MeUnit = new FakeUnit { Name = "Me", Reaction = Reaction.Friendly };
         public FakeUnit TargetUnit;
+
+        /// <summary>The player's pet, or null for petless (no pet tamed / below taming level).</summary>
+        public FakeUnit PetUnit;
+
         public readonly List<IWowUnit> EnemyList = new List<IWowUnit>();
         public readonly List<IWowUnit> PartyList = new List<IWowUnit>();
+
+        /// <summary>GUIDs the pet was told to attack, in order (assert pet commands in tests).</summary>
+        public readonly List<ulong> PetAttackLog = new List<ulong>();
+
+        /// <summary>Abilities on the pet's action bar (e.g. "Growl"). A pet without an entry simply lacks it.</summary>
+        public readonly HashSet<string> PetAbilities = new HashSet<string>();
+
+        /// <summary>Pet abilities that were cast, in order.</summary>
+        public readonly List<string> PetCastLog = new List<string>();
 
         /// <summary>If empty, every spell counts as known (convenient default).</summary>
         public readonly HashSet<string> KnownSpells = new HashSet<string>();
@@ -47,6 +60,7 @@ namespace AIO3.Core.Testing
 
         public IWowUnit Me => MeUnit;
         public IWowUnit Target => TargetUnit;
+        public IWowUnit Pet => PetUnit;
         public WowClass PlayerClass => Class;
         public int HighestTalentTab => TalentTab;
         public string ActiveStanceName => StanceName;
@@ -90,6 +104,31 @@ namespace AIO3.Core.Testing
         public void SetTarget(IWowUnit unit)
         {
             if (unit != null) LastSetTargetGuid = unit.Guid;
+        }
+
+        /// <summary>Yard amounts StepBack was asked for; StepBackResult controls whether it "succeeds"
+        /// (false simulates a refused move — blocked / cliff).</summary>
+        public readonly List<float> StepBackLog = new List<float>();
+        public bool StepBackResult = true;
+
+        public bool StepBack(float yards)
+        {
+            StepBackLog.Add(yards);
+            return StepBackResult;
+        }
+
+        public void PetAttack(IWowUnit target)
+        {
+            if (target != null) PetAttackLog.Add(target.Guid);
+        }
+
+        public bool PetHasAbility(string name) => PetAbilities.Contains(name);
+
+        public bool CastPetAbility(string name)
+        {
+            if (!PetAbilities.Contains(name)) return false;
+            PetCastLog.Add(name);
+            return true;
         }
 
         public void RunLocked(Action action) => action();

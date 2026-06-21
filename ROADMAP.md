@@ -9,7 +9,10 @@ casters → DoT-spreading — and then fills in the remaining classes.
 - [x] **Paladin** — hybrid melee. *(Retribution / Protection solo leveling specs, 10–80; Holy is not a
       solo leveling spec here.)* Brought the seal / aura / blessing / judgement buff system (`PaladinCommon`)
       and the class-module abstraction (`IClassModule`) that makes Main class-agnostic.
-- [ ] **Hunter** — first pet class: builds the **pet controller** + ranged + focus.
+- [x] **Hunter** — first pet class. *(Beast Mastery solo leveling spec.)* Built the shared, class-agnostic
+      **pet controller** (`PetControl`: summon / revive / heal / attack / **taunt**) — keyed on the pet
+      actually existing (never on level), so a petless hunter plays ranged-only and any pet without a given
+      ability (e.g. a taunt) is handled automatically. Marksmanship / Survival still to come.
 - [ ] **Mage** — first pure caster: mana, cast-while-stationary, kiting (the caster baseline).
 - [ ] **Warlock** — caster + permanent pet + DoTs: reuses the pet controller and builds the
       **`SpreadDot`** shared block.
@@ -24,9 +27,11 @@ casters → DoT-spreading — and then fills in the remaining classes.
 - [ ] **DamageTracker** — learn per-ability damage from the combat log. *Measure-only first* (record +
       log), then *advisory* (re-orders the damage filler and feeds the target-selection time-to-kill
       estimate). Class-agnostic; pet damage tracked in a separate notebook by the pet's GUID.
-- [ ] **Pet controller** (with Hunter) — the pet as its own actor: its own target selection, ability
-      priority list, and cooldowns (read from the pet action bar — we share no cooldowns with the pet).
-      Pet-aware add selection (enemies attacking the pet). Behind a setting (product coexistence).
+- [x] **Pet controller v1** (with Hunter) — `PetControl`: keep the pet summoned / revived / healed, send it
+      to the target, and **taunt** (cast a named pet ability off its bar, auto-skipping pets that lack it).
+      Class-agnostic (Warlock / DK reuse it), keyed on the pet existing (never level), behind a setting.
+      *v2 still to do:* the pet as a full second rotation (its own ability priority + pet-bar cooldowns),
+      pet-aware add selection (`IsTargetingMeOrMyPet`), and multi-target taunt redirect.
 - [ ] **`SpreadDot`** shared block (with Warlock) — apply / maintain a DoT across several enemies.
 - [ ] Content port — important debuffs / dispels from the old project.
 - [ ] CI (build + tests) and DLL releases.

@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using AIO3.Core.Game;
+using robotManager.Helpful;
 using wManager.Events;
 using wManager.Wow.Class;
 using wManager.Wow.Helpers;
 using wManager.Wow.ObjectManager;
 using WReaction = wManager.Wow.Enums.Reaction;
+using HitFlags = wManager.Wow.Enums.CGWorldFrameHitFlags;
 
 namespace AIO3.Adapter
 {
@@ -42,6 +44,13 @@ namespace AIO3.Adapter
         private int _itemScanAt;
         private readonly Dictionary<string, (bool value, int at)> _usableCache = new Dictionary<string, (bool, int)>();
         private readonly Dictionary<string, (bool value, int at)> _currentSpellCache = new Dictionary<string, (bool, int)>();
+
+        // Pet action-bar cache. The bar is stable per pet, so we scan it once per pet (refreshed on a pet
+        // change or a short TTL) and answer PetHasAbility from the set — keeping the "pet lacks this
+        // ability" path cheap (a HashSet lookup, no per-tick Lua) so an absent taunt is handled for free.
+        private ulong _petBarGuid;
+        private int _petBarAt;
+        private HashSet<string> _petAbilities = new HashSet<string>();
 
         private static int Now => Environment.TickCount;
 
@@ -138,6 +147,17 @@ namespace AIO3.Adapter
             {
                 WoWUnit t = ObjectManager.Target;
                 return (t != null && t.IsValid && t.Guid != 0) ? new WRobotUnit(t) : null;
+            }
+        }
+
+        public IWowUnit Pet
+        {
+            get
+            {
+                // IsValid distinguishes "have a pet" (even when dead) from "no pet" — key on existence,
+                // never on level. A dead pet returns a (non-alive) wrapper so the controller can revive it.
+                WoWUnit p = ObjectManager.Pet;
+                return (p != null && p.IsValid && p.Guid != 0) ? new WRobotUnit(p) : null;
             }
         }
 
@@ -251,7 +271,10 @@ namespace AIO3.Adapter
         private static string LuaUnitId(WoWUnit unit)
         {
             if (unit.Guid == ObjectManager.Me.Guid) return "player";
-            if (unit.Guid == ObjectManager.Target.Guid) return "target";
+            WoWUnit pet = ObjectManager.Pet;
+            if (pet != null && pet.IsValid && unit.Guid == pet.Guid) return "pet"; // e.g. Mend Pet
+            WoWUnit target = ObjectManager.Target;
+            if (target != null && unit.Guid == target.Guid) return "target";
             ObjectManager.Me.FocusGuid = unit.Guid;
             return "focus";
         }
@@ -261,6 +284,91 @@ namespace AIO3.Adapter
             // Verified API: WoWUnit.Target is a settable ulong (GUID) on the local player that performs
             // the actual in-game target switch, so WRobot's facing/movement follows the new target.
             if (unit != null && unit.Guid != 0) ObjectManager.Me.Target = unit.Guid;
+        }
+
+        public bool StepBack(float yards)
+        {
+            var me = ObjectManager.Me;
+            Vector3 pos = me.Position;
+            // The spot we'd back into (Rotation is the facing in radians; +PI = directly behind).
+            Vector3 dest = pos.InFrontOf(me.Rotation + (float)System.Math.PI, yards);
+
+            // Cliff guard: probe straight DOWN at the destination — require solid ground within a safe drop,
+            // else it's a ledge and we refuse. This is what actually prevents walking off an edge (the old
+            // AIO only checked horizontally and could fall). One cheap trace; no PathFinder (it was the 20ms+
+            // tick spike) — a short straight backstep's real danger is a cliff right behind, which this catches.
+            var top = new Vector3(dest.X, dest.Y, pos.Z + 2f, "None");
+            var bottom = new Vector3(dest.X, dest.Y, pos.Z - 5f, "None"); // 5y = max tolerated drop
+            if (!TraceLine.TraceLineGo(top, bottom, HitFlags.HitTestGroundAndStructures, out _)) return false;
+
+            // Back up with a held key-press, NOT MovementManager.MoveTo: a running WRobot product owns the
+            // MoveTo pathing and overrides it on the next frame (the reported "backpedal doesn't work"), and
+            // a MoveTo turns the character around to run away — which looks bad and loses the ranged facing.
+            // A backpedal key-press keeps us facing the mob and physically steps back. We then SLEEP the same
+            // duration so the rotation pauses (no melee/cast mid-step) — a clean "step back a bit, then
+            // resume" instead of casting while sliding backwards. The loop holds no frame lock here.
+            int ms = System.Math.Min(1500, (int)(yards / 5f * 1000f));
+            Move.Backward(Move.MoveAction.PressKey, ms);
+            System.Threading.Thread.Sleep(ms);
+            return true;
+        }
+
+        public void PetAttack(IWowUnit target)
+        {
+            if (!(target is WRobotUnit wTarget)) return;
+            WoWUnit unit = wTarget.Inner;
+            WoWUnit pet = ObjectManager.Pet;
+            if (unit == null || !unit.IsValid || pet == null || !pet.IsValid) return;
+
+            // If the unit is our current target the simple form works; otherwise park its GUID on focus
+            // and use the macro conditional (the pattern the old AIO uses), then clear focus again.
+            WoWUnit current = ObjectManager.Target;
+            if (current != null && current.IsValid && current.Guid == unit.Guid)
+            {
+                Lua.LuaDoString("PetAttack('target');");
+            }
+            else
+            {
+                ObjectManager.Me.FocusGuid = unit.Guid;
+                Lua.RunMacroText("/petattack [@focus]");
+                Lua.LuaDoString("ClearFocus();");
+            }
+        }
+
+        public bool PetHasAbility(string name) => PetAbilities().Contains(name);
+
+        public bool CastPetAbility(string name)
+        {
+            if (!PetHasAbility(name)) return false; // cheap (cached) — no Lua when the pet doesn't have it
+            // Proven pattern from the old PetManager: find the action slot by name, cast it if off cooldown.
+            return Lua.LuaDoString<bool>(
+                "local idx=0 for i=1,10 do local n=GetPetActionInfo(i) if n=='" + name + "' then idx=i end end " +
+                "if idx>0 then local s,d=GetPetActionCooldown(idx) if (d-(GetTime()-s))<=0 then CastPetAction(idx) return true end end return false");
+        }
+
+        // The current pet's action-bar ability names, scanned once per pet (5s TTL) via Lua.
+        private HashSet<string> PetAbilities()
+        {
+            WoWUnit pet = ObjectManager.Pet;
+            ulong guid = (pet != null && pet.IsValid) ? pet.Guid : 0;
+            if (guid == 0)
+            {
+                if (_petAbilities.Count != 0) _petAbilities = new HashSet<string>();
+                _petBarGuid = 0;
+                return _petAbilities;
+            }
+            if (guid == _petBarGuid && unchecked(Now - _petBarAt) < 5000) return _petAbilities;
+
+            string raw = Lua.LuaDoString<string>(
+                "local t='' for i=1,10 do local n=GetPetActionInfo(i) if n then t=t..n..'|' end end return t");
+            var set = new HashSet<string>();
+            if (!string.IsNullOrEmpty(raw))
+                foreach (string n in raw.Split('|'))
+                    if (n.Length > 0) set.Add(n);
+            _petAbilities = set;
+            _petBarGuid = guid;
+            _petBarAt = Now;
+            return _petAbilities;
         }
 
         public void RunLocked(Action action)

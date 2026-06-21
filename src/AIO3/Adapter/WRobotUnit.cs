@@ -32,6 +32,8 @@ namespace AIO3.Adapter
         public bool IsCasting => _unit.IsCast;
         public int CastingSpellId => _unit.CastingSpellId;
         public bool IsTargetingMe => _unit.IsTargetingMe;
+        public bool IsTargetingMyPet => _unit.IsTargetingMyPet;
+        public ulong TargetGuid => _unit.Target; // WoWUnit.Target is the GUID of this unit's current target
         public bool IsAttackable => _unit.IsAttackable;
         public bool IsElite => _unit.IsElite;
 

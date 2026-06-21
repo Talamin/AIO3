@@ -19,6 +19,11 @@ namespace AIO3.Core.Combat
         public IGameClient Game { get; }
         public IWowUnit Me { get; }
         public IWowUnit Target { get; }
+
+        /// <summary>The player's pet snapshot, or null if none exists (petless / below taming level /
+        /// dismissed). Captured under the frame lock like the other units; pet steps key on this.</summary>
+        public IWowUnit Pet { get; }
+
         public IReadOnlyList<IWowUnit> Enemies { get; }
         public IReadOnlyList<IWowUnit> Party { get; }
 
@@ -36,13 +41,15 @@ namespace AIO3.Core.Combat
             IReadOnlyList<IWowUnit> enemies,
             IReadOnlyList<IWowUnit> party,
             InterruptTracker interrupts = null,
-            DamageTracker damage = null)
+            DamageTracker damage = null,
+            IWowUnit pet = null)
         {
             Game = game;
             Me = me;
             Target = target;
             Enemies = enemies;
             Party = party;
+            Pet = pet;
             Interrupts = interrupts ?? new InterruptTracker();
             Damage = damage ?? new DamageTracker();
         }
@@ -55,7 +62,8 @@ namespace AIO3.Core.Combat
             game.Enemies.ToArray(),
             game.Party.ToArray(),
             interrupts,
-            damage);
+            damage,
+            game.Pet);
 
         // --- shared, computed-once world facts ---
 

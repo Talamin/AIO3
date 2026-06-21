@@ -34,6 +34,14 @@ namespace AIO3.Core.Game
         Reaction Reaction { get; }
         bool IsTargetingMe { get; }
 
+        /// <summary>True if this unit is currently targeting the player's pet. Lets the pet controller keep
+        /// holding a mob it already peeled (so it doesn't thrash back to the main target).</summary>
+        bool IsTargetingMyPet { get; }
+
+        /// <summary>GUID of the unit this unit is currently targeting, or 0. Used for pet/target
+        /// coordination (e.g. "is my pet already attacking my target?").</summary>
+        ulong TargetGuid { get; }
+
         /// <summary>Whether the player may actually attack this unit (false for friendly NPCs).</summary>
         bool IsAttackable { get; }
 

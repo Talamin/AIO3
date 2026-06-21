@@ -4,12 +4,13 @@ AIO3 is a ground-up rework of the [Talamin/AIO-Public](https://github.com/Talami
 WRobot fightclass. It keeps the proven **Action Priority List (APL)** model from the original
 but rebuilds the foundation to be **layered, testable, and configurable in-game**.
 
-> Status: functional and in active use. **Warrior** (Fury / Arms / Protection) and **Paladin**
-> (Retribution / Protection) run end-to-end in-game as full solo leveling APLs (10–80), with talent
-> auto-assign, an in-game settings overlay, per-character persistence, runtime spec selection, empirical
-> interrupt learning, and a tuned performance path. Each class is a self-contained **module**
-> (`IClassModule`) so the entry point is class-agnostic — adding the next class is dropping in a module.
-> The remaining classes are not implemented yet (the foundation is built to add them).
+> Status: functional and in active use. **Warrior** (Fury / Arms / Protection), **Paladin**
+> (Retribution / Protection) and **Hunter** (Beast Mastery) run end-to-end in-game as solo leveling APLs
+> (10–80), with talent auto-assign, an in-game settings overlay, per-character persistence, runtime spec
+> selection, empirical interrupt learning, and a tuned performance path. Each class is a self-contained
+> **module** (`IClassModule`) so the entry point is class-agnostic — adding the next class is dropping in a
+> module. The Hunter brought a shared **pet controller** (`PetControl`). The remaining classes are not
+> implemented yet (the foundation is built to add them).
 
 ## Design goals
 
@@ -35,6 +36,12 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
   live (an `Auto` choice picks a spec-appropriate default and falls back as you learn better options).
   Self-sustained while leveling (Holy Light / Art of War Flash of Light / Lay on Hands / Divine Plea).
   Holy is intentionally absent — it is a healer, not a solo leveling spec.
+- **Hunter — Beast Mastery**, ranged + pet. Brings the shared, class-agnostic **pet controller**
+  (`PetControl`): keep the pet summoned / revived / healed, send it to the target, and **taunt** to pull
+  mobs back onto it. Everything pet-related keys on the pet *actually existing* (never on level), so a
+  petless hunter (below the taming level / untamed / a product owning the pet) plays as a clean ranged DPS
+  with the pet steps skipped — and a taunt is only used if that pet actually has one (an Imp has none).
+  The aspect (Viper ↔ Hawk/Dragonhawk) is managed by mana with hysteresis. Marksmanship / Survival are next.
 - **Interrupts** — `Smart` / `Always` / `Never`. `Smart` empirically learns which casts are actually
   (non-)interruptible from the combat log and persists that per character (the API flag is unreliable).
 - **Auto target switching** — **on by default** (toggle per class). Among enemies already attacking you
