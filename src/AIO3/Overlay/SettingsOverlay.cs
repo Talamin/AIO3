@@ -103,7 +103,13 @@ namespace AIO3.Overlay
 
             var sb = new StringBuilder();
             sb.Append("if AIO3Frame then AIO3Frame:Hide() end\n");
-            sb.Append("AIO3Bridge = AIO3Bridge or {}\n");
+            // Start the C#<->Lua bridge fresh each time the frame is (re)built. The frame is built once per
+            // fightclass load, right AFTER settings are loaded from persistence, so the C# Setting objects
+            // are the source of truth here — each widget below seeds its bridge key from them. Reusing a
+            // stale bridge (it is a Lua global that survives fightclass reloads / class switches, and the
+            // keys are shared across classes) made a Paladin inherit the Warrior's last values and the first
+            // Poll() then wrote those back over the real defaults. Resetting kills that.
+            sb.Append("AIO3Bridge = {}\n");
             sb.Append("AIO3Frame = CreateFrame(\"Frame\",\"AIO3Frame\",UIParent)\n");
             sb.Append("AIO3Frame:SetWidth(").Append(width).Append(") AIO3Frame:SetHeight(").Append(height).Append(")\n");
             sb.Append("AIO3Frame:SetPoint(\"CENTER\",0,220)\n");
