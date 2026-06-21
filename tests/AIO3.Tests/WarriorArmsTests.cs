@@ -47,6 +47,26 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Charges_directly_from_battle_stance_without_a_dance()
+        {
+            // Arms is already in its home Battle Stance, so Charge needs no stance switch — neither the
+            // dance min-range nor the rage gate apply. It charges across the whole 8-25y even at a closer
+            // range and with rage in the bank (Charge from Battle Stance loses nothing).
+            var fs = new WarriorSettings();
+            fs.UseGapClosers.Value = true;
+            FakeGameClient game = ArmsGame(); // Battle Stance home
+            game.TargetUnit.Distance = 12;    // inside the dance min-range
+            game.MeUnit.Rage = 30;            // would block a *switch*, but there is none here
+            game.KnownSpells.Add("Charge");
+
+            RotationStep fired = new RotationEngine(new SoloArms(fs).BuildSteps())
+                .Tick(CombatContext.Capture(game));
+
+            Assert.Equal("Charge", fired?.Name);
+            Assert.Contains("Charge", game.CastLog);
+        }
+
+        [Fact]
         public void Mortal_Strike_is_the_core_strike()
         {
             FakeGameClient game = ArmsGame();

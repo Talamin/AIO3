@@ -175,7 +175,7 @@ namespace AIO3.Tests
             var fs = new WarriorSettings();
             fs.UseGapClosers.Value = true; // opt-in (off by default)
             FakeGameClient game = WarriorGame(); // Berserker stance (Fury home)
-            game.TargetUnit.Distance = 15;
+            game.TargetUnit.Distance = 20;       // far enough that the switch won't overrun the 8y minimum
             game.KnownSpells.Add("Charge"); // Intercept unlearned
 
             var engine = new RotationEngine(new SoloFury(fs).BuildSteps());
@@ -190,6 +190,39 @@ namespace AIO3.Tests
             game.CastLog.Clear();
             engine.Tick(CombatContext.Capture(game));
             Assert.Contains("Charge", game.CastLog);
+        }
+
+        [Fact]
+        public void Charge_dance_does_not_start_when_too_close_to_switch()
+        {
+            // Inside the dance range (8 < d < 18): switching stance now would close inside Charge's 8y
+            // minimum mid-switch and waste the dance — so we don't start it, we just walk in.
+            var fs = new WarriorSettings();
+            fs.UseGapClosers.Value = true;
+            FakeGameClient game = WarriorGame(); // Berserker stance, 0 rage
+            game.TargetUnit.Distance = 12;
+            game.KnownSpells.Add("Charge");
+
+            RotationStep fired = Fire(game, new SoloFury(fs));
+            Assert.NotEqual("Charge", fired?.Name);
+            Assert.DoesNotContain("Battle Stance", game.CastLog); // no wasted stance switch
+        }
+
+        [Fact]
+        public void Charge_dance_does_not_start_while_we_still_have_rage()
+        {
+            // Far enough to dance, but a stance switch would zero our rage and we can spend it reaching
+            // melee — so keep the rage and walk in instead of dancing.
+            var fs = new WarriorSettings();
+            fs.UseGapClosers.Value = true;
+            FakeGameClient game = WarriorGame(); // Berserker stance
+            game.TargetUnit.Distance = 20;
+            game.MeUnit.Rage = 30;
+            game.KnownSpells.Add("Charge");
+
+            RotationStep fired = Fire(game, new SoloFury(fs));
+            Assert.NotEqual("Charge", fired?.Name);
+            Assert.DoesNotContain("Battle Stance", game.CastLog);
         }
 
         [Fact]
