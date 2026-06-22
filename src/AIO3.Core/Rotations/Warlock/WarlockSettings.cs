@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AIO3.Core.Combat;
 using AIO3.Core.Settings;
 
 namespace AIO3.Core.Rotations.Warlock
@@ -37,6 +38,15 @@ namespace AIO3.Core.Rotations.Warlock
         public readonly IntSetting PetHealPercent =
             new IntSetting("petHeal", "Health Funnel pet below HP%", value: 0, min: 0, max: 100, step: 5);
 
+        /// <summary>Let the Voidwalker TANK mobs off you: it taunts (Torment) whatever is attacking the cloth
+        /// caster — the big solo survival win. Auto-skips for Imp / Felhunter (no Torment).</summary>
+        public readonly ToggleSetting PetTank =
+            new ToggleSetting("petTank", "Pet tanks (taunt off you)", value: true);
+
+        /// <summary>Let the Imp keep firing Firebolt (its ranged nuke). Usually autocast already; harmless. Auto-skips for non-Imps.</summary>
+        public readonly ToggleSetting ImpFirebolt =
+            new ToggleSetting("impFirebolt", "Imp casts Firebolt", value: true);
+
         // --- Rotation ---
 
         /// <summary>Combat distance reported to WRobot (ICustomClass.Range). A warlock casts at range; the wand
@@ -52,6 +62,12 @@ namespace AIO3.Core.Rotations.Warlock
         /// <summary>Use offensive racials (Blood Fury / Berserking) in combat.</summary>
         public readonly ToggleSetting UseRacials =
             new ToggleSetting("racials", "Use racials", value: true);
+
+        /// <summary>How to interrupt enemy casts with the Felhunter's Spell Lock (the warlock's only interrupt):
+        /// Smart / Always / Never. Smart currently behaves like Always (fire on any target cast); the empirical
+        /// InterruptTracker integration is a later refinement. Auto-skips when the pet isn't a Felhunter.</summary>
+        public readonly ChoiceSetting InterruptCasts =
+            new ChoiceSetting("interrupt", "Interrupt casts (Spell Lock)", InterruptModes.Smart, InterruptModes.All);
 
         // --- Demonology ---
 
@@ -84,6 +100,20 @@ namespace AIO3.Core.Rotations.Warlock
         /// <summary>Channel Drain Life to self-heal when low and solo (no healer to rely on). 0 disables it.</summary>
         public readonly IntSetting DrainLifeHealthPercent =
             new IntSetting("drainLifeHp", "Drain Life below HP%", value: 40, min: 0, max: 90, step: 5);
+
+        /// <summary>EMERGENCY Fear: with no Frost Nova, Fear the mob meleeing you to break melee for a brief heal
+        /// window when low. A panic button, not a kite (DoTs break Fear).</summary>
+        public readonly ToggleSetting UseFear =
+            new ToggleSetting("useFear", "Emergency Fear when meleed + low HP", value: true);
+
+        /// <summary>Fire the emergency Fear / Howl only below this health %. 0 disables both.</summary>
+        public readonly IntSetting FearHealthPercent =
+            new IntSetting("fearHp", "Emergency Fear/Howl below HP%", value: 25, min: 0, max: 90, step: 5);
+
+        /// <summary>EMERGENCY Howl of Terror: when SURROUNDED (>= 2 mobs meleeing you) and low, fear everything
+        /// nearby (self-cast PBAoE, like Frost Nova).</summary>
+        public readonly ToggleSetting UseHowl =
+            new ToggleSetting("useHowl", "Emergency Howl when surrounded + low HP", value: true);
 
         // --- Mana ---
 
@@ -137,10 +167,13 @@ namespace AIO3.Core.Rotations.Warlock
             Pet.Category = "Pet";
             ManagePet.Category = "Pet";
             PetHealPercent.Category = "Pet";
+            PetTank.Category = "Pet";
+            ImpFirebolt.Category = "Pet";
 
             CombatRange.Category = "Rotation";
             Curse.Category = "Rotation";
             UseRacials.Category = "Rotation";
+            InterruptCasts.Category = "Rotation";
             EmergencyHealthPercent.Category = "Rotation";
 
             DemonicEmpowerment.Category = "Demonology";
@@ -150,6 +183,9 @@ namespace AIO3.Core.Rotations.Warlock
             UseChaosBolt.Category = "Destruction";
 
             DrainLifeHealthPercent.Category = "Survival";
+            UseFear.Category = "Survival";
+            FearHealthPercent.Category = "Survival";
+            UseHowl.Category = "Survival";
 
             LifeTapManaPercent.Category = "Mana";
             LifeTapHealthFloor.Category = "Mana";
@@ -168,15 +204,15 @@ namespace AIO3.Core.Rotations.Warlock
                 // Buffs
                 ArmorChoice,
                 // Pet
-                Pet, ManagePet, PetHealPercent,
+                Pet, ManagePet, PetHealPercent, PetTank, ImpFirebolt,
                 // Rotation
-                CombatRange, Curse, UseRacials, EmergencyHealthPercent,
+                CombatRange, Curse, UseRacials, InterruptCasts, EmergencyHealthPercent,
                 // Demonology
                 DemonicEmpowerment, UseSoulFire,
                 // Destruction
                 UseConflagrate, UseChaosBolt,
                 // Survival
-                DrainLifeHealthPercent,
+                DrainLifeHealthPercent, UseFear, FearHealthPercent, UseHowl,
                 // Mana
                 LifeTapManaPercent, LifeTapHealthFloor, GlyphLifeTap, UseWand, WandManaPercent,
                 // Spec

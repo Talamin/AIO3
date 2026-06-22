@@ -46,7 +46,9 @@ namespace AIO3.Core.Rotations.Warlock
 
         public IReadOnlyList<RotationStep> BuildSteps() => _steps;
 
-        private List<RotationStep> Build() => new List<RotationStep>
+        // Build the core list once, then splice the demon's own special abilities (Torment / Spell Lock /
+        // Firebolt) onto the end with the shared WarlockCommon.WithPetSpecials (mirrors the hunter).
+        private List<RotationStep> Build() => (List<RotationStep>)WarlockCommon.WithPetSpecials(_settings, new List<RotationStep>
         {
             // --- emergency survival ---
             CombatBlocks.UseItems("Emergency heal", Consumables.HealthItems,
@@ -71,6 +73,12 @@ namespace AIO3.Core.Rotations.Warlock
             WarlockCommon.Wand(_settings, priority: 1.0f),
             WarlockCommon.LifeTap(_settings, priority: 1.5f),
             WarlockCommon.GlyphLifeTap(_settings, priority: 1.6f),
+
+            // --- EMERGENCY break-melee (no Frost Nova; panic buttons, gated tightly on low HP) ---
+            // Above Drain Life: you can't safely channel a heal while a mob beats on you — break melee first.
+            // Howl (surrounded) outranks single Fear; both skip cleanly when unknown / not low / not meleed.
+            WarlockCommon.HowlOfTerror(_settings, priority: 1.85f),
+            WarlockCommon.Fear(_settings, priority: 1.9f),
 
             // --- self-heal (channel → stand still; shared block owns the gate) ---
             WarlockCommon.DrainLife(_settings, priority: 2.0f),
@@ -103,6 +111,6 @@ namespace AIO3.Core.Rotations.Warlock
             // Shadow Bolt is the fallback filler before Incinerate is learned (auto-skips once Incinerate wins).
             Skill.Spell("Shadow Bolt").Priority(20f).On(Targets.CurrentEnemy)
                  .When(ctx => !ctx.Game.IsSpellKnown(Incinerate) && !ctx.Game.PlayerIsMoving),
-        };
+        });
     }
 }
