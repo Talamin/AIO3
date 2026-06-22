@@ -13,7 +13,8 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
 > **pet controller** (`PetControl`); the Mage brought the **caster baseline** (`MageCommon`: mana, kiting,
 > conjuring). The **Warlock** brings all three solo specs (**Affliction / Demonology / Destruction**) on a
 > `WarlockCommon` caster baseline + the shared pet controller — built and unit-tested, **not yet in-game
-> verified**, with multi-target DoT spreading (`SpreadDot`) and Fear kiting still to follow. The remaining
+> verified**, including pet specials (Torment tank-taunt, Spell Lock interrupt, Firebolt) and emergency Fear /
+> Howl of Terror, with multi-target DoT spreading (`SpreadDot`) still to follow. The remaining
 > classes are not implemented yet (the foundation is built to add them).
 
 ## Design goals

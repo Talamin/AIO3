@@ -21,9 +21,10 @@ casters → DoT-spreading — and then fills in the remaining classes.
 - [~] **Warlock** — caster + permanent pet + DoTs: reuses the pet controller and builds the
       **`SpreadDot`** shared block. *(All three solo specs done (Affliction / Demonology / Destruction) on a
       `WarlockCommon` caster baseline + per-spec Auto pet (Voidwalker / Felguard / Imp) — DoT upkeep, Life Tap,
-      Drain Life, wand, Conflagrate/Incinerate, Demonic Empowerment/Soul Fire. Not yet in-game-verified.
-      Still to do: multi-target SpreadDot (needs a focus-DoT adapter seam), Fear/Howl kiting, pet special
-      abilities (Spell Lock / Torment / Firebolt), Metamorphosis, Soulstone / Death Coil.)*
+      Drain Life, wand, Conflagrate/Incinerate, Demonic Empowerment/Soul Fire, pet specials (Torment tank-taunt,
+      Spell Lock interrupt, Firebolt), and emergency Fear / Howl of Terror. Not yet in-game-verified. Still to do:
+      multi-target SpreadDot (needs a focus-DoT adapter seam; deferred — not needed for solo), Metamorphosis,
+      Soulstone / Death Coil, the remaining pet abilities (Devour Magic / Sacrifice / Seduction / Felguard Cleave).)*
 - [ ] **Rogue** — melee, energy / combo points.
 - [ ] **Priest** (Shadow) — caster DoTs (+ healing later).
 - [ ] **Death Knight** — melee, runes / runic power + temporary pet.
