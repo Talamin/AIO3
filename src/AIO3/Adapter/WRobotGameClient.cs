@@ -454,9 +454,10 @@ namespace AIO3.Adapter
 
         private int _lastAuraDumpAt; // throttle for the diagnostic aura dump below
 
-        /// <summary>Diagnostic (Debug logging only, throttled): logs OUR position and the target's position +
-        /// auras, plus every other nearby hostile's position — so we can tell exactly WHO moves between ticks
-        /// (player swims in vs. mob holds), read the water Z-offset, and see adds. Fight thread; never throws.</summary>
+        /// <summary>Diagnostic (Debug logging only, throttled): logs OUR position + health/mana + our own buffs
+        /// (procs like Shadow Trance / Brain Freeze, armor, Life Tap glyph), the target's position + auras (DoT
+        /// uptime), the PET's state, and every other nearby hostile — so we can see WHO moves between ticks, the
+        /// water Z-offset, DoT/proc/pet state, and adds. Fight thread; never throws.</summary>
         private void DumpTargetAuras(WoWUnit unit)
         {
             if (!DebugLog.Enabled || unit == null || !unit.IsValid) return;
@@ -464,18 +465,28 @@ namespace AIO3.Adapter
             _lastAuraDumpAt = Now;
             try
             {
-                ulong me = ObjectManager.Me.Guid;
-                Vector3 mp = ObjectManager.Me.Position, tp = unit.Position;
+                WoWUnit meUnit = ObjectManager.Me;
+                ulong me = meUnit.Guid;
+                Vector3 mp = meUnit.Position, tp = unit.Position;
                 string auras = string.Join(", ", BuffManager.GetAuras(unit.GetBaseAddress)
                     .Select(a => $"{a.SpellId}:{a.GetSpell?.Name}(o={(a.Owner == me ? "me" : a.Owner.ToString())})"));
+                // Our own buffs (by name) — armor, Life Tap glyph, procs (Shadow Trance / Brain Freeze / Hot Streak).
+                string self = string.Join(",", BuffManager.GetAuras(meUnit.GetBaseAddress)
+                    .Select(a => a.GetSpell?.Name).Where(n => !string.IsNullOrEmpty(n)));
+                // Pet state (pet casters: Voidwalker / Imp / Water Elemental) — alive, health, distance.
+                WoWUnit pet = ObjectManager.Pet;
+                string petStr = (pet != null && pet.IsValid && pet.IsAlive)
+                    ? $" | pet {pet.Name} hp={pet.HealthPercent:0}% @{pet.GetDistance:0.#}" : "";
                 // Other nearby hostiles (adds), '*' = targeting me — so a second add and who it's on is visible.
                 string others = string.Join(", ", ObjectManager.GetObjectWoWUnit()
                     .Where(o => o != null && o.IsValid && o.IsAlive && o.IsAttackable
                                 && o.Reaction <= WReaction.Neutral && o.Guid != unit.Guid && o.GetDistance <= 40)
                     .Select(o => $"{o.Name}@{o.GetDistance:0.#}({o.Position.X:0.#},{o.Position.Y:0.#},{o.Position.Z:0.#}){(o.IsTargetingMe ? "*" : "")}"));
-                DebugLog.Write($"pos me=({mp.X:0.#},{mp.Y:0.#},{mp.Z:0.#}) | tgt {unit.Name}@{unit.GetDistance:0.#} "
-                    + $"hp={unit.HealthPercent:0}% onMe={unit.IsTargetingMe} ({tp.X:0.#},{tp.Y:0.#},{tp.Z:0.#}) "
-                    + $"| auras: {auras}" + (others.Length > 0 ? $" | others: {others}" : ""));
+                DebugLog.Write($"pos me=({mp.X:0.#},{mp.Y:0.#},{mp.Z:0.#}) hp={meUnit.HealthPercent:0}% mp={meUnit.ManaPercentage:0}% "
+                    + $"| tgt {unit.Name}@{unit.GetDistance:0.#} hp={unit.HealthPercent:0}% onMe={unit.IsTargetingMe} ({tp.X:0.#},{tp.Y:0.#},{tp.Z:0.#}) "
+                    + $"| auras: {auras}{petStr}"
+                    + (self.Length > 0 ? $" | self: {self}" : "")
+                    + (others.Length > 0 ? $" | others: {others}" : ""));
             }
             catch { }
         }
