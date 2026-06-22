@@ -17,6 +17,7 @@ namespace AIO3.Core.Rotations
                 case WowClass.Paladin: return new PaladinModule();
                 case WowClass.Hunter: return new HunterModule();
                 case WowClass.Mage: return new MageModule();
+                case WowClass.Warlock: return new WarlockModule();
                 default: return null;
             }
         }
