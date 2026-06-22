@@ -34,13 +34,24 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
 
 ## What's implemented
 
-- **Warrior — Fury / Arms / Protection**, each a single solo leveling APL that fills in as you level
-  (unknown spells auto-skip). Talent points are auto-assigned per spec out of combat.
-- **Paladin — Retribution / Protection**, the same single-APL-per-spec model. Brings the shared
-  **seal / aura / blessing / judgement** upkeep system (`PaladinCommon`): the buff choices are resolved
-  live (an `Auto` choice picks a spec-appropriate default and falls back as you learn better options).
-  Self-sustained while leveling (Holy Light / Art of War Flash of Light / Lay on Hands / Divine Plea).
-  Holy is intentionally absent — it is a healer, not a solo leveling spec.
+- **Warrior — Fury / Arms / Protection**, melee rage. Each spec manages its **stance** (Fury → Berserker,
+  Arms → Battle, Protection → Defensive, falling back to whatever's learned) and works the **gap-closers** as a
+  *stance-dance*: to **Charge** out of combat it switches to Battle Stance, charges, then restores the home
+  stance; **Intercept** covers the in-combat gap (gap-closers default off — they move the character, which a
+  WRobot product may own). On top of that: rage-gated ability choice (pool vs. dump), **Heroic Strike / Cleave**
+  as an on-next-swing rage dump (guarded so the 50 ms tick doesn't re-queue it every frame), **Rend** (refreshed,
+  skipped on bleed-immune creatures and bosses), **Execute** under 20%, **Victory Rush**, **Bloodrage**,
+  **Hamstring / Piercing Howl** slows, **AoE** (Thunder Clap / Whirlwind / Cleave at 2+ enemies in range), a
+  **burst** cooldown (Recklessness on a boss / elite / pack), **defensives** (Last Stand / Shield Wall / Shield
+  Block, Enraged Regeneration, Berserker Rage to break fear), an emergency Healthstone / potion, racials, and a
+  **Pummel / Shield Bash** interrupt. Talent points auto-assign per spec out of combat.
+- **Paladin — Retribution / Protection** (Holy is intentionally absent — a healer, not a solo leveling spec).
+  Brings the shared **seal / aura / blessing / judgement** upkeep (`PaladinCommon`), each resolved **live** so an
+  `Auto` choice picks a spec-appropriate default and falls back as you learn better options. **Retribution**:
+  Judgement → Exorcism (on an Art-of-War proc) → Divine Storm → Crusader Strike, Hammer of Wrath under 20%,
+  Consecration / Holy Wrath on packs. **Protection**: Righteous Fury + Holy Shield upkeep, Shield of
+  Righteousness → Hammer of the Righteous, Avenger's Shield gated so it never pulls (the product owns the opener).
+  Self-sustained while leveling (Art-of-War Flash of Light / Lay on Hands / Divine Plea). Talents auto-assign.
 - **Hunter — Beast Mastery / Marksmanship / Survival**, ranged + pet. Brings the shared, class-agnostic
   **pet controller** (`PetControl`): keep the pet summoned / revived / healed, send it to the target,
   **peel** adds off you (it redirects to the lowest-HP mob attacking *you*, then a mob attacking the pet),
@@ -59,7 +70,17 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
   suppressed while swimming (the product wins the position fight in water, so the mage just stands and nukes).
   **Self-sufficient** — conjures its own food / water / mana gem and points WRobot at the best conjured food
   in the bags to eat/drink; summons and directs a **Water Elemental** (Frost). Polymorphs an extra attacker
-  (off by default; only sheepable creature types, resolved live).
+  (off by default; only sheepable creature types, resolved live) and, after the kill, retargets its own sheeped
+  add so it gets finished instead of waking up untended.
+- **Warlock — Affliction / Demonology / Destruction**, caster + permanent pet + DoTs on the `WarlockCommon`
+  caster baseline (Fel / Demon Armor, **Life Tap** for mana, Drain Life self-heal, wand). Each spec keeps its
+  DoTs up (Corruption / Immolate / Unstable Affliction / the chosen Curse / Haunt) and fills with its signature
+  damage — Shadow Bolt, **Conflagrate + Incinerate** (Destruction), Soul-Fire-on-proc + **Demonic Empowerment**
+  (Demonology). A **per-spec Auto pet** (Affliction → Voidwalker, Demonology → Felguard, Destruction → Imp, with
+  fallback) is summoned and commanded through the shared pet controller, including its **special abilities** —
+  **Torment** (the Voidwalker tanks mobs off the cloth caster), **Spell Lock** (the Felhunter is the warlock's
+  *only* interrupt) and the Imp's Firebolt. **Emergency Fear / Howl of Terror** break melee when you're low and
+  surrounded so you can heal. *(Built and unit-tested; not yet in-game-verified.)*
 - **Cliff-safe backpedal** — when a mob is in the hunter's face (on the pet, inside melee range), the
   hunter steps back to restore ranged distance, refusing to move over a ledge (a downward trace guards the
   destination). The hop runs *on WRobot's own fight-loop thread* and briefly cancels its move-to-range for
