@@ -18,8 +18,10 @@ casters → DoT-spreading — and then fills in the remaining classes.
       Fire / Arcane solo leveling specs; `MageCommon` caster baseline — armor, mana, survival, kiting
       (Frost Nova → Blink / step-back, suppressed while swimming), Polymorph adds, Water Elemental,
       conjure + eat/drink best bag food. Skips the tick while dead/ghost.)*
-- [ ] **Warlock** — caster + permanent pet + DoTs: reuses the pet controller and builds the
-      **`SpreadDot`** shared block.
+- [~] **Warlock** — caster + permanent pet + DoTs: reuses the pet controller and builds the
+      **`SpreadDot`** shared block. *(Phase 1 done: foundation + Affliction solo spec on a `WarlockCommon`
+      caster baseline — DoT upkeep, Life Tap, Drain Life, Voidwalker. Not yet in-game-verified. Phase 2:
+      Demonology / Destruction, SpreadDot, Fear/Howl kiting, pet specials, Soulstone / Death Coil.)*
 - [ ] **Rogue** — melee, energy / combo points.
 - [ ] **Priest** (Shadow) — caster DoTs (+ healing later).
 - [ ] **Death Knight** — melee, runes / runic power + temporary pet.
