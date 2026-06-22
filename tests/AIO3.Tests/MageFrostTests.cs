@@ -333,6 +333,37 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Finishes_our_sheeped_add_after_the_target_dies()
+        {
+            // Main target dead, our Polymorphed add still up + no live target → grab it so we finish it instead of
+            // letting the product pull a fresh mob while the sheep expires and the add wakes on us.
+            FakeGameClient g = MageGame();
+            g.TargetUnit.IsAlive = false; // we just killed the main target
+            var sheeped = new FakeUnit { Guid = 7, Reaction = Reaction.Hostile, IsAttackable = true, IsAlive = true, Distance = 8, HealthPercent = 100 };
+            sheeped.WithAura("Polymorph", mine: true);
+            g.EnemyList.Add(sheeped);
+            var s = new MageSettings();
+            s.UsePolymorph.Value = true;
+
+            Assert.Equal("Finish sheeped add", Fire(g, s)?.Name);
+            Assert.Equal(7ul, g.LastSetTargetGuid); // we re-targeted the sheeped add
+        }
+
+        [Fact]
+        public void Does_not_grab_the_sheeped_add_while_a_live_target_remains()
+        {
+            // A live target is still up → keep fighting it; only finish the sheeped add in the post-kill gap.
+            FakeGameClient g = MageGame();
+            var sheeped = new FakeUnit { Guid = 7, Reaction = Reaction.Hostile, IsAttackable = true, IsAlive = true, Distance = 8, HealthPercent = 100 };
+            sheeped.WithAura("Polymorph", mine: true);
+            g.EnemyList.Add(sheeped);
+            var s = new MageSettings();
+            s.UsePolymorph.Value = true;
+
+            Assert.NotEqual("Finish sheeped add", Fire(g, s)?.Name);
+        }
+
+        [Fact]
         public void Holds_AoE_while_our_sheep_is_up()
         {
             FakeGameClient g = MageGame();

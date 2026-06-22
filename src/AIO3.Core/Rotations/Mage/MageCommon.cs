@@ -168,6 +168,18 @@ namespace AIO3.Core.Rotations.Mage
                                        && ctx.EnemiesTargetingMe >= 2,
                 action: (ctx, t) => ctx.Game.Polymorph(t) ? CastResult.Success : CastResult.Failed);
 
+        /// <summary>Finish OUR sheeped add once the main target is dead. When we have no live target but a mob we
+        /// Polymorphed is still up, target it — the next tick's nukes break the sheep and kill it. Without this the
+        /// product wanders off to a fresh pull, the Polymorph expires unattended, and the add wakes up on us. Only
+        /// acts in the post-kill gap (no live target), so it doesn't fight the product over a real multi-mob pull.</summary>
+        public static RotationStep FinishSheepedAdd(MageSettings s, float priority) =>
+            new RotationStep(
+                name: "Finish sheeped add",
+                priority: priority,
+                targets: ctx => ctx.Enemies.Where(e => e.IsAlive && e.IsAttackable && e.HasMyAura("Polymorph")),
+                condition: (ctx, t) => s.UsePolymorph.Value && !ctx.HasEnemyTarget,
+                action: (ctx, t) => { ctx.Game.SetTarget(t); return CastResult.Success; });
+
         // --- mana ---
 
         /// <summary>Channel Evocation to refill mana when low — but only when nothing is meleeing us (so the

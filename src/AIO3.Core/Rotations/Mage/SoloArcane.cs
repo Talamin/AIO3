@@ -45,6 +45,8 @@ namespace AIO3.Core.Rotations.Mage
 
             // --- CC an extra attacker first (the sheep holds: Frost Nova + AoE are suppressed while it's up) ---
             MageCommon.Polymorph(_settings, priority: 1.1f),
+            // After a kill, grab our own sheeped add (no live target) so we finish it instead of leaving it to wake.
+            MageCommon.FinishSheepedAdd(_settings, priority: 0.1f),
 
             // --- kite ---
             MageCommon.FrostNova(_settings, priority: 1.2f),
