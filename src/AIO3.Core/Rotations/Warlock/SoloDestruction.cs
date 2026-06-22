@@ -28,6 +28,8 @@ namespace AIO3.Core.Rotations.Warlock
 
         // DoT refresh window: re-apply when fewer than this many ms remain (avoid clipping ticks).
         private const int DotRefreshMs = 2000;
+        // The Destruction filler nuke — referenced twice (the cast, and the Shadow-Bolt-until-learned gate).
+        private const string Incinerate = "Incinerate";
 
         private readonly WarlockSettings _settings;
         private readonly List<RotationStep> _steps;
@@ -96,11 +98,11 @@ namespace AIO3.Core.Rotations.Warlock
             Skill.Spell("Chaos Bolt").Priority(12f).On(Targets.CurrentEnemy)
                  .When(ctx => _settings.UseChaosBolt.Value && !ctx.Game.PlayerIsMoving),
             // Incinerate is the Destruction filler (bonus on an Immolate'd target). Replaces Shadow Bolt once known.
-            Skill.Spell("Incinerate").Priority(18f).On(Targets.CurrentEnemy)
+            Skill.Spell(Incinerate).Priority(18f).On(Targets.CurrentEnemy)
                  .When(ctx => !ctx.Game.PlayerIsMoving),
             // Shadow Bolt is the fallback filler before Incinerate is learned (auto-skips once Incinerate wins).
             Skill.Spell("Shadow Bolt").Priority(20f).On(Targets.CurrentEnemy)
-                 .When(ctx => !ctx.Game.IsSpellKnown("Incinerate") && !ctx.Game.PlayerIsMoving),
+                 .When(ctx => !ctx.Game.IsSpellKnown(Incinerate) && !ctx.Game.PlayerIsMoving),
         };
     }
 }
