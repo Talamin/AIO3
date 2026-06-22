@@ -19,9 +19,11 @@ casters → DoT-spreading — and then fills in the remaining classes.
       (Frost Nova → Blink / step-back, suppressed while swimming), Polymorph adds, Water Elemental,
       conjure + eat/drink best bag food. Skips the tick while dead/ghost.)*
 - [~] **Warlock** — caster + permanent pet + DoTs: reuses the pet controller and builds the
-      **`SpreadDot`** shared block. *(Phase 1 done: foundation + Affliction solo spec on a `WarlockCommon`
-      caster baseline — DoT upkeep, Life Tap, Drain Life, Voidwalker. Not yet in-game-verified. Phase 2:
-      Demonology / Destruction, SpreadDot, Fear/Howl kiting, pet specials, Soulstone / Death Coil.)*
+      **`SpreadDot`** shared block. *(All three solo specs done (Affliction / Demonology / Destruction) on a
+      `WarlockCommon` caster baseline + per-spec Auto pet (Voidwalker / Felguard / Imp) — DoT upkeep, Life Tap,
+      Drain Life, wand, Conflagrate/Incinerate, Demonic Empowerment/Soul Fire. Not yet in-game-verified.
+      Still to do: multi-target SpreadDot (needs a focus-DoT adapter seam), Fear/Howl kiting, pet special
+      abilities (Spell Lock / Torment / Firebolt), Metamorphosis, Soulstone / Death Coil.)*
 - [ ] **Rogue** — melee, energy / combo points.
 - [ ] **Priest** (Shadow) — caster DoTs (+ healing later).
 - [ ] **Death Knight** — melee, runes / runic power + temporary pet.

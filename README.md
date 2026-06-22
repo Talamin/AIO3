@@ -11,9 +11,10 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
 > learning, and a tuned performance path. Each class is a self-contained **module** (`IClassModule`) so the
 > entry point is class-agnostic — adding the next class is dropping in a module. The Hunter brought a shared
 > **pet controller** (`PetControl`); the Mage brought the **caster baseline** (`MageCommon`: mana, kiting,
-> conjuring). The **Warlock** has landed in part — Phase 1 is the foundation + the **Affliction** solo spec
-> (DoT upkeep, Life Tap, Drain Life, Voidwalker), with Demonology / Destruction and multi-target DoT spreading
-> to follow. The remaining classes are not implemented yet (the foundation is built to add them).
+> conjuring). The **Warlock** brings all three solo specs (**Affliction / Demonology / Destruction**) on a
+> `WarlockCommon` caster baseline + the shared pet controller — built and unit-tested, **not yet in-game
+> verified**, with multi-target DoT spreading (`SpreadDot`) and Fear kiting still to follow. The remaining
+> classes are not implemented yet (the foundation is built to add them).
 
 ## Design goals
 

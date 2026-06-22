@@ -10,9 +10,8 @@ namespace AIO3.Core.Rotations.Warlock
     /// <summary>
     /// Resolves which warlock spec to run, combining a manual override with talent auto-detection.
     /// WoW's warlock talent tab order is Affliction (1), Demonology (2), Destruction (3); 0 = none spent yet.
-    /// Phase 1 only ships the Affliction solo spec — Demonology / Destruction resolve to it as a fallback
-    /// until their specs land, so a player on those trees still gets a working (if generic) rotation. With no
-    /// points yet we default to Affliction (the DoT leveling default).
+    /// All three solo specs ship, so each tab maps to its own rotation; with no points yet we default to
+    /// Affliction (the DoT leveling default).
     /// </summary>
     public static class WarlockSpecs
     {

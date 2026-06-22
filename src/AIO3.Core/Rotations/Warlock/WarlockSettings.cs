@@ -20,11 +20,13 @@ namespace AIO3.Core.Rotations.Warlock
 
         // --- Pet ---
 
-        /// <summary>Which demon to summon for solo. Voidwalker is the leveling default (tanky, holds threat).
+        /// <summary>Which demon to summon. Auto picks per spec at eval time (Demonology → Felguard, Destruction
+        /// → Imp, Affliction/other → Voidwalker), with a known-spell fallback so a low-level lock that has not
+        /// learned the spec demon yet drops to the tanky Voidwalker. A manual choice overrides Auto.
         /// Everything pet-related is also automatically skipped when petless (key is the pet existing, not level).</summary>
         public readonly ChoiceSetting Pet =
-            new ChoiceSetting("pet", "Pet", "Voidwalker",
-                new[] { "Voidwalker", "Imp", "Felhunter", "Succubus", "Felguard" });
+            new ChoiceSetting("pet", "Pet", "Auto",
+                new[] { "Auto", "Voidwalker", "Imp", "Felhunter", "Succubus", "Felguard" });
 
         /// <summary>Keep the demon summoned and pointed at the target. Turn off if a WRobot product manages the
         /// pet. (Pet steps also auto-skip when petless, since they key on the pet actually existing.)</summary>
@@ -50,6 +52,28 @@ namespace AIO3.Core.Rotations.Warlock
         /// <summary>Use offensive racials (Blood Fury / Berserking) in combat.</summary>
         public readonly ToggleSetting UseRacials =
             new ToggleSetting("racials", "Use racials", value: true);
+
+        // --- Demonology ---
+
+        /// <summary>Keep Demonic Empowerment up on the demon (spec buff; auto-skips if unknown / petless).</summary>
+        public readonly ToggleSetting DemonicEmpowerment =
+            new ToggleSetting("demonicEmpowerment", "Demonology: Demonic Empowerment on pet", value: true);
+
+        /// <summary>Cast Soul Fire when a Decimation/Molten-Core-style proc is up (gated on the buff; auto-skips
+        /// if Soul Fire is unknown). Off the proc it stays behind Shadow Bolt, so leaving this on is harmless.</summary>
+        public readonly ToggleSetting UseSoulFire =
+            new ToggleSetting("soulFire", "Demonology: Soul Fire on proc", value: true);
+
+        // --- Destruction ---
+
+        /// <summary>Use Conflagrate (consumes Immolate for a burst). Gated so it only fires while Immolate is up
+        /// on the target; auto-skips if unknown.</summary>
+        public readonly ToggleSetting UseConflagrate =
+            new ToggleSetting("conflagrate", "Destruction: use Conflagrate", value: true);
+
+        /// <summary>Use Chaos Bolt as a nuke when known (sits between Incinerate and the Shadow Bolt fallback).</summary>
+        public readonly ToggleSetting UseChaosBolt =
+            new ToggleSetting("chaosBolt", "Destruction: use Chaos Bolt", value: true);
 
         /// <summary>Use an emergency healthstone/potion below this health %. 0 disables it.</summary>
         public readonly IntSetting EmergencyHealthPercent =
@@ -119,6 +143,12 @@ namespace AIO3.Core.Rotations.Warlock
             UseRacials.Category = "Rotation";
             EmergencyHealthPercent.Category = "Rotation";
 
+            DemonicEmpowerment.Category = "Demonology";
+            UseSoulFire.Category = "Demonology";
+
+            UseConflagrate.Category = "Destruction";
+            UseChaosBolt.Category = "Destruction";
+
             DrainLifeHealthPercent.Category = "Survival";
 
             LifeTapManaPercent.Category = "Mana";
@@ -141,6 +171,10 @@ namespace AIO3.Core.Rotations.Warlock
                 Pet, ManagePet, PetHealPercent,
                 // Rotation
                 CombatRange, Curse, UseRacials, EmergencyHealthPercent,
+                // Demonology
+                DemonicEmpowerment, UseSoulFire,
+                // Destruction
+                UseConflagrate, UseChaosBolt,
                 // Survival
                 DrainLifeHealthPercent,
                 // Mana

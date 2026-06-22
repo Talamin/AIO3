@@ -61,7 +61,8 @@ namespace AIO3.Core.Rotations.Warlock
             // Summon the chosen demon when none exists; "Revive Pet" never exists for a warlock (a dead demon is
             // re-summoned), so the call spell is used for both — PetControl re-summons whenever ctx.Pet is gone.
             PetControl.Summon(ctx => _settings.ManagePet.Value,
-                WarlockCommon.SummonSpell(_settings), WarlockCommon.SummonSpell(_settings), priority: 0.6f),
+                ctx => WarlockCommon.SummonSpell(_settings, ctx, WarlockSpec.Affliction),
+                ctx => WarlockCommon.SummonSpell(_settings, ctx, WarlockSpec.Affliction), priority: 0.6f),
             PetControl.Attack(ctx => _settings.ManagePet.Value, priority: 0.7f),
             // Health Funnel the demon when low (opt-in; channelled, so only while standing still and we have HP).
             PetControl.Heal(

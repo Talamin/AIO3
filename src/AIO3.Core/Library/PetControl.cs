@@ -29,7 +29,13 @@ namespace AIO3.Core.Library
         /// already had suddenly disappears (almost always because we just mounted), wait out a short grace
         /// before re-summoning — otherwise we'd cast Call Pet into the mount-up and dismount ourselves on a
         /// loop. A pet we never had (fresh login) is summoned immediately.</summary>
-        public static RotationStep Summon(Func<CombatContext, bool> enabled, string callSpell, string reviveSpell, float priority)
+        public static RotationStep Summon(Func<CombatContext, bool> enabled, string callSpell, string reviveSpell, float priority) =>
+            Summon(enabled, ctx => callSpell, ctx => reviveSpell, priority);
+
+        /// <summary>Same as <see cref="Summon(Func{CombatContext,bool},string,string,float)"/> but resolves the
+        /// call / revive spell names at EVAL TIME — so a runtime pet choice (e.g. the warlock's per-spec "Auto"
+        /// demon with a known-spell fallback) picks the right summon each tick.</summary>
+        public static RotationStep Summon(Func<CombatContext, bool> enabled, Func<CombatContext, string> callSpell, Func<CombatContext, string> reviveSpell, float priority)
         {
             bool petSeen = false;
             int vanishedAt = 0;
@@ -161,7 +167,7 @@ namespace AIO3.Core.Library
         }
 
         // null = nothing to do (the pet exists and is alive).
-        private static string SummonSpell(CombatContext ctx, string callSpell, string reviveSpell) =>
-            ctx.Pet == null ? callSpell : (!ctx.Pet.IsAlive ? reviveSpell : null);
+        private static string SummonSpell(CombatContext ctx, Func<CombatContext, string> callSpell, Func<CombatContext, string> reviveSpell) =>
+            ctx.Pet == null ? callSpell(ctx) : (!ctx.Pet.IsAlive ? reviveSpell(ctx) : null);
     }
 }

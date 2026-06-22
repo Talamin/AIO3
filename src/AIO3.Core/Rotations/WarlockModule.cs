@@ -7,12 +7,12 @@ using AIO3.Core.Settings;
 namespace AIO3.Core.Rotations
 {
     /// <summary>
-    /// Warlock class implementation: a caster + permanent demon + DoTs. Phase 1 ships the Affliction solo
-    /// leveling spec only; Demonology / Destruction resolve but fall back to Affliction until their specs land.
-    /// Shares the <see cref="WarlockSettings"/> and the <see cref="WarlockCommon"/> caster baseline (armor,
-    /// Life Tap mana engine, Drain Life, wand) and keeps the demon up via the class-agnostic
-    /// <see cref="Library.PetControl"/>. The rotation is rebuilt only when the spec or mode changes, so the
-    /// host can swap the engine by reference comparison.
+    /// Warlock class implementation: a caster + permanent demon + DoTs. Ships the three solo leveling specs
+    /// (Affliction / Demonology / Destruction). Shares the <see cref="WarlockSettings"/> and the
+    /// <see cref="WarlockCommon"/> caster baseline (armor, Life Tap mana engine, Drain Life, wand) and keeps
+    /// the demon up via the class-agnostic <see cref="Library.PetControl"/> (the per-spec "Auto" demon resolves
+    /// at eval time: Affliction → Voidwalker, Demonology → Felguard, Destruction → Imp). The rotation is rebuilt
+    /// only when the spec or mode changes, so the host can swap the engine by reference comparison.
     /// </summary>
     public sealed class WarlockModule : IClassModule
     {
@@ -56,8 +56,15 @@ namespace AIO3.Core.Rotations
             return _rotation;
         }
 
-        // Phase 1 ships only the Affliction spec; Demonology / Destruction fall back to it until their specs land.
-        private IRotation Build(WarlockSpec spec) => new SoloAffliction(_settings);
+        private IRotation Build(WarlockSpec spec)
+        {
+            switch (spec)
+            {
+                case WarlockSpec.Demonology: return new SoloDemonology(_settings);
+                case WarlockSpec.Destruction: return new SoloDestruction(_settings);
+                default: return new SoloAffliction(_settings);
+            }
+        }
 
         public string[] DesiredTalentBuild() =>
             _settings.AutoAssignTalents.Value && _activeSpec.HasValue

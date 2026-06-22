@@ -28,7 +28,7 @@ namespace AIO3.Tests
 
         [Theory]
         [InlineData(1, "Affliction")]
-        [InlineData(2, "Demonology")] // resolves to its label even though the spec falls back to Affliction
+        [InlineData(2, "Demonology")]
         [InlineData(3, "Destruction")]
         [InlineData(0, "Affliction")] // no points → leveling default
         public void Auto_resolves_the_spec_from_talents(int tab, string expectedLabel)
@@ -39,12 +39,12 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Phase1_always_runs_the_affliction_rotation()
+        public void Resolves_each_tab_to_its_own_spec_rotation()
         {
-            // Demo/Destro fall back to the Affliction spec in Phase 1.
             var m = new WarlockModule();
-            Assert.Contains("Affliction", m.ResolveRotation(2).Name); // tab 2 = Demonology
-            Assert.Contains("Affliction", m.ResolveRotation(3).Name); // tab 3 = Destruction
+            Assert.Contains("Affliction", m.ResolveRotation(1).Name);
+            Assert.Contains("Demonology", m.ResolveRotation(2).Name);
+            Assert.Contains("Destruction", m.ResolveRotation(3).Name);
         }
 
         [Fact]

@@ -69,9 +69,31 @@ namespace AIO3.Core.Rotations.Warlock
                               && ctx.Me.PowerPercent < s.WandManaPercent.Value
                               && !ctx.Game.IsCurrentSpell("Shoot")).OffGcd();
 
-        /// <summary>The summon spell for the chosen demon (e.g. "Summon Voidwalker"). Used by the shared
-        /// PetControl.Summon call so the spec keeps the right pet up.</summary>
-        public static string SummonSpell(WarlockSettings s) => "Summon " + s.Pet.Value;
+        /// <summary>The summon spell for the chosen demon (e.g. "Summon Voidwalker"). Resolved at eval time so
+        /// an overlay edit swaps the demon live and an "Auto" pick fills in per spec. Used by the shared
+        /// PetControl.Summon call so the spec keeps the right pet up. The <paramref name="spec"/> only matters
+        /// for Auto: Demonology → Felguard, Destruction → Imp, everything else → Voidwalker; a known-spell
+        /// fallback drops to the tanky Voidwalker when the spec demon is not learned yet.</summary>
+        public static string SummonSpell(WarlockSettings s, CombatContext ctx, WarlockSpec spec) =>
+            "Summon " + ResolvePet(s, ctx, spec);
+
+        /// <summary>Resolve which demon to summon: a manual choice wins; "Auto" picks the spec-appropriate demon,
+        /// falling back to the Voidwalker when that demon's summon spell is not known yet (low level).</summary>
+        public static string ResolvePet(WarlockSettings s, CombatContext ctx, WarlockSpec spec)
+        {
+            string choice = s.Pet.Value;
+            if (choice != "Auto") return choice;
+
+            string preferred;
+            switch (spec)
+            {
+                case WarlockSpec.Demonology: preferred = "Felguard"; break;
+                case WarlockSpec.Destruction: preferred = "Imp"; break;
+                default: preferred = "Voidwalker"; break;
+            }
+            if (ctx != null && !ctx.Game.IsSpellKnown("Summon " + preferred)) return "Voidwalker";
+            return preferred;
+        }
 
         /// <summary>The curse spell to maintain, from the chosen curse setting. Resolved at eval time so an
         /// overlay edit swaps the curse live.</summary>
