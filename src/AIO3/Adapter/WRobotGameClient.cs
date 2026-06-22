@@ -293,6 +293,7 @@ namespace AIO3.Adapter
             // Keep the caches honest right after we change state ourselves.
             if (spell == "Auto Attack") { _autoAttacking = true; _autoAttackingKnown = true; _autoAttackingAt = Now; }
             if (spell.EndsWith("Stance")) { _stance = null; _usableCache.Clear(); } // stance affects usability
+            if (spell.StartsWith("Conjure")) _itemCountCache.Clear(); // we just changed a bag count
             return CastResult.Success;
         }
 
@@ -568,18 +569,22 @@ namespace AIO3.Adapter
         // Cached bag counts for CountItems: one Lua round-trip per name-set, refreshed on a short TTL (the
         // conjure checks run out of combat where a few-second staleness is fine, and this avoids a Lua call
         // per tick). Keyed on the joined names.
+        private const int ItemCountTtlMs = 6000; // conjure stock changes slowly OOC; a conjure cast clears the cache
         private readonly Dictionary<string, (int count, int at)> _itemCountCache = new Dictionary<string, (int, int)>();
 
         public int CountItems(IReadOnlyList<string> names)
         {
             if (names == null || names.Count == 0) return 0;
             string key = string.Join("", names);
-            if (_itemCountCache.TryGetValue(key, out var cached) && unchecked(Now - cached.at) < 2500)
+            if (_itemCountCache.TryGetValue(key, out var cached) && unchecked(Now - cached.at) < ItemCountTtlMs)
                 return cached.count;
 
-            int total = 0;
-            foreach (string n in names)
-                total += ItemsManager.GetItemCountByNameLUA(n);
+            // ONE Lua round-trip for the WHOLE list. The cost is the round-trip itself (~15-40ms) plus the per-name
+            // bag scan inside GetItemCountByNameLUA, so one call per name scaled with BOTH the list length and the
+            // number of items in the bags (~170ms for the 10-name conjure lists, dominating the OOC tick). Native
+            // GetItemCount is O(1) per name, so summing them all in a single call is cheap and size-independent.
+            string sum = string.Join("+", names.Select(n => "GetItemCount('" + n.Replace("'", "\\'") + "')"));
+            int total = Lua.LuaDoString<int>("return " + sum);
             _itemCountCache[key] = (total, Now);
             return total;
         }
