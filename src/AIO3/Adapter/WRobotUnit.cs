@@ -72,10 +72,22 @@ namespace AIO3.Adapter
 
         public bool HasMyAura(string name)
         {
+            // SpellIdByName resolves only the CAST ranks of a name (Frost Nova -> 122,865,...). Some roots/CC
+            // land as a separately-named "Effect" aura with a different spell id (Frost Nova's root is the
+            // 56135 "Frost Nova Effect" aura) and sometimes no recorded caster (Owner == 0). So: accept the
+            // fast cast-rank id match OR a prefix match on the resolved aura name (catches "<name> Effect"),
+            // and treat an unowned aura as ours too (solo play — no other caster of these spells is around).
             ulong me = ObjectManager.Me.Guid;
             var ids = SpellListManager.SpellIdByName(name);
-            return BuffManager.GetAuras(_unit.GetBaseAddress)
-                .Any(a => a.Owner == me && ids.Contains(a.SpellId));
+            foreach (var a in BuffManager.GetAuras(_unit.GetBaseAddress))
+            {
+                if (a.Owner != me && a.Owner != 0UL) continue;            // ours, or an unowned effect aura
+                if (ids.Contains(a.SpellId)) return true;                 // fast path: a cast-rank id
+                string auraName = a.GetSpell?.Name;                       // fallback: the resolved aura name
+                if (!string.IsNullOrEmpty(auraName)
+                    && auraName.StartsWith(name, System.StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
         }
 
         public long MyAuraTimeLeftMs(string name)

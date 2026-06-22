@@ -36,6 +36,7 @@ namespace AIO3.Core.Rotations
         public string ActiveLabel { get; private set; } = "Solo Beast Mastery";
         public bool AutoSwitchTargetEnabled => _settings.AutoSwitchTarget.Value;
         public bool DebugLoggingEnabled => _settings.DebugProfiling.Value;
+        public bool ManageBagFoodDrink => false; // hunter eats vendor food (left to the vendor plugin)
 
         public IRotation ResolveRotation(int highestTalentTab)
         {

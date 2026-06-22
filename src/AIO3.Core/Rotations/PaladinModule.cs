@@ -37,6 +37,7 @@ namespace AIO3.Core.Rotations
         public string ActiveLabel { get; private set; } = "Solo Retribution";
         public bool AutoSwitchTargetEnabled => _settings.AutoSwitchTarget.Value;
         public bool DebugLoggingEnabled => _settings.DebugProfiling.Value;
+        public bool ManageBagFoodDrink => false; // paladin eats vendor food (left to the vendor plugin)
 
         public IRotation ResolveRotation(int highestTalentTab)
         {

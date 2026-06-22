@@ -39,6 +39,11 @@ namespace AIO3.Core.Rotations
         /// <summary>Dev toggle: the host periodically logs per-tick timing + learned per-ability damage.</summary>
         bool DebugLoggingEnabled { get; }
 
+        /// <summary>Let WRobot eat/drink the best food/water in our bags (so a conjuring class actually consumes
+        /// what it conjured, instead of a named vendor item it may not carry). The host applies it to WRobot when
+        /// it changes. Off for classes that leave food to a vendor plugin; read by the host like the toggles above.</summary>
+        bool ManageBagFoodDrink { get; }
+
         /// <summary>Resolve the rotation to run from the manual override + talent auto-detection and the
         /// Solo/Group mode. Returns the current rotation instance, rebuilt internally only when the spec or
         /// mode changed — so the host can compare instances (ReferenceEquals) to know when to swap the engine.</summary>

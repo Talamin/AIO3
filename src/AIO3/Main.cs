@@ -32,6 +32,7 @@ public class Main : ICustomClass
     private SettingsOverlay _overlay;
     private SettingsStore _store;
     private TalentTrainer _talentTrainer;
+    private bool _lastManageFood;             // last applied "use best bag food/drink" state (apply only on change)
     private InterruptTracker _interrupts;
     private InterruptLearner _interruptLearner;
     private DamageTracker _damageTracker;     // measure-only for now: learns per-ability damage from the log
@@ -129,12 +130,23 @@ public class Main : ICustomClass
                 }
 
                 bool mounted = _game.PlayerIsMounted;
+                bool dead = _game.PlayerIsDeadOrGhost; // dead/ghost: the product runs the corpse, we do nothing
                 RotationStep fired = null;
                 bool settingsChanged = false;
 
                 // Mirror the "Debug logging" toggle to the on-disk debug log (read directly off disk for
                 // diagnosing behaviour like the backpedal, instead of scraping the in-game log window).
                 DebugLog.Enabled = _class != null && _class.DebugLoggingEnabled;
+
+                // Apply the class's food/drink preference to WRobot, but only when it changes (it writes a
+                // wManager setting). A conjuring class (mage) turns on "use best bag food/drink" so WRobot eats
+                // what it conjured; other classes leave it to the vendor plugin.
+                bool manageFood = _class != null && _class.ManageBagFoodDrink;
+                if (manageFood != _lastManageFood)
+                {
+                    _game.SetManageBagFoodDrink(manageFood);
+                    _lastManageFood = manageFood;
+                }
 
                 // Overlay polling and spec reconcile use Lua but DON'T need the frame lock — running them
                 // under it pauses the game's frame (stutter) for ~12 Lua reads. Keep them out of the lock.
@@ -160,7 +172,7 @@ public class Main : ICustomClass
                 // pause casting while it plays out — no per-tick re-pressing (which jerked) and no blocking.
                 bool repositioning = _game.ServiceReposition();
 
-                if (!mounted && !repositioning)
+                if (!mounted && !repositioning && !dead)
                 {
                     CombatContext ctx = null;
                     _game.RunLocked(() => ctx = CombatContext.Capture(_game, _interrupts, _damageTracker));
@@ -185,6 +197,7 @@ public class Main : ICustomClass
                 if (_class != null && _talentTrainer != null
                     && !_applyingTalents
                     && !_game.PlayerInCombat
+                    && !dead
                     && talentTimer.ElapsedMilliseconds > 15000)
                 {
                     string[] build = _class.DesiredTalentBuild();
@@ -214,7 +227,7 @@ public class Main : ICustomClass
                     }
                     idleHeartbeat.Restart();
                 }
-                else if (idleHeartbeat.ElapsedMilliseconds > 10000)
+                else if (!dead && idleHeartbeat.ElapsedMilliseconds > 10000)
                 {
                     idleHeartbeat.Restart();
                     Logging.Write("[AIO3] idle (no action chosen)");

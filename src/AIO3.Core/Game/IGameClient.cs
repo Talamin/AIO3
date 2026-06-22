@@ -81,6 +81,15 @@ namespace AIO3.Core.Game
         bool PlayerIsMounted { get; }
         bool PlayerInCombat { get; }
 
+        /// <summary>True while the player is dead OR a ghost (corpse-running). The host skips the whole rotation
+        /// tick then — the product owns the corpse run, and ticking would just burn time (e.g. the conjure bag
+        /// scans) and spam the perf log while we can do nothing.</summary>
+        bool PlayerIsDeadOrGhost { get; }
+
+        /// <summary>True while the player is swimming (in water). The kite is futile here — swimming is half speed
+        /// and the mobs aren't held by Frost Nova's ground root, so a caster just stands and nukes instead.</summary>
+        bool PlayerIsSwimming { get; }
+
         /// <summary>True when the WRobot product is engaged in a fight (its own fight state, set during
         /// the approach too). The rotation only runs while this (or actual combat) holds, so the FC
         /// never acts — or moves (Charge) — while the product is merely navigating.</summary>
@@ -94,6 +103,11 @@ namespace AIO3.Core.Game
         /// <summary>Use the first of these items that is in the bags and off cooldown. Returns true if one was used.</summary>
         bool UseFirstReadyItem(System.Collections.Generic.IReadOnlyList<string> names);
 
+        /// <summary>Configure WRobot's regen: when <paramref name="on"/>, eat/drink the BEST food/water found in
+        /// the bags (so a conjuring class consumes what it conjured) and drink to restore mana. When off, leave
+        /// WRobot's named-food settings alone. The host calls this only when the class module's preference changes.</summary>
+        void SetManageBagFoodDrink(bool on);
+
         /// <summary>Set the player's current target (so WRobot's facing/movement follows it).</summary>
         void SetTarget(IWowUnit unit);
 
@@ -106,6 +120,22 @@ namespace AIO3.Core.Game
         /// the backpedal key down for the hop's window (releasing it once at the end) and returns true while
         /// the hop is in progress, so the host pauses casting without blocking the loop or starving movement.</summary>
         bool ServiceReposition();
+
+        /// <summary>Blink-escape away from the current target: turn to face directly away, cast Blink (which
+        /// teleports in the facing direction), then face back toward the target so casting can resume. Runs on
+        /// WRobot's fight-loop thread (so the product can't re-orient us mid-cast). Returns true if started;
+        /// no-op (false) if Blink is unknown/on cooldown or there is no target.</summary>
+        bool BlinkAway();
+
+        /// <summary>Total count of the given items in the player's bags (summed across all the names — e.g. all
+        /// ranks of conjured food). Used by the mage's auto-conjure to decide when to make more.</summary>
+        int CountItems(IReadOnlyList<string> names);
+
+        /// <summary>Polymorph (sheep) the given add — which is NOT the current target. The adapter parks it on
+        /// focus to read its creature type (only sheepable types: Beast / Humanoid / Critter), turns to face it
+        /// so the cast lands, and casts on focus. Returns false (no-op) if it's unknown/on cooldown or the add
+        /// isn't a sheepable type, so the rotation falls through. The caller picks WHICH add and gates the rest.</summary>
+        bool Polymorph(IWowUnit add);
 
         /// <summary>Run an action under the WoW frame lock (consistent memory reads).</summary>
         void RunLocked(Action action);

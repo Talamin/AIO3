@@ -5,12 +5,14 @@ WRobot fightclass. It keeps the proven **Action Priority List (APL)** model from
 but rebuilds the foundation to be **layered, testable, and configurable in-game**.
 
 > Status: functional and in active use. **Warrior** (Fury / Arms / Protection), **Paladin**
-> (Retribution / Protection) and **Hunter** (Beast Mastery / Marksmanship / Survival) run end-to-end in-game as solo leveling APLs
-> (10–80), with talent auto-assign, an in-game settings overlay, per-character persistence, runtime spec
-> selection, empirical interrupt learning, and a tuned performance path. Each class is a self-contained
-> **module** (`IClassModule`) so the entry point is class-agnostic — adding the next class is dropping in a
-> module. The Hunter brought a shared **pet controller** (`PetControl`). The remaining classes are not
-> implemented yet (the foundation is built to add them).
+> (Retribution / Protection), **Hunter** (Beast Mastery / Marksmanship / Survival) and **Mage**
+> (Frost / Fire / Arcane) run end-to-end in-game as solo leveling APLs (10–80), with talent auto-assign,
+> an in-game settings overlay, per-character persistence, runtime spec selection, empirical interrupt
+> learning, and a tuned performance path. Each class is a self-contained **module** (`IClassModule`) so the
+> entry point is class-agnostic — adding the next class is dropping in a module. The Hunter brought a shared
+> **pet controller** (`PetControl`); the Mage brought the **caster baseline** (`MageCommon`: mana, kiting,
+> conjuring). **Warlock** is next; the remaining classes are not implemented yet (the foundation is built
+> to add them).
 
 ## Design goals
 
@@ -45,6 +47,16 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
   level / untamed / a product owning the pet) plays as a clean ranged DPS with the pet steps skipped — and
   abilities a given pet lacks are skipped automatically. The aspect (Viper ↔ Hawk/Dragonhawk) is managed by
   mana with hysteresis.
+- **Mage — Frost / Fire / Arcane**, the first pure caster and the shared **caster baseline** (`MageCommon`)
+  the later casters reuse: armor upkeep, Arcane Intellect, mana management (Evocation / conjured Mana Gem /
+  wand) and survival (Ice Block / Ice Barrier / Mana Shield). Cast-time nukes gate on standing still while
+  instants and procs (Brain Freeze, Fingers-of-Frost shatter, Hot Streak, Missile Barrage) fire on the move.
+  **Kiting** — Frost Nova roots a mob as it enters the nova radius, then Blink away (with a landing-safety
+  check) or a cliff-safe step back; it holds for a Polymorphed add, skips a mob about to die, and is
+  suppressed while swimming (the product wins the position fight in water, so the mage just stands and nukes).
+  **Self-sufficient** — conjures its own food / water / mana gem and points WRobot at the best conjured food
+  in the bags to eat/drink; summons and directs a **Water Elemental** (Frost). Polymorphs an extra attacker
+  (off by default; only sheepable creature types, resolved live).
 - **Cliff-safe backpedal** — when a mob is in the hunter's face (on the pet, inside melee range), the
   hunter steps back to restore ranged distance, refusing to move over a ledge (a downward trace guards the
   destination). The hop runs *on WRobot's own fight-loop thread* and briefly cancels its move-to-range for
@@ -60,7 +72,8 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
 - **Performance** — cooldowns/GCD are read in one memory pass per tick (not a slow API call per spell);
   the enemy/party lists are rebuilt on the object-manager pulse, not per tick; the WRobot frame lock is
   held only around the unit snapshot; and the handful of per-tick Lua reads (stance, auto-attack,
-  usability) are cached. A toggle logs per-tick / per-step timing for development.
+  usability) are cached. The rotation idles entirely while dead or running back to a corpse (the product
+  owns the corpse run). A toggle logs per-tick / per-step timing (and, for diagnosis, unit positions) to disk.
 - **Content** — the curated boss list is ported from the old project.
 
 ## Architecture

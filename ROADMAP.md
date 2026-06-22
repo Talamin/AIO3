@@ -14,7 +14,10 @@ casters → DoT-spreading — and then fills in the remaining classes.
       keyed on the pet actually existing (never on level), so a petless hunter plays ranged-only and any pet
       without a given ability (e.g. a taunt) is handled automatically. The pet peels adds off the owner, and
       a cliff-safe backpedal regains ranged distance.
-- [ ] **Mage** — first pure caster: mana, cast-while-stationary, kiting (the caster baseline).
+- [x] **Mage** — first pure caster: mana, cast-while-stationary, kiting (the caster baseline). *(Frost /
+      Fire / Arcane solo leveling specs; `MageCommon` caster baseline — armor, mana, survival, kiting
+      (Frost Nova → Blink / step-back, suppressed while swimming), Polymorph adds, Water Elemental,
+      conjure + eat/drink best bag food. Skips the tick while dead/ghost.)*
 - [ ] **Warlock** — caster + permanent pet + DoTs: reuses the pet controller and builds the
       **`SpreadDot`** shared block.
 - [ ] **Rogue** — melee, energy / combo points.

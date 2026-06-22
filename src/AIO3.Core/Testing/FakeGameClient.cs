@@ -31,6 +31,11 @@ namespace AIO3.Core.Testing
 
         /// <summary>If empty, every spell counts as known (convenient default).</summary>
         public readonly HashSet<string> KnownSpells = new HashSet<string>();
+
+        /// <summary>Spells explicitly NOT known — overrides the all-known default, so a single spell can be made
+        /// unknown (e.g. a low-level mage without Frost Nova) without whitelisting everything else.</summary>
+        public readonly HashSet<string> UnknownSpells = new HashSet<string>();
+
         public readonly HashSet<string> SpellsOnCooldown = new HashSet<string>();
 
         /// <summary>Spells currently queued/casting (e.g. on-next-swing abilities).</summary>
@@ -45,6 +50,8 @@ namespace AIO3.Core.Testing
         public bool Moving;
         public bool Mounted;
         public bool InCombatFlag;
+        public bool DeadOrGhostFlag;
+        public bool SwimmingFlag;
         public bool ProductFightingFlag;
         public bool AutoAttacking;
         public WowClass Class = WowClass.None;
@@ -67,7 +74,7 @@ namespace AIO3.Core.Testing
         public IReadOnlyList<IWowUnit> Enemies => EnemyList;
         public IReadOnlyList<IWowUnit> Party => PartyList;
 
-        public bool IsSpellKnown(string spell) => KnownSpells.Count == 0 || KnownSpells.Contains(spell);
+        public bool IsSpellKnown(string spell) => !UnknownSpells.Contains(spell) && (KnownSpells.Count == 0 || KnownSpells.Contains(spell));
         public bool IsSpellReady(string spell) => !SpellsOnCooldown.Contains(spell);
         public bool IsCurrentSpell(string spell) => CurrentSpells.Contains(spell);
         public float SpellRange(string spell) => SpellRanges.TryGetValue(spell, out float r) ? r : DefaultSpellRange;
@@ -76,6 +83,8 @@ namespace AIO3.Core.Testing
         public bool PlayerIsMoving => Moving;
         public bool PlayerIsMounted => Mounted;
         public bool PlayerInCombat => InCombatFlag;
+        public bool PlayerIsDeadOrGhost => DeadOrGhostFlag;
+        public bool PlayerIsSwimming => SwimmingFlag;
         public bool ProductIsFighting => ProductFightingFlag;
         public bool PlayerIsAutoAttacking => AutoAttacking;
 
@@ -105,6 +114,11 @@ namespace AIO3.Core.Testing
         {
             if (unit != null) LastSetTargetGuid = unit.Guid;
         }
+
+        /// <summary>Last value passed to <see cref="SetManageBagFoodDrink"/> (null = never called).</summary>
+        public bool? ManageBagFoodDrinkSet;
+
+        public void SetManageBagFoodDrink(bool on) => ManageBagFoodDrinkSet = on;
 
         /// <summary>Yard amounts StepBack was asked for; StepBackResult controls whether it "succeeds"
         /// (false simulates a refused move — blocked / cliff).</summary>
@@ -139,6 +153,36 @@ namespace AIO3.Core.Testing
         /// <summary>Set by tests to exercise the host's "pause while repositioning" gate.</summary>
         public bool Repositioning;
         public bool ServiceReposition() => Repositioning;
+
+        /// <summary>Number of times BlinkAway was invoked; BlinkAwayResult controls whether it "succeeds".</summary>
+        public int BlinkAwayCount;
+        public bool BlinkAwayResult = true;
+        public bool BlinkAway()
+        {
+            BlinkAwayCount++;
+            return BlinkAwayResult;
+        }
+
+        /// <summary>Per-item bag counts for CountItems (e.g. conjured food). Missing = 0.</summary>
+        public readonly Dictionary<string, int> ItemCounts = new Dictionary<string, int>();
+        public int CountItems(IReadOnlyList<string> names)
+        {
+            int total = 0;
+            foreach (string n in names)
+                if (ItemCounts.TryGetValue(n, out int c)) total += c;
+            return total;
+        }
+
+        /// <summary>GUIDs Polymorph was cast on, in order; PolymorphResult controls whether it "succeeds"
+        /// (false simulates the add not being a sheepable type / unknown).</summary>
+        public readonly List<ulong> PolymorphLog = new List<ulong>();
+        public bool PolymorphResult = true;
+        public bool Polymorph(IWowUnit add)
+        {
+            if (add == null) return false;
+            PolymorphLog.Add(add.Guid);
+            return PolymorphResult;
+        }
 
         public void RunLocked(Action action) => action();
     }

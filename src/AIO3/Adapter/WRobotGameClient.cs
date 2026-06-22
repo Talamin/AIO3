@@ -209,6 +209,38 @@ namespace AIO3.Adapter
 
         public bool PlayerInCombat => ObjectManager.Me.InCombat;
 
+        private bool _deadCached;
+        private int _deadCheckedAt;
+        // Me.IsDead catches the corpse; a GHOST (released, running to the corpse) still has health, so IsDead is
+        // false there — UnitIsDeadOrGhost covers both. Cache 250ms so this Lua read doesn't run every 50ms tick
+        // (death state changes slowly; a quarter-second of latency on revive is irrelevant).
+        public bool PlayerIsDeadOrGhost
+        {
+            get
+            {
+                if (unchecked(Now - _deadCheckedAt) < 250) return _deadCached;
+                _deadCheckedAt = Now;
+                _deadCached = ObjectManager.Me.IsDead
+                    || Lua.LuaDoString<bool>("return UnitIsDeadOrGhost('player') == 1");
+                return _deadCached;
+            }
+        }
+
+        private bool _swimCached;
+        private int _swimCheckedAt;
+        // Swimming is read via the IsSwimming() Lua API (no reliable memory flag in this build), cached 250ms so
+        // it doesn't run every 50ms tick. Entering/leaving water a quarter-second late doesn't matter for the kite.
+        public bool PlayerIsSwimming
+        {
+            get
+            {
+                if (unchecked(Now - _swimCheckedAt) < 250) return _swimCached;
+                _swimCheckedAt = Now;
+                _swimCached = Lua.LuaDoString<bool>("return IsSwimming() == 1");
+                return _swimCached;
+            }
+        }
+
         // WRobot's own fight state — true throughout a fight including the approach. Mirrors how the old
         // AIO gated its combat rotation, so we only act when the product has committed to a target.
         public bool ProductIsFighting => Fight.InFight;
@@ -250,7 +282,13 @@ namespace AIO3.Adapter
 
             if (force) Lua.LuaDoString("SpellStopCasting();");
 
-            SpellManager.CastSpellByNameOn(s.Name, LuaUnitId(unit));
+            // A self target casts with NO unit (plain "/cast X"): self-buffs (armor, Arcane Intellect, Icy
+            // Veins, Evocation) auto-apply to the player, and no-target PBAoE/instants (Frost Nova, Arcane
+            // Explosion, Blizzard) only cast this way — casting them "on player" fails (they have no friendly
+            // target type), which is why Frost Nova silently never fired. Other units still use the targeted cast.
+            string unitId = LuaUnitId(unit);
+            if (unitId == "player") SpellManager.CastSpellByNameLUA(s.Name);
+            else SpellManager.CastSpellByNameOn(s.Name, unitId);
 
             // Keep the caches honest right after we change state ourselves.
             if (spell == "Auto Attack") { _autoAttacking = true; _autoAttackingKnown = true; _autoAttackingAt = Now; }
@@ -297,8 +335,21 @@ namespace AIO3.Adapter
             if (unit != null && unit.Guid != 0) ObjectManager.Me.Target = unit.Guid;
         }
 
+        public void SetManageBagFoodDrink(bool on)
+        {
+            // TryToUseBestBagFoodDrink makes WRobot eat/drink the best food/water it finds in the bags (the items
+            // we conjure), instead of the named vendor item in FoodName/DrinkName. RestingMana makes it drink to
+            // refill mana. Set in memory only (no Save) — same as UseLuaToMove in Initialize; we re-assert on load.
+            var s = wManager.wManagerSetting.CurrentSetting;
+            s.TryToUseBestBagFoodDrink = on;
+            if (on) s.RestingMana = true; // a caster drinks to refill mana, not just to heal
+            DebugLog.Write($"Regen: TryToUseBestBagFoodDrink={on}" + (on ? " + RestingMana=true" : ""));
+        }
+
         private volatile float _pendingBackYards; // hand-off to the fight-loop thread (set here, consumed there)
         private int _backpedalReadyAt;            // cooldown so we don't backpedal-spam (casting resumes between hops)
+        private const float MaxSafeBackstepDrop = 12f; // refuse a backstep only if the floor behind drops more than
+                                                       // this (a real cliff); gentle slopes are fine to back down
 
         /// <summary>Request a backpedal of <paramref name="yards"/>. This does NOT move here — it validates
         /// (cliff guard + cooldown) on the rotation thread and hands the request to the fight-loop thread, which
@@ -308,23 +359,48 @@ namespace AIO3.Adapter
         /// (the step "fired"); the actual hold happens in OnFightLoop.</summary>
         public bool StepBack(float yards)
         {
-            if (_repositioning) return false;                          // a hop is already running
-            if (unchecked(Now - _backpedalReadyAt) < 0) return false;  // throttled — let other steps cast
+            if (_repositioning) { StepSkipLog("hop in progress"); return false; }            // a hop is already running
+            if (unchecked(Now - _backpedalReadyAt) < 0) { StepSkipLog("throttled"); return false; } // let other steps cast
 
             var me = ObjectManager.Me;
             Vector3 pos = me.Position;
             // The spot we'd back into (Rotation is the facing in radians; +PI = directly behind).
             Vector3 dest = pos.InFrontOf(me.Rotation + (float)System.Math.PI, yards);
 
-            // Cliff guard: probe straight DOWN at the destination — require solid ground within a safe drop,
-            // else it's a ledge and we refuse (let other steps run). This is what actually prevents walking off
-            // an edge (the old AIO only checked horizontally and could fall). One cheap trace; no PathFinder.
-            var top = new Vector3(dest.X, dest.Y, pos.Z + 2f, "None");
-            var bottom = new Vector3(dest.X, dest.Y, pos.Z - 5f, "None"); // 5y = max tolerated drop
-            if (!TraceLine.TraceLineGo(top, bottom, HitFlags.HitTestGroundAndStructures, out _)) return false;
+            // Cliff guard: find the FLOOR behind us and refuse only a genuine drop/void, never ordinary ground.
+            // TraceLineGo returns true when it HITS (scout-verified), and the out point is the floor's real world
+            // position. Use the floor-only flag (HitTestGround — walls/WMOs don't fool it) and a generous window
+            // (well above to well below, so any normal slope is caught; WRobot also biases both endpoints +1.5yd
+            // Z internally). The old tight ±(2..5) window mislabeled flat/slightly-sloped ground as a "cliff" and
+            // killed the kite in-game. Now: refuse only if there's NO floor in the whole window (a real void) or
+            // the floor is a big drop below us (a real cliff); a gentle downhill is fine to back down.
+            var top = new Vector3(dest.X, dest.Y, pos.Z + 5f, "None");
+            var bottom = new Vector3(dest.X, dest.Y, pos.Z - 25f, "None");
+            if (!TraceLine.TraceLineGo(top, bottom, HitFlags.HitTestGround, out Vector3 ground))
+            {
+                StepSkipLog($"no floor behind: posZ={pos.Z:0.#} dest=({dest.X:0.#},{dest.Y:0.#}) "
+                    + $"hdist={pos.DistanceTo2D(dest):0.#} rot={me.Rotation:0.00}");
+                return false;
+            }
+            float drop = pos.Z - ground.Z; // + = downhill behind us, - = uphill
+            if (drop > MaxSafeBackstepDrop)
+            {
+                StepSkipLog($"drop {drop:0.#}yd behind (> {MaxSafeBackstepDrop:0})");
+                return false;
+            }
+            if (DebugLog.Enabled) DebugLog.Write($"StepBack ok: back-drop={drop:0.#}yd"); // diagnostic
 
             _pendingBackYards = yards; // picked up by OnFightLoop within ~80ms
             return true;
+        }
+
+        private int _lastStepSkipLogAt;
+        // Diagnostic only (Debug logging, throttled): why a requested step-back was refused.
+        private void StepSkipLog(string reason)
+        {
+            if (!DebugLog.Enabled || unchecked(Now - _lastStepSkipLogAt) < 1000) return;
+            _lastStepSkipLogAt = Now;
+            DebugLog.Write($"StepBack refused: {reason}");
         }
 
         private Vector3 _backStart;
@@ -342,6 +418,15 @@ namespace AIO3.Adapter
         /// is frozen for the hold, so the duration is short and a cooldown throttles re-triggers. Must never throw.</summary>
         private void OnFightLoop(WoWUnit unit, CancelEventArgs cancelable)
         {
+            DumpTargetAuras(unit); // diagnostic only (Debug logging) — shows the real id/name/owner of each aura
+
+            if (_pendingBlink)
+            {
+                _pendingBlink = false;
+                DoBlinkAway(cancelable);
+                return; // don't also backpedal the same iteration
+            }
+
             float yards = _pendingBackYards;
             if (yards <= 0f) return;
             _pendingBackYards = 0f;
@@ -364,6 +449,185 @@ namespace AIO3.Adapter
                 _backpedalReadyAt = unchecked(Now + 1200); // brief cooldown; cast between hops
                 _repositioning = false;
             }
+        }
+
+        private int _lastAuraDumpAt; // throttle for the diagnostic aura dump below
+
+        /// <summary>Diagnostic (Debug logging only, throttled): logs OUR position and the target's position +
+        /// auras, plus every other nearby hostile's position — so we can tell exactly WHO moves between ticks
+        /// (player swims in vs. mob holds), read the water Z-offset, and see adds. Fight thread; never throws.</summary>
+        private void DumpTargetAuras(WoWUnit unit)
+        {
+            if (!DebugLog.Enabled || unit == null || !unit.IsValid) return;
+            if (unchecked(Now - _lastAuraDumpAt) < 1000) return; // at most one dump per second
+            _lastAuraDumpAt = Now;
+            try
+            {
+                ulong me = ObjectManager.Me.Guid;
+                Vector3 mp = ObjectManager.Me.Position, tp = unit.Position;
+                string auras = string.Join(", ", BuffManager.GetAuras(unit.GetBaseAddress)
+                    .Select(a => $"{a.SpellId}:{a.GetSpell?.Name}(o={(a.Owner == me ? "me" : a.Owner.ToString())})"));
+                // Other nearby hostiles (adds), '*' = targeting me — so a second add and who it's on is visible.
+                string others = string.Join(", ", ObjectManager.GetObjectWoWUnit()
+                    .Where(o => o != null && o.IsValid && o.IsAlive && o.IsAttackable
+                                && o.Reaction <= WReaction.Neutral && o.Guid != unit.Guid && o.GetDistance <= 40)
+                    .Select(o => $"{o.Name}@{o.GetDistance:0.#}({o.Position.X:0.#},{o.Position.Y:0.#},{o.Position.Z:0.#}){(o.IsTargetingMe ? "*" : "")}"));
+                DebugLog.Write($"pos me=({mp.X:0.#},{mp.Y:0.#},{mp.Z:0.#}) | tgt {unit.Name}@{unit.GetDistance:0.#} "
+                    + $"hp={unit.HealthPercent:0}% onMe={unit.IsTargetingMe} ({tp.X:0.#},{tp.Y:0.#},{tp.Z:0.#}) "
+                    + $"| auras: {auras}" + (others.Length > 0 ? $" | others: {others}" : ""));
+            }
+            catch { }
+        }
+
+        private volatile bool _pendingBlink; // set by BlinkAway, consumed on the fight-loop thread
+        private float _blinkAwayHeading;     // published with _pendingBlink; read on the fight thread
+        private float _blinkBackHeading;
+        private const float BlinkDistance = 20f;   // Blink teleports ~20yd
+        private const float BlinkLandClearance = 8f; // don't blink within this of another mob
+
+        /// <summary>Request a Blink-escape away from the current target. Validates HERE (rotation thread) that the
+        /// landing spot ~20yd behind us is SAFE — solid ground (no cliff), a clear path (no wall), and no other
+        /// mob standing there — so blinking blind off a ledge or into adds can't happen. If it isn't safe we
+        /// return false and the rotation falls through to the cliff-safe step-back instead. The actual
+        /// face→Blink→face runs on the fight-loop thread (so the product can't re-orient us mid-cast).</summary>
+        public bool BlinkAway()
+        {
+            Spell blink = GetSpell("Blink");
+            if (!blink.KnownSpell || !IsUsable(blink)) return false;
+            WoWUnit me = ObjectManager.Me;
+            WoWUnit tgt = ObjectManager.Target;
+            if (me == null || tgt == null || !tgt.IsValid) return false;
+
+            Vector3 mp = me.Position, tp = tgt.Position;
+            float toTarget = (float)System.Math.Atan2(tp.Y - mp.Y, tp.X - mp.X);
+            float away = Norm(toTarget + (float)System.Math.PI);
+            Vector3 dest = mp.InFrontOf(away, BlinkDistance);
+
+            if (!CanBlinkTo(mp, dest, tgt)) return false; // unsafe landing → let the step-back handle it
+
+            _blinkAwayHeading = away;
+            _blinkBackHeading = Norm(toTarget);
+            _pendingBlink = true; // volatile publish AFTER the headings are written
+            return true;
+        }
+
+        /// <summary>Is the Blink landing spot safe? Checks (1) a cliff — solid ground within a safe drop at the
+        /// destination; (2) a wall — a clear path from us to it (Blink slams into geometry otherwise); (3) adds —
+        /// no hostile (other than the mob we're escaping) standing at the landing spot.</summary>
+        private static bool CanBlinkTo(Vector3 from, Vector3 dest, WoWUnit target)
+        {
+            // Cliff: require ground within a safe drop where we'd land, else it's a ledge → refuse.
+            var top = new Vector3(dest.X, dest.Y, from.Z + 2f, "None");
+            var bottom = new Vector3(dest.X, dest.Y, from.Z - 5f, "None"); // 5y = max tolerated drop
+            if (!TraceLine.TraceLineGo(top, bottom, HitFlags.HitTestGroundAndStructures, out _)) return false;
+
+            // Wall: a clear path at body height (true = blocked → Blink would slam into it and barely move).
+            var eyeFrom = new Vector3(from.X, from.Y, from.Z + 1.5f, "None");
+            var eyeTo = new Vector3(dest.X, dest.Y, from.Z + 1.5f, "None");
+            if (TraceLine.TraceLineGo(eyeFrom, eyeTo, HitFlags.HitTestGroundAndStructures, out _)) return false;
+
+            // Adds: don't blink INTO another mob (the one we're escaping is in front, so it's excluded).
+            ulong targetGuid = target != null ? target.Guid : 0;
+            foreach (WoWUnit u in ObjectManager.GetObjectWoWUnit())
+            {
+                if (u == null || !u.IsValid || !u.IsAlive || !u.IsAttackable) continue;
+                if (u.Reaction > WReaction.Neutral) continue; // friendly → ignore
+                if (u.Guid == targetGuid) continue;
+                if (u.Position.DistanceTo2D(dest) <= BlinkLandClearance) return false;
+            }
+            return true;
+        }
+
+        /// <summary>On the fight thread: turn to face the precomputed AWAY heading (instant — a direct orientation
+        /// write, NOT the animated Face/CTM), cast Blink (teleports in the facing direction), then face back toward
+        /// the target so casting can resume. StopMove first so Blink follows facing, not a movement vector. Cancels
+        /// the fight iteration so the product doesn't re-path us mid-escape. Safety was already checked in BlinkAway.</summary>
+        private void DoBlinkAway(CancelEventArgs cancelable)
+        {
+            WoWUnit me = ObjectManager.Me;
+            if (me == null) return;
+            Spell blink = GetSpell("Blink");
+            if (!blink.KnownSpell || !IsUsable(blink)) return;
+
+            cancelable.Cancel = true;
+            MovementManager.StopMove();
+            me.Rotation = _blinkAwayHeading; // face away
+            SpellManager.CastSpellByNameLUA("Blink");
+            me.Rotation = _blinkBackHeading;  // face back to the target
+            DebugLog.Write("BlinkAway");
+        }
+
+        private static float Norm(float radians)
+        {
+            const float TwoPi = (float)(2 * System.Math.PI);
+            while (radians < 0f) radians += TwoPi;
+            while (radians >= TwoPi) radians -= TwoPi;
+            return radians;
+        }
+
+        // Cached bag counts for CountItems: one Lua round-trip per name-set, refreshed on a short TTL (the
+        // conjure checks run out of combat where a few-second staleness is fine, and this avoids a Lua call
+        // per tick). Keyed on the joined names.
+        private readonly Dictionary<string, (int count, int at)> _itemCountCache = new Dictionary<string, (int, int)>();
+
+        public int CountItems(IReadOnlyList<string> names)
+        {
+            if (names == null || names.Count == 0) return 0;
+            string key = string.Join("", names);
+            if (_itemCountCache.TryGetValue(key, out var cached) && unchecked(Now - cached.at) < 2500)
+                return cached.count;
+
+            int total = 0;
+            foreach (string n in names)
+                total += ItemsManager.GetItemCountByNameLUA(n);
+            _itemCountCache[key] = (total, Now);
+            return total;
+        }
+
+        // Whether a creature entry is a sheepable type (Beast/Humanoid/Critter). Cached so we only pay one Lua
+        // read per entry — we resolve it for a NON-target add by parking it on focus (UnitCreatureType only
+        // works for a unit token, and the add isn't our target).
+        private readonly Dictionary<int, bool> _sheepableByEntry = new Dictionary<int, bool>();
+
+        public bool Polymorph(IWowUnit add)
+        {
+            if (!(add is WRobotUnit w)) return false;
+            WoWUnit u = w.Inner;
+            if (u == null || !u.IsValid || !u.IsAlive) return false;
+            Spell poly = GetSpell("Polymorph");
+            if (!poly.KnownSpell || !IsUsable(poly)) return false;
+            if (ObjectManager.Me.IsCast) return false; // already casting (likely the Polymorph itself)
+
+            // Resolve sheepability from the per-entry cache FIRST — so an add we've already learned can't be
+            // sheeped (Undead/Elemental "Apparition" mobs are NOT polymorph-able) costs nothing per tick: no
+            // focus, no Lua. Only an UNKNOWN entry pays the one-time focus-park + type read.
+            if (_sheepableByEntry.TryGetValue(u.Entry, out bool sheepable))
+            {
+                if (!sheepable) return false; // known un-sheepable — decline for free (focus untouched)
+            }
+            else
+            {
+                // Unknown entry: park it on focus once (UnitCreatureType needs a unit token and the add isn't
+                // our target), read + cache the type, and log it so it's visible WHY a mob won't sheep.
+                ObjectManager.Me.FocusGuid = u.Guid;
+                string ct = Lua.LuaDoString<string>("return UnitCreatureType('focus') or ''");
+                if (string.IsNullOrEmpty(ct)) { Lua.LuaDoString("ClearFocus();"); return false; } // unresolved — retry later
+                sheepable = ct == "Humanoid" || ct == "Beast" || ct == "Critter";
+                _sheepableByEntry[u.Entry] = sheepable;
+                DebugLog.Write($"Polymorph: {u.Name} type='{ct}' sheepable={sheepable}");
+                if (!sheepable) { Lua.LuaDoString("ClearFocus();"); return false; }
+            }
+
+            // Sheepable: park on focus (the cast targets a non-target add), face it (instant orientation write,
+            // like BlinkAway, so the cast isn't refused for facing), cast, then drop focus immediately — the cast
+            // is target-locked at start, and a stale focus would interfere with later focus-token casts.
+            ObjectManager.Me.FocusGuid = u.Guid;
+            Vector3 mp = ObjectManager.Me.Position, ap = u.Position;
+            ObjectManager.Me.Rotation = Norm((float)System.Math.Atan2(ap.Y - mp.Y, ap.X - mp.X));
+            SpellManager.CastSpellByNameOn("Polymorph", "focus");
+            Lua.LuaDoString("ClearFocus();");
+            DebugLog.Write($"Polymorph cast on {u.Name}");
+            return true;
         }
 
         public void PetAttack(IWowUnit target)
