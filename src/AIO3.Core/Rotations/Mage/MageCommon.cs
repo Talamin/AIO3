@@ -272,18 +272,22 @@ namespace AIO3.Core.Rotations.Mage
         /// half speed and the product re-approaches the rooted mob between hops (it undoes the kite), so the kite
         /// just oscillates at melee and wastes Frost Nova; we stand and nuke instead.</summary>
         private static bool KiteWorthy(CombatContext ctx, float range, int minHealthPct, bool meleeOnly = false) =>
-            !ctx.Game.PlayerIsSwimming
-            && ctx.Enemies.Any(e => e.IsTargetingMe && e.Distance <= range && e.HealthPercent > minHealthPct
-                                    && (!meleeOnly || !e.IsCaster));
+            // Cheap enemy check FIRST so the Lua-backed swimming read is only paid when a mob is actually on us
+            // (most ticks we're nuking from range with nothing in melee → this short-circuits and skips the Lua).
+            ctx.Enemies.Any(e => e.IsTargetingMe && e.Distance <= range && e.HealthPercent > minHealthPct
+                                 && (!meleeOnly || !e.IsCaster))
+            && !ctx.Game.PlayerIsSwimming;
 
         /// <summary>Like <see cref="KiteWorthy"/> but the mob must also be rooted by OUR Frost Nova AND be a MELEE
         /// mob (not a caster). The step-back only runs while this holds: backing off a rooted melee mob gains real
         /// distance (it can't follow); backing off a caster is pointless (it keeps casting from range) and backing
         /// off an unrooted mob just drags it along. Also suppressed while swimming.</summary>
         private static bool RootedKiteWorthy(CombatContext ctx, float range, int minHealthPct) =>
-            !ctx.Game.PlayerIsSwimming
-            && ctx.Enemies.Any(e => e.IsTargetingMe && e.Distance <= range && e.HealthPercent > minHealthPct
-                                    && !e.IsCaster && e.HasMyAura("Frost Nova"));
+            // Enemy check first (incl. the per-unit aura read) so the Lua swimming read is only paid when a rooted
+            // mob is on us — otherwise this short-circuits before either.
+            ctx.Enemies.Any(e => e.IsTargetingMe && e.Distance <= range && e.HealthPercent > minHealthPct
+                                 && !e.IsCaster && e.HasMyAura("Frost Nova"))
+            && !ctx.Game.PlayerIsSwimming;
 
         /// <summary>True if one of OUR Polymorphs is active on an enemy. While it is, the specs hold Frost Nova
         /// and all AoE (they deal damage and would break the sheep); single-target on the main mob + Blink /
