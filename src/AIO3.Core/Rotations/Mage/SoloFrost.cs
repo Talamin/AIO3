@@ -99,10 +99,10 @@ namespace AIO3.Core.Rotations.Mage
                  .When(ctx => !ctx.Game.PlayerIsMoving && !ctx.Game.IsSpellKnown("Frostbolt")),
         });
 
-        // Target is "frozen" (rooted by Frost Nova or we have a Fingers of Frost charge) → Ice Lance / Deep Freeze shatter.
+        // Target is "frozen" (rooted by Frost Nova or we have a Fingers of Frost charge) → Ice Lance / Deep Freeze
+        // shatter. HasAura (name-based HaveBuff) already detects the root cheaply; no need for the costlier HasMyAura.
         private static bool Frozen(CombatContext ctx) =>
-            ctx.Me.HasAura("Fingers of Frost")
-            || ctx.Target.HasAura("Frost Nova") || ctx.Target.HasMyAura("Frost Nova");
+            ctx.Me.HasAura("Fingers of Frost") || ctx.Target.HasAura("Frost Nova");
 
         // Brain Freeze proc makes the next Frostfire Bolt instant + free (buff shows as "Fireball!").
         private static bool BrainFreeze(CombatContext ctx) =>

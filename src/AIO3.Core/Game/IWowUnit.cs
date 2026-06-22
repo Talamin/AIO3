@@ -48,6 +48,10 @@ namespace AIO3.Core.Game
         /// <summary>Elite / rare-elite / world-boss classification (tougher than normal mobs).</summary>
         bool IsElite { get; }
 
+        /// <summary>True if the unit has a mana pool — a heuristic for "this is a caster" (it casts from range,
+        /// so kiting it is futile; burst it / freeze-shatter instead). Pure melee mobs use rage/energy/no power.</summary>
+        bool IsCaster { get; }
+
         /// <summary>Localized creature type (e.g. "Humanoid", "Elemental"); "" if unknown.</summary>
         string CreatureType { get; }
 

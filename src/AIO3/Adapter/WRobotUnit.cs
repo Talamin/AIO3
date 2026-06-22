@@ -36,6 +36,7 @@ namespace AIO3.Adapter
         public ulong TargetGuid => _unit.Target; // WoWUnit.Target is the GUID of this unit's current target
         public bool IsAttackable => _unit.IsAttackable;
         public bool IsElite => _unit.IsElite;
+        public bool IsCaster => _unit.MaxMana > 0; // has a mana pool → casts from range; don't kite, burst it
 
         // Creature type is read via Lua and cached per creature entry. We can only query it reliably
         // for the current target, so we resolve it when this unit is the target and reuse it after.
@@ -83,12 +84,17 @@ namespace AIO3.Adapter
             {
                 if (a.Owner != me && a.Owner != 0UL) continue;            // ours, or an unowned effect aura
                 if (ids.Contains(a.SpellId)) return true;                 // fast path: a cast-rank id
-                string auraName = a.GetSpell?.Name;                       // fallback: the resolved aura name
+                string auraName = SpellNameById(a.SpellId);              // fallback: resolved aura name (id-cached)
                 if (!string.IsNullOrEmpty(auraName)
                     && auraName.StartsWith(name, System.StringComparison.OrdinalIgnoreCase)) return true;
             }
             return false;
         }
+
+        // Resolving a spell-id to its name builds a Spell (not free); cache it across all units + ticks so the
+        // HasMyAura name-fallback doesn't reconstruct one per aura per tick (that dominated the in-combat tick).
+        private static readonly ConcurrentDictionary<uint, string> SpellNameCache = new ConcurrentDictionary<uint, string>();
+        private static string SpellNameById(uint id) => SpellNameCache.GetOrAdd(id, sid => new Spell(sid).Name ?? "");
 
         public long MyAuraTimeLeftMs(string name)
         {

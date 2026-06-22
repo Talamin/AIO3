@@ -33,6 +33,7 @@ public class Main : ICustomClass
     private SettingsStore _store;
     private TalentTrainer _talentTrainer;
     private bool _lastManageFood;             // last applied "use best bag food/drink" state (apply only on change)
+    private int _lastCastTick;                // Environment.TickCount of the previous cast (for the debug cast-gap)
     private InterruptTracker _interrupts;
     private InterruptLearner _interruptLearner;
     private DamageTracker _damageTracker;     // measure-only for now: learns per-ability damage from the log
@@ -216,7 +217,9 @@ public class Main : ICustomClass
 
                 if (fired != null)
                 {
-                    DebugLog.Write($"cast {fired.Name}"); // full trace on disk (not deduped)
+                    int gap = unchecked(Environment.TickCount - _lastCastTick); // ms since the previous cast
+                    _lastCastTick = Environment.TickCount;
+                    DebugLog.Write($"cast {fired.Name} (+{gap}ms)"); // full trace on disk (not deduped); +gap = cast interval
 
                     // Log each distinct cast (dedupe consecutive identical within 2s to avoid spam).
                     if (fired.Name != lastFired || sinceLastLog.ElapsedMilliseconds > 2000)

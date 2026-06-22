@@ -268,6 +268,23 @@ namespace AIO3.Adapter
             return v;
         }
 
+        // WoW's spell-queue window (ms) — casts issued within this much of a cast's end get queued for seamless
+        // chaining. Read once from the CVar (rarely changes); default 400. We cast inside it, see Cast().
+        private int _queueWindowMs = -1;
+        private int QueueWindowMs
+        {
+            get
+            {
+                if (_queueWindowMs < 0)
+                {
+                    try { _queueWindowMs = Lua.LuaDoString<int>("return tonumber(GetCVar('SpellQueueWindow')) or 400"); }
+                    catch { _queueWindowMs = 400; }
+                    if (_queueWindowMs <= 0) _queueWindowMs = 400; // a 0/disabled CVar -> still chain at the default
+                }
+                return _queueWindowMs;
+            }
+        }
+
         public CastResult Cast(string spell, IWowUnit target, bool force = false)
         {
             if (!(target is WRobotUnit wTarget)) return CastResult.NoTarget;
@@ -278,7 +295,17 @@ namespace AIO3.Adapter
             if (!s.KnownSpell) return CastResult.NotKnown;
             if (!IsUsable(s)) return CastResult.NotUsable;
             if (s.CastTime > 0.0 && ObjectManager.Me.GetMove) return CastResult.Moving;
-            if (!force && ObjectManager.Me.IsCast) return CastResult.Busy;
+            if (!force && ObjectManager.Me.IsCast)
+            {
+                // Don't restart an in-progress cast — BUT allow the next cast inside the spell-queue window (the
+                // last ~SpellQueueWindow ms): WoW then QUEUES it so casts chain seamlessly, exactly what manual
+                // spamming does. Without this we waited for the cast to fully finish and lost the loop-cadence gap
+                // (~80-125ms) every cast. CastingTimeLeft is 0 during a CHANNEL (not covered by it), so a channel
+                // (Evocation / Arcane Missiles / Drain Life) stays blocked here and we never clip it.
+                int castLeft = (int)ObjectManager.Me.CastingTimeLeft;
+                if (!(castLeft > 0 && castLeft <= QueueWindowMs)) return CastResult.Busy;
+                DebugLog.Write($"queue {s.Name} ({castLeft}ms left on the current cast)"); // queue-window cast → WoW chains it
+            }
 
             if (force) Lua.LuaDoString("SpellStopCasting();");
 

@@ -145,7 +145,7 @@ namespace AIO3.Core.Rotations.Mage
                 priority: priority,
                 targets: Targets.Self,
                 condition: (ctx, t) => s.UseBlink.Value && ctx.Game.PlayerInCombat
-                                       && KiteWorthy(ctx, MeleeRange, s.KiteMinTargetHealth.Value)
+                                       && KiteWorthy(ctx, MeleeRange, s.KiteMinTargetHealth.Value, meleeOnly: true)
                                        && ctx.Game.IsSpellKnown("Blink") && ctx.Game.IsSpellReady("Blink"),
                 action: (ctx, t) => ctx.Game.BlinkAway() ? CastResult.Success : CastResult.Failed,
                 recastDelayMs: 2000);
@@ -265,21 +265,25 @@ namespace AIO3.Core.Rotations.Mage
             ctx.Enemies.Any(e => e.IsTargetingMe && e.Distance <= MeleeRange);
 
         /// <summary>True if a mob worth kiting is on us and within <paramref name="range"/>: it's targeting us and
-        /// still above <paramref name="minHealthPct"/> (a mob about to die isn't worth the root + hop). Used to
-        /// trigger Frost Nova / Blink. Never while SWIMMING — in water the player swims at half speed and the
-        /// product re-approaches the rooted mob between hops (it undoes the kite), so the kite just oscillates the
-        /// player at melee and wastes Frost Nova; we stand and nuke instead (proven to work once the root expires).</summary>
-        private static bool KiteWorthy(CombatContext ctx, float range, int minHealthPct) =>
+        /// still above <paramref name="minHealthPct"/> (a mob about to die isn't worth the root + hop). When
+        /// <paramref name="meleeOnly"/>, only MELEE mobs count (a caster has a mana pool and casts from range, so
+        /// stepping back doesn't escape it — we burst it instead; Frost Nova still freezes it for a shatter). Used
+        /// to trigger Frost Nova (any mob) / Blink (melee only). Never while SWIMMING — in water the player swims at
+        /// half speed and the product re-approaches the rooted mob between hops (it undoes the kite), so the kite
+        /// just oscillates at melee and wastes Frost Nova; we stand and nuke instead.</summary>
+        private static bool KiteWorthy(CombatContext ctx, float range, int minHealthPct, bool meleeOnly = false) =>
             !ctx.Game.PlayerIsSwimming
-            && ctx.Enemies.Any(e => e.IsTargetingMe && e.Distance <= range && e.HealthPercent > minHealthPct);
+            && ctx.Enemies.Any(e => e.IsTargetingMe && e.Distance <= range && e.HealthPercent > minHealthPct
+                                    && (!meleeOnly || !e.IsCaster));
 
-        /// <summary>Like <see cref="KiteWorthy"/> but the mob must also be rooted by OUR Frost Nova. The step-back
-        /// only runs while this holds: stepping back from a rooted mob gains real distance (it can't follow),
-        /// whereas backing up from an unrooted mob just drags it along endlessly. Also suppressed while swimming.</summary>
+        /// <summary>Like <see cref="KiteWorthy"/> but the mob must also be rooted by OUR Frost Nova AND be a MELEE
+        /// mob (not a caster). The step-back only runs while this holds: backing off a rooted melee mob gains real
+        /// distance (it can't follow); backing off a caster is pointless (it keeps casting from range) and backing
+        /// off an unrooted mob just drags it along. Also suppressed while swimming.</summary>
         private static bool RootedKiteWorthy(CombatContext ctx, float range, int minHealthPct) =>
             !ctx.Game.PlayerIsSwimming
             && ctx.Enemies.Any(e => e.IsTargetingMe && e.Distance <= range && e.HealthPercent > minHealthPct
-                                    && e.HasMyAura("Frost Nova"));
+                                    && !e.IsCaster && e.HasMyAura("Frost Nova"));
 
         /// <summary>True if one of OUR Polymorphs is active on an enemy. While it is, the specs hold Frost Nova
         /// and all AoE (they deal damage and would break the sheep); single-target on the main mob + Blink /

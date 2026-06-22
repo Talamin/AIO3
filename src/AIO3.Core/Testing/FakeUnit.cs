@@ -22,6 +22,7 @@ namespace AIO3.Core.Testing
         public ulong TargetGuid { get; set; }
         public bool IsAttackable { get; set; } = true;
         public bool IsElite { get; set; }
+        public bool IsCaster { get; set; } // has a mana pool → kite logic treats it as a caster (burst, don't kite)
         public string CreatureType { get; set; } = "";
 
         public sealed class Aura

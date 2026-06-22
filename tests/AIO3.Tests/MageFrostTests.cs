@@ -244,6 +244,35 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Does_not_step_back_from_a_caster()
+        {
+            // A caster keeps casting from range, so backing off is pointless — burst it instead (no step-back).
+            FakeGameClient g = MageGame();
+            g.InCombatFlag = true;
+            FakeUnit add = AddMeleeAttacker(g);
+            add.IsCaster = true;                    // a mana-using caster
+            add.WithAura("Frost Nova", mine: true); // rooted/frozen
+            g.SpellsOnCooldown.Add("Frost Nova");
+            g.SpellsOnCooldown.Add("Blink");
+
+            RotationStep fired = Fire(g);
+            Assert.NotEqual("Kite back", fired?.Name);
+            Assert.Empty(g.StepBackLog);
+        }
+
+        [Fact]
+        public void Frost_Nova_still_freezes_a_caster_for_the_shatter()
+        {
+            // We don't kite casters, but Frost Nova still freezes one in melee so the shatter (Ice Lance / Deep
+            // Freeze) hits hard while we burst it down.
+            FakeGameClient g = MageGame();
+            g.InCombatFlag = true;
+            FakeUnit add = AddMeleeAttacker(g);
+            add.IsCaster = true; // a caster in melee
+            Assert.Equal("Frost Nova", Fire(g)?.Name);
+        }
+
+        [Fact]
         public void Conjures_food_when_low_out_of_combat()
         {
             FakeGameClient g = MageGame();
