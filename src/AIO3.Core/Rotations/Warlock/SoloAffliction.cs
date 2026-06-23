@@ -91,23 +91,17 @@ namespace AIO3.Core.Rotations.Warlock
             // (racials are appended by the shared Racials bundle at the 2.5 band)
 
             // --- DoTs (single-target upkeep, priority order) ---
-            // Haunt: short damage-multiplier debuff — keep it up (cast-time, so stand still).
-            Skill.Spell("Haunt").Priority(5f).On(Targets.CurrentEnemy)
-                 .When(ctx => (!ctx.Target.HasMyAura("Haunt") || ctx.Target.MyAuraTimeLeftMs("Haunt") < HauntRefreshMs)
-                              && !ctx.Game.PlayerIsMoving),
+            // Haunt: short damage-multiplier debuff — keep it up (cast-time, so stand still; no re-queue mid-cast).
+            CombatBlocks.MaintainCastDebuff("Haunt", HauntRefreshMs, priority: 5f),
             // The chosen curse (instant; resolved live from the setting).
             WarlockCommon.MaintainCurse(_settings, priority: 6f),
             // Immolate only when Unstable Affliction is NOT known (they share the slot at higher levels). Cast-time.
-            Skill.Spell("Immolate").Priority(7f).On(Targets.CurrentEnemy)
-                 .When(ctx => !ctx.Game.IsSpellKnown("Unstable Affliction")
-                              && (!ctx.Target.HasMyAura("Immolate") || ctx.Target.MyAuraTimeLeftMs("Immolate") < DotRefreshMs)
-                              && !ctx.Game.PlayerIsMoving),
+            CombatBlocks.MaintainCastDebuff("Immolate", DotRefreshMs, priority: 7f,
+                extraGate: ctx => !ctx.Game.IsSpellKnown("Unstable Affliction")),
             // Corruption is instant.
             CombatBlocks.MaintainMyDebuff("Corruption", DotRefreshMs, priority: 8f),
             // Unstable Affliction is cast-time — stand still.
-            Skill.Spell("Unstable Affliction").Priority(9f).On(Targets.CurrentEnemy)
-                 .When(ctx => (!ctx.Target.HasMyAura("Unstable Affliction") || ctx.Target.MyAuraTimeLeftMs("Unstable Affliction") < DotRefreshMs)
-                              && !ctx.Game.PlayerIsMoving),
+            CombatBlocks.MaintainCastDebuff("Unstable Affliction", DotRefreshMs, priority: 9f),
 
             // --- procs ---
             // Shadow Trance (Nightfall) makes the next Shadow Bolt instant — spend it on the move too.

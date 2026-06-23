@@ -88,10 +88,9 @@ namespace AIO3.Core.Rotations.Warlock
             // --- DoTs / curse (priority order) ---
             // The chosen curse (instant; resolved live from the setting).
             WarlockCommon.MaintainCurse(_settings, priority: 6f),
-            // Immolate is Destruction's key DoT (Conflagrate / Incinerate key off it). Cast-time → stand still.
-            Skill.Spell("Immolate").Priority(7f).On(Targets.CurrentEnemy)
-                 .When(ctx => (!ctx.Target.HasMyAura("Immolate") || ctx.Target.MyAuraTimeLeftMs("Immolate") < DotRefreshMs)
-                              && !ctx.Game.PlayerIsMoving),
+            // Immolate is Destruction's key DoT (Conflagrate / Incinerate key off it). Cast-time → stand still;
+            // the block also guards against re-queueing a second Immolate before the first cast's debuff lands.
+            CombatBlocks.MaintainCastDebuff("Immolate", DotRefreshMs, priority: 7f),
             // Conflagrate consumes Immolate for a burst — only fire it while Immolate is actually on the target
             // (instant, so it does not gate on movement). Gated so we never cast it on a target without Immolate.
             Skill.Spell("Conflagrate").Priority(8f).On(Targets.CurrentEnemy)

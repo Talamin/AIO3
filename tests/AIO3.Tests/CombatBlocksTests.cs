@@ -93,5 +93,34 @@ namespace AIO3.Tests
             game.CastLog.Clear();
             Assert.Null(engine.Tick(CombatContext.Capture(game)));
         }
+
+        [Fact]
+        public void MaintainCastDebuff_casts_when_missing_and_stationary()
+        {
+            FakeGameClient game = Game(out _);
+            var engine = new RotationEngine(new List<RotationStep> { CombatBlocks.MaintainCastDebuff("Immolate", 3000, 1f) });
+            Assert.Equal("Immolate", engine.Tick(CombatContext.Capture(game))?.Name);
+        }
+
+        [Fact]
+        public void MaintainCastDebuff_holds_while_already_casting_it()
+        {
+            // The double-cast guard: the cast-time DoT's debuff only lands when the cast finishes, so while it IS
+            // the current cast the bare missing-aura check is still true — without this guard the cast-queue window
+            // would queue a second cast.
+            FakeGameClient game = Game(out _);
+            game.CurrentSpells.Add("Immolate"); // mid-cast
+            var engine = new RotationEngine(new List<RotationStep> { CombatBlocks.MaintainCastDebuff("Immolate", 3000, 1f) });
+            Assert.Null(engine.Tick(CombatContext.Capture(game)));
+        }
+
+        [Fact]
+        public void MaintainCastDebuff_holds_while_moving()
+        {
+            FakeGameClient game = Game(out _);
+            game.Moving = true; // cast-time DoT → stand still
+            var engine = new RotationEngine(new List<RotationStep> { CombatBlocks.MaintainCastDebuff("Immolate", 3000, 1f) });
+            Assert.Null(engine.Tick(CombatContext.Capture(game)));
+        }
     }
 }

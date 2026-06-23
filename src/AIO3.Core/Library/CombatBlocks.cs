@@ -95,6 +95,24 @@ namespace AIO3.Core.Library
                  .When(ctx => !ctx.Target.HasMyAura(spell) || ctx.Target.MyAuraTimeLeftMs(spell) < minMsLeft);
 
         /// <summary>
+        /// Maintain a CAST-TIME self-debuff (a DoT like Immolate / Unstable Affliction / Haunt): refresh it when
+        /// missing or under <paramref name="minMsLeft"/> remaining, but only while standing still AND not already
+        /// casting it. The "not already casting it" guard (<see cref="IGameClient.IsCurrentSpell"/>) is what stops
+        /// the cast-queue window from queueing a SECOND cast in the ~400ms before the first cast's debuff lands —
+        /// the double-cast (the debuff isn't on the target yet, so the bare missing-aura check is still true).
+        /// <paramref name="extraGate"/> adds an optional extra condition (e.g. "only when UA isn't known").
+        /// </summary>
+        public static RotationStep MaintainCastDebuff(string spell, int minMsLeft, float priority,
+            Func<CombatContext, bool> extraGate = null) =>
+            Skill.Spell(spell)
+                 .Priority(priority)
+                 .On(Targets.CurrentEnemy)
+                 .When(ctx => (extraGate == null || extraGate(ctx))
+                              && (!ctx.Target.HasMyAura(spell) || ctx.Target.MyAuraTimeLeftMs(spell) < minMsLeft)
+                              && !ctx.Game.PlayerIsMoving
+                              && !ctx.Game.IsCurrentSpell(spell));
+
+        /// <summary>
         /// Use the first ready item from <paramref name="names"/> when <paramref name="when"/> holds
         /// (e.g. an emergency healthstone/potion below a health threshold). Off the GCD.
         /// </summary>

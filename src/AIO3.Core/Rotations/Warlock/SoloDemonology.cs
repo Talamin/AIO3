@@ -91,10 +91,8 @@ namespace AIO3.Core.Rotations.Warlock
             WarlockCommon.MaintainCurse(_settings, priority: 6f),
             // Corruption is instant.
             CombatBlocks.MaintainMyDebuff("Corruption", DotRefreshMs, priority: 8f),
-            // Immolate is cast-time — stand still.
-            Skill.Spell("Immolate").Priority(9f).On(Targets.CurrentEnemy)
-                 .When(ctx => (!ctx.Target.HasMyAura("Immolate") || ctx.Target.MyAuraTimeLeftMs("Immolate") < DotRefreshMs)
-                              && !ctx.Game.PlayerIsMoving),
+            // Immolate is cast-time — stand still; the block also guards against re-queueing it mid-cast.
+            CombatBlocks.MaintainCastDebuff("Immolate", DotRefreshMs, priority: 9f),
 
             // --- proc spender ---
             // Soul Fire is a hard-hitting cast normally made instant/cheap by a Demonology proc (Decimation /
