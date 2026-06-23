@@ -99,6 +99,12 @@ namespace AIO3.Core.Rotations.Mage
         public readonly IntSetting KiteMinTargetHealth =
             new IntSetting("kiteMinHp", "Kite only above enemy HP%", value: 30, min: 0, max: 90, step: 5);
 
+        /// <summary>Don't kite (Frost Nova / Blink / step back) a mob this many levels — or more — BELOW you. A
+        /// "grey", trivial mob dies in a hit or two, so we just nuke it down instead of wasting a root + hop on it.
+        /// 0 = kite regardless of level. (Default 5 = WoW's "grey con" rule of thumb.)</summary>
+        public readonly IntSetting KiteSkipGreyLevels =
+            new IntSetting("kiteSkipGrey", "Skip kite vs mobs N lvls below", value: 5, min: 0, max: 15, step: 1);
+
         /// <summary>Blink-escape when a mob reaches melee: the FC turns to face away, Blinks (so it teleports
         /// AWAY, not into the mob), then faces back. Pairs with Frost Nova (root → blink away → cast from range).
         /// Turn off if a product owns movement.</summary>
@@ -188,6 +194,7 @@ namespace AIO3.Core.Rotations.Mage
             UseKiting.Category = "Survival";
             KiteYards.Category = "Survival";
             KiteMinTargetHealth.Category = "Survival";
+            KiteSkipGreyLevels.Category = "Survival";
             UseBlink.Category = "Survival";
             UseIceBlock.Category = "Survival";
             IceBlockHealthPercent.Category = "Survival";
@@ -214,7 +221,7 @@ namespace AIO3.Core.Rotations.Mage
                 // Rotation
                 CombatRange, UseAoe, AoeThreshold, InterruptCasts, UsePolymorph, UseRacials, UseCooldowns, EmergencyHealthPercent,
                 // Survival
-                UseKiting, KiteYards, KiteMinTargetHealth, UseBlink, UseIceBlock, IceBlockHealthPercent, UseIceBarrier, UseManaShield, ManaShieldHealthPercent,
+                UseKiting, KiteYards, KiteMinTargetHealth, KiteSkipGreyLevels, UseBlink, UseIceBlock, IceBlockHealthPercent, UseIceBarrier, UseManaShield, ManaShieldHealthPercent,
                 // Mana
                 EvocationManaPercent, UseManaGem, ManaGemManaPercent, UseWand, WandManaPercent,
                 // Spec

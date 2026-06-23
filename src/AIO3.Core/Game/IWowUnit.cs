@@ -14,6 +14,10 @@ namespace AIO3.Core.Game
         string Name { get; }
         bool IsAlive { get; }
 
+        /// <summary>Unit level (player or creature); 0 if unknown/unread. Used to skip kiting a "grey",
+        /// trivial mob that's several levels below us (it dies in a hit or two — not worth a root + hop).</summary>
+        int Level { get; }
+
         /// <summary>0..100.</summary>
         double HealthPercent { get; }
 

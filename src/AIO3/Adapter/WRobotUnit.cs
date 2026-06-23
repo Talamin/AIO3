@@ -25,6 +25,8 @@ namespace AIO3.Adapter
         public int Entry => _unit.Entry;
         public string Name => _unit.Name;
         public bool IsAlive => _unit.IsAlive;
+        public int Level => (int)_unit.Level; // WoWUnit.Level is uint; 0 if not yet read
+
         public double HealthPercent => _unit.HealthPercent;
         public double PowerPercent => _unit.ManaPercentage;
         public int Rage => (int)_unit.Rage;

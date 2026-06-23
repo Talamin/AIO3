@@ -117,7 +117,8 @@ namespace AIO3.Core.Rotations.Mage
         public static RotationStep FrostNova(MageSettings s, float priority) =>
             Skill.Spell("Frost Nova").Priority(priority).On(Targets.Self)
                  .When(ctx => s.UseKiting.Value && ctx.Game.PlayerInCombat
-                              && KiteWorthy(ctx, FrostNovaRadius, s.KiteMinTargetHealth.Value) && !AnySheeped(ctx));
+                              && KiteWorthy(ctx, FrostNovaRadius, s.KiteMinTargetHealth.Value, s.KiteSkipGreyLevels.Value)
+                              && !AnySheeped(ctx));
 
         /// <summary>Step back to regain ranged distance when a mob is meleeing us (after Frost Nova roots it).
         /// Cliff-safe (the adapter refuses to step over a ledge). The rotation pauses for the hop. Only runs when
@@ -131,7 +132,7 @@ namespace AIO3.Core.Rotations.Mage
                 priority: priority,
                 targets: Targets.Self,
                 condition: (ctx, t) => s.UseKiting.Value && ctx.Game.PlayerInCombat && ctx.HasEnemyTarget
-                                       && RootedKiteWorthy(ctx, FrostNovaRadius, s.KiteMinTargetHealth.Value),
+                                       && RootedKiteWorthy(ctx, FrostNovaRadius, s.KiteMinTargetHealth.Value, s.KiteSkipGreyLevels.Value),
                 action: (ctx, t) => ctx.Game.StepBack(s.KiteYards.Value) ? CastResult.Success : CastResult.Failed,
                 ignoreGcd: true,
                 recastDelayMs: 1500);
@@ -145,7 +146,7 @@ namespace AIO3.Core.Rotations.Mage
                 priority: priority,
                 targets: Targets.Self,
                 condition: (ctx, t) => s.UseBlink.Value && ctx.Game.PlayerInCombat
-                                       && KiteWorthy(ctx, MeleeRange, s.KiteMinTargetHealth.Value, meleeOnly: true)
+                                       && KiteWorthy(ctx, MeleeRange, s.KiteMinTargetHealth.Value, s.KiteSkipGreyLevels.Value, meleeOnly: true)
                                        && ctx.Game.IsSpellKnown("Blink") && ctx.Game.IsSpellReady("Blink"),
                 action: (ctx, t) => ctx.Game.BlinkAway() ? CastResult.Success : CastResult.Failed,
                 recastDelayMs: 2000);
@@ -271,23 +272,30 @@ namespace AIO3.Core.Rotations.Mage
         /// to trigger Frost Nova (any mob) / Blink (melee only). Never while SWIMMING — in water the player swims at
         /// half speed and the product re-approaches the rooted mob between hops (it undoes the kite), so the kite
         /// just oscillates at melee and wastes Frost Nova; we stand and nuke instead.</summary>
-        private static bool KiteWorthy(CombatContext ctx, float range, int minHealthPct, bool meleeOnly = false) =>
+        private static bool KiteWorthy(CombatContext ctx, float range, int minHealthPct, int skipGreyLevels, bool meleeOnly = false) =>
             // Cheap enemy check FIRST so the Lua-backed swimming read is only paid when a mob is actually on us
             // (most ticks we're nuking from range with nothing in melee → this short-circuits and skips the Lua).
             ctx.Enemies.Any(e => e.IsTargetingMe && e.Distance <= range && e.HealthPercent > minHealthPct
-                                 && (!meleeOnly || !e.IsCaster))
+                                 && (!meleeOnly || !e.IsCaster) && !IsGrey(ctx, e, skipGreyLevels))
             && !ctx.Game.PlayerIsSwimming;
 
         /// <summary>Like <see cref="KiteWorthy"/> but the mob must also be rooted by OUR Frost Nova AND be a MELEE
         /// mob (not a caster). The step-back only runs while this holds: backing off a rooted melee mob gains real
         /// distance (it can't follow); backing off a caster is pointless (it keeps casting from range) and backing
         /// off an unrooted mob just drags it along. Also suppressed while swimming.</summary>
-        private static bool RootedKiteWorthy(CombatContext ctx, float range, int minHealthPct) =>
+        private static bool RootedKiteWorthy(CombatContext ctx, float range, int minHealthPct, int skipGreyLevels) =>
             // Enemy check first (incl. the per-unit aura read) so the Lua swimming read is only paid when a rooted
             // mob is on us — otherwise this short-circuits before either.
             ctx.Enemies.Any(e => e.IsTargetingMe && e.Distance <= range && e.HealthPercent > minHealthPct
-                                 && !e.IsCaster && e.HasMyAura("Frost Nova"))
+                                 && !e.IsCaster && !IsGrey(ctx, e, skipGreyLevels) && e.HasMyAura("Frost Nova"))
             && !ctx.Game.PlayerIsSwimming;
+
+        /// <summary>True if <paramref name="e"/> is a "grey", trivial mob — at least <paramref name="skipGreyLevels"/>
+        /// levels BELOW us — so it isn't worth kiting (it dies in a hit or two; just nuke it). Guards on both
+        /// levels being known (0 = unread) so an unknown level never counts as grey, and on the toggle (0 = off).</summary>
+        private static bool IsGrey(CombatContext ctx, IWowUnit e, int skipGreyLevels) =>
+            skipGreyLevels > 0 && e.Level > 0 && ctx.Me.Level > 0
+            && e.Level <= ctx.Me.Level - skipGreyLevels;
 
         /// <summary>True if one of OUR Polymorphs is active on an enemy. While it is, the specs hold Frost Nova
         /// and all AoE (they deal damage and would break the sheep); single-target on the main mob + Blink /

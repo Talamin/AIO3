@@ -226,6 +226,50 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Skips_the_kite_for_a_grey_low_level_mob()
+        {
+            // A trivial mob 5+ levels below us dies in a hit or two — not worth a root + step back. Just nuke it.
+            FakeGameClient g = MageGame();
+            g.InCombatFlag = true;
+            g.MeUnit.Level = 30;
+            FakeUnit add = AddMeleeAttacker(g);
+            add.Level = 25;                          // exactly 5 below → grey at the default threshold
+            add.WithAura("Frost Nova", mine: true);  // even already rooted, we don't bother stepping back
+            g.SpellsOnCooldown.Add("Frost Nova");
+
+            RotationStep fired = Fire(g);
+            Assert.NotEqual("Frost Nova", fired?.Name);
+            Assert.NotEqual("Kite back", fired?.Name);
+            Assert.Empty(g.StepBackLog);
+        }
+
+        [Fact]
+        public void Still_kites_a_mob_only_a_few_levels_below()
+        {
+            // 4 levels below is still yellow/green (not grey) at the default 5 → kite it normally.
+            FakeGameClient g = MageGame();
+            g.InCombatFlag = true;
+            g.MeUnit.Level = 30;
+            FakeUnit add = AddMeleeAttacker(g);
+            add.Level = 26;                          // only 4 below → not grey
+            Assert.Equal("Frost Nova", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Grey_skip_is_off_when_the_threshold_is_zero()
+        {
+            // KiteSkipGreyLevels = 0 disables the grey rule entirely (kite regardless of level difference).
+            FakeGameClient g = MageGame();
+            g.InCombatFlag = true;
+            g.MeUnit.Level = 80;
+            FakeUnit add = AddMeleeAttacker(g);
+            add.Level = 1;                           // hopelessly grey...
+            var s = new MageSettings();
+            s.KiteSkipGreyLevels.Value = 0;          // ...but the rule is off
+            Assert.Equal("Frost Nova", Fire(g, s)?.Name);
+        }
+
+        [Fact]
         public void Does_not_kite_while_swimming()
         {
             // In water the kite is futile (half-speed swim + the product re-approaches the rooted mob), so the

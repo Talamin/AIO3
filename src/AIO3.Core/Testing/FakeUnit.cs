@@ -10,6 +10,7 @@ namespace AIO3.Core.Testing
         public int Entry { get; set; }
         public string Name { get; set; } = "";
         public bool IsAlive { get; set; } = true;
+        public int Level { get; set; } // 0 by default → never treated as grey in tests unless set
         public double HealthPercent { get; set; } = 100;
         public double PowerPercent { get; set; } = 100;
         public int Rage { get; set; }
