@@ -106,6 +106,8 @@ namespace AIO3.Tests
             game.SpellsOnCooldown.Add("Judgement of Light");
             game.SpellsOnCooldown.Add("Shield of Righteousness");
             game.SpellsOnCooldown.Add("Hammer of the Righteous");
+            game.UnknownSpells.Add("Blood Fury");   // not an Orc → the shared racial bundle stays out of the way
+            game.UnknownSpells.Add("Berserking");   // not a Troll
             game.InCombatFlag = true;
 
             Assert.Equal("Avenger's Shield", Fire(game)?.Name);

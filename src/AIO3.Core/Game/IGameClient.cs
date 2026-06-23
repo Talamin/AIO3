@@ -90,6 +90,19 @@ namespace AIO3.Core.Game
         /// and the mobs aren't held by Frost Nova's ground root, so a caster just stands and nukes instead.</summary>
         bool PlayerIsSwimming { get; }
 
+        /// <summary>True while the player is rooted/snared in place (Frost Nova / Entangling Roots / a net). Read
+        /// from the real movement-flag bit (not the misleading WoWUnit.Rooted, which is a different unit flag).
+        /// Lets the Gnome racial Escape Artist break a root.</summary>
+        bool PlayerIsRooted { get; }
+
+        /// <summary>True if the player has any debuff of the given dispel type ("Poison" / "Disease" / "Magic" /
+        /// "Curse"). Lets the Dwarf racial Stoneform fire on a poison/disease, and serves future cleanse logic.</summary>
+        bool PlayerHasDebuffType(string dispelType);
+
+        /// <summary>True if a Humanoid or Undead corpse is within ~8yd — the targets the Undead racial Cannibalize
+        /// can feed on (an out-of-combat heal). Creature type comes from the per-entry cache (mobs we fought).</summary>
+        bool HasCannibalizeCorpseNearby();
+
         /// <summary>True when the WRobot product is engaged in a fight (its own fight state, set during
         /// the approach too). The rotation only runs while this (or actual combat) holds, so the FC
         /// never acts — or moves (Charge) — while the product is merely navigating.</summary>

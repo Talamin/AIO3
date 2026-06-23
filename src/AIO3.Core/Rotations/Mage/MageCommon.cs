@@ -79,19 +79,11 @@ namespace AIO3.Core.Rotations.Mage
 
         // --- interrupt ---
 
-        /// <summary>Counterspell an enemy cast (Smart mode learns what's interruptible; Never when disabled).</summary>
+        /// <summary>Counterspell an enemy cast (Smart mode learns what's interruptible; Never when disabled).
+        /// Arcane Torrent (the Blood Elf AoE-silence backup) now lives in the shared <see cref="Racials"/> bundle.</summary>
         public static RotationStep Counterspell(MageSettings s, float priority) =>
             CombatBlocks.Interrupt("Counterspell", priority,
                 ctx => s.InterruptCasts.Value ? InterruptModes.Smart : InterruptModes.Never);
-
-        /// <summary>Arcane Torrent (Blood Elf): the 8-yard AoE silence is a backup to Counterspell — pop it when an
-        /// enemy is casting within melee range of us (multiple casters, or Counterspell on cooldown / not yet known),
-        /// gated by the interrupt toggle. It also restores ~8% mana, so we also fire it purely for the mana when low
-        /// (the cast does both at once). In combat only; auto-skips for non-Blood-Elf.</summary>
-        public static RotationStep ArcaneTorrent(MageSettings s, float priority) =>
-            CombatBlocks.ArcaneTorrent(priority, ctx => s.UseArcaneTorrent.Value && ctx.Game.PlayerInCombat
-                && ((s.InterruptCasts.Value && ctx.Enemies.Any(e => e.IsCasting && e.Distance <= MeleeRange))
-                    || ctx.Me.PowerPercent < s.ManaGemManaPercent.Value));
 
         // --- survival ---
 

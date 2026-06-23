@@ -30,8 +30,9 @@ namespace AIO3.Core.Rotations.Paladin
 
         public IReadOnlyList<Setting> Settings => _settings.All;
 
-        public IReadOnlyList<RotationStep> BuildSteps() => new List<RotationStep>
+        public IReadOnlyList<RotationStep> BuildSteps() => Racials.With(new List<RotationStep>
         {
+            // (racials are appended by the shared Racials bundle at the 4.0 band)
             // --- emergency survival ---
             CombatBlocks.UseItems("Emergency heal", Consumables.HealthItems,
                 ctx => _settings.EmergencyHealthPercent.Value > 0 && ctx.Me.HealthPercent < _settings.EmergencyHealthPercent.Value,
@@ -70,6 +71,6 @@ namespace AIO3.Core.Rotations.Paladin
                  .When(ctx => ctx.EnemiesWithin(8f) >= _settings.AoeThreshold.Value
                               || ctx.Target.IsElite || ctx.Target.IsBoss()),
             PaladinCommon.HolyWrath(_settings, priority: 13f),
-        };
+        }, ctx => _settings.UseRacials.Value, basePriority: 4f);
     }
 }

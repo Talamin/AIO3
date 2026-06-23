@@ -26,7 +26,7 @@ namespace AIO3.Core.Rotations.Hunter
 
         public IReadOnlyList<Setting> Settings => _settings.All;
 
-        public IReadOnlyList<RotationStep> BuildSteps() => HunterCommon.WithPetSpecials(_settings, new List<RotationStep>
+        public IReadOnlyList<RotationStep> BuildSteps() => Racials.With(HunterCommon.WithPetSpecials(_settings, new List<RotationStep>
         {
             // --- emergency survival ---
             CombatBlocks.UseItems("Emergency heal", Consumables.HealthItems,
@@ -49,9 +49,7 @@ namespace AIO3.Core.Rotations.Hunter
             HunterCommon.Aspect(_settings, priority: 1.5f),
             HunterCommon.Misdirection(_settings, priority: 1.8f),
 
-            // --- offensive racials + cooldown ---
-            CombatBlocks.OffensiveRacial("Blood Fury", 3f, ctx => _settings.UseRacials.Value),
-            CombatBlocks.OffensiveRacial("Berserking", 3.01f, ctx => _settings.UseRacials.Value),
+            // --- cooldown (racials are appended by the shared Racials bundle at the 3.0 band) ---
             Skill.Spell("Rapid Fire").Priority(3.5f).On(Targets.Self)
                  .When(ctx => _settings.UseCooldowns.Value && ctx.HasEnemyTarget
                               && (ctx.Target.IsBoss() || ctx.Target.IsElite
@@ -84,6 +82,6 @@ namespace AIO3.Core.Rotations.Hunter
             Skill.Spell("Raptor Strike").Priority(14f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.Distance < HunterCommon.RangedMin),
             HunterCommon.Disengage(_settings, priority: 14.5f),
-        });
+        }), ctx => _settings.UseRacials.Value, basePriority: 3f);
     }
 }

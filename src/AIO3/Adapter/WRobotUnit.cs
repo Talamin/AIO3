@@ -64,6 +64,16 @@ namespace AIO3.Adapter
             }
         }
 
+        /// <summary>True if the cached creature type for <paramref name="entry"/> is one of <paramref name="types"/>.
+        /// Reads only the per-entry cache (no Lua) — populated while a mob was alive and our target — so the
+        /// Cannibalize corpse scan can tell a Humanoid/Undead corpse from a Beast without inspecting each corpse.</summary>
+        internal static bool CachedCreatureTypeIs(int entry, params string[] types)
+        {
+            if (!CreatureTypeByEntry.TryGetValue(entry, out string ct) || string.IsNullOrEmpty(ct)) return false;
+            foreach (string t in types) if (ct == t) return true;
+            return false;
+        }
+
         public Reaction Reaction =>
             _unit.Reaction > WReaction.Neutral ? Reaction.Friendly :
             _unit.Reaction == WReaction.Neutral ? Reaction.Neutral :

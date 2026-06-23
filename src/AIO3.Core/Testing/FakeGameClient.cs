@@ -52,6 +52,11 @@ namespace AIO3.Core.Testing
         public bool InCombatFlag;
         public bool DeadOrGhostFlag;
         public bool SwimmingFlag;
+        public bool RootedFlag;
+        public bool CannibalizeCorpseFlag;
+
+        /// <summary>Dispel types currently on the player ("Poison"/"Disease"/…) for PlayerHasDebuffType.</summary>
+        public readonly HashSet<string> DebuffTypes = new HashSet<string>();
         public bool ProductFightingFlag;
         public bool AutoAttacking;
         public WowClass Class = WowClass.None;
@@ -85,6 +90,9 @@ namespace AIO3.Core.Testing
         public bool PlayerInCombat => InCombatFlag;
         public bool PlayerIsDeadOrGhost => DeadOrGhostFlag;
         public bool PlayerIsSwimming => SwimmingFlag;
+        public bool PlayerIsRooted => RootedFlag;
+        public bool PlayerHasDebuffType(string dispelType) => DebuffTypes.Contains(dispelType);
+        public bool HasCannibalizeCorpseNearby() => CannibalizeCorpseFlag;
         public bool ProductIsFighting => ProductFightingFlag;
         public bool PlayerIsAutoAttacking => AutoAttacking;
 

@@ -59,7 +59,8 @@ namespace AIO3.Core.Rotations.Warlock
             new ChoiceSetting("curse", "Curse", "Agony",
                 new[] { "Agony", "Doom", "Elements", "Tongues", "Weakness" });
 
-        /// <summary>Use offensive racials (Blood Fury / Berserking) in combat.</summary>
+        /// <summary>Use racials in combat (Blood Fury / Berserking / Arcane Torrent / War Stomp / Gift of the
+        /// Naaru, per race). Gates the shared <see cref="Library.Racials"/> bundle.</summary>
         public readonly ToggleSetting UseRacials =
             new ToggleSetting("racials", "Use racials", value: true);
 

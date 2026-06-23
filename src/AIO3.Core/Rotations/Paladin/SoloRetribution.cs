@@ -29,7 +29,7 @@ namespace AIO3.Core.Rotations.Paladin
 
         public IReadOnlyList<Setting> Settings => _settings.All;
 
-        public IReadOnlyList<RotationStep> BuildSteps() => new List<RotationStep>
+        public IReadOnlyList<RotationStep> BuildSteps() => Racials.With(new List<RotationStep>
         {
             // --- emergency survival ---
             CombatBlocks.UseItems("Emergency heal", Consumables.HealthItems,
@@ -48,9 +48,7 @@ namespace AIO3.Core.Rotations.Paladin
             PaladinCommon.Aura(PaladinSpec.Retribution, _settings, priority: 3.1f),
             PaladinCommon.Blessing(PaladinSpec.Retribution, _settings, priority: 3.2f),
 
-            // --- offensive racials + major cooldown ---
-            CombatBlocks.OffensiveRacial("Blood Fury", 4f, ctx => _settings.UseRacials.Value),
-            CombatBlocks.OffensiveRacial("Berserking", 4.01f, ctx => _settings.UseRacials.Value),
+            // --- major cooldown (racials are appended by the shared Racials bundle at the 4.0 band) ---
             PaladinCommon.AvengingWrath(_settings, priority: 4.3f),
 
             // --- single target priority ---
@@ -66,6 +64,6 @@ namespace AIO3.Core.Rotations.Paladin
             Skill.Spell("Consecration").Priority(12f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.EnemiesWithin(10f) >= _settings.AoeThreshold.Value),
             PaladinCommon.HolyWrath(_settings, priority: 13f),
-        };
+        }, ctx => _settings.UseRacials.Value, basePriority: 4f);
     }
 }

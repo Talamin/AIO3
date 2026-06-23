@@ -50,7 +50,8 @@ namespace AIO3.Core.Rotations.Warrior
         public readonly ToggleSetting AutoAssignTalents =
             new ToggleSetting("autoTalents", "Auto-assign talents", value: true);
 
-        /// <summary>Use offensive racials (Blood Fury / Berserking) in combat.</summary>
+        /// <summary>Use racials in combat (Blood Fury / Berserking / Arcane Torrent / War Stomp / Gift of the
+        /// Naaru, per race). Gates the shared <see cref="Library.Racials"/> bundle.</summary>
         public readonly ToggleSetting UseRacials =
             new ToggleSetting("racials", "Use racials", value: true);
 

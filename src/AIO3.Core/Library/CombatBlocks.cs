@@ -107,17 +107,11 @@ namespace AIO3.Core.Library
                 action: (ctx, t) => ctx.Game.UseFirstReadyItem(names) ? CastResult.Success : CastResult.Failed,
                 ignoreGcd: true);
 
-        /// <summary>An offensive racial (used in combat with an enemy, off the GCD; IsSpellKnown gates by race).</summary>
+        /// <summary>An offensive racial (used in combat with an enemy, off the GCD; IsSpellKnown gates by race).
+        /// Used by the shared <see cref="Racials"/> bundle.</summary>
         public static RotationStep OffensiveRacial(string spell, float priority, Func<CombatContext, bool> enabled) =>
             Skill.Spell(spell).Priority(priority).On(Targets.Self)
                  .When(ctx => enabled(ctx) && ctx.Game.PlayerInCombat && ctx.HasEnemyTarget).OffGcd();
-
-        /// <summary>Arcane Torrent (Blood Elf racial): an 8-yard PBAoE silence that also restores a little resource
-        /// (mana for casters), on a 2-minute cooldown. Self-cast and off the GCD; IsSpellKnown gates it to Blood
-        /// Elves (auto-skips for every other race). Fires whenever <paramref name="when"/> holds — the caller
-        /// composes the trigger (e.g. an enemy is casting within 8yd → silence, or mana is low → the restore).</summary>
-        public static RotationStep ArcaneTorrent(float priority, Func<CombatContext, bool> when) =>
-            Skill.Spell("Arcane Torrent").Priority(priority).On(Targets.Self).When(when).OffGcd();
 
         // Minimum recorded hits before a candidate's learned damage is trusted (else it's explored).
         private const int MinDamageSamples = 5;

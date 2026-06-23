@@ -241,6 +241,39 @@ namespace AIO3.Adapter
             }
         }
 
+        // True movement-root bit. GetMovementFlag reads the MovementInfo block (scout-verified: flags field at
+        // +0x38, MOVEMENTFLAG_ROOT = 0x800). NOT WoWUnit.Rooted — that aliases UnitFlags.Influenced (0x4), which
+        // does NOT flip for Frost Nova / Entangling Roots / a net, so it's useless here. Cheap memory read, no Lua.
+        public bool PlayerIsRooted => ObjectManager.Me.GetMovementFlag(0x38, 0x800);
+
+        private HashSet<string> _debuffTypes = new HashSet<string>();
+        private int _debuffTypesAt;
+        // One Lua scan of the player's debuffs per ~250ms, caching the set of dispel types present. UnitDebuff's
+        // 5th return is the debuffType ("Poison"/"Disease"/"Magic"/"Curse") — scout-verified for 3.3.5a.
+        public bool PlayerHasDebuffType(string dispelType)
+        {
+            if (unchecked(Now - _debuffTypesAt) >= 250)
+            {
+                _debuffTypesAt = Now;
+                string joined = Lua.LuaDoString<string>(
+                    "local t='' for i=1,40 do local _,_,_,_,d=UnitDebuff('player',i) " +
+                    "if d and d~='' then t=t..d..';' end end return t");
+                var set = new HashSet<string>();
+                if (!string.IsNullOrEmpty(joined))
+                    foreach (string p in joined.Split(';'))
+                        if (p.Length > 0) set.Add(p);
+                _debuffTypes = set;
+            }
+            return _debuffTypes.Contains(dispelType);
+        }
+
+        // A Humanoid/Undead corpse within 8yd for Cannibalize. GetObjectWoWUnit() includes dead units (scout-
+        // verified); IsDead/Entry/GetDistance all resolve on them. The creature type comes from our per-entry
+        // cache (populated when the mob was alive + our target), so a fresh unfought corpse simply won't match.
+        public bool HasCannibalizeCorpseNearby() =>
+            ObjectManager.GetObjectWoWUnit().Any(u => u.IsDead && u.GetDistance <= 8f
+                && WRobotUnit.CachedCreatureTypeIs(u.Entry, "Humanoid", "Undead"));
+
         // WRobot's own fight state — true throughout a fight including the approach. Mirrors how the old
         // AIO gated its combat rotation, so we only act when the product has committed to a target.
         public bool ProductIsFighting => Fight.InFight;

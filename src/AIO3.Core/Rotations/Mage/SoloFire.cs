@@ -27,7 +27,7 @@ namespace AIO3.Core.Rotations.Mage
 
         public IReadOnlyList<Setting> Settings => _settings.All;
 
-        public IReadOnlyList<RotationStep> BuildSteps() => MageCommon.WithConjure(_settings, new List<RotationStep>
+        public IReadOnlyList<RotationStep> BuildSteps() => Racials.With(MageCommon.WithConjure(_settings, new List<RotationStep>
         {
             // --- emergency survival ---
             CombatBlocks.UseItems("Emergency heal", Consumables.HealthItems,
@@ -42,7 +42,6 @@ namespace AIO3.Core.Rotations.Mage
 
             // --- interrupt ---
             MageCommon.Counterspell(_settings, priority: 1.0f),
-            MageCommon.ArcaneTorrent(_settings, priority: 1.05f),
 
             // --- CC an extra attacker first (the sheep holds: Frost Nova + AoE are suppressed while it's up) ---
             MageCommon.Polymorph(_settings, priority: 1.1f),
@@ -58,9 +57,7 @@ namespace AIO3.Core.Rotations.Mage
             MageCommon.Evocation(_settings, priority: 2.0f),
             MageCommon.ManaGem(_settings, priority: 2.1f),
 
-            // --- offensive racials + cooldowns ---
-            CombatBlocks.OffensiveRacial("Blood Fury", 2.5f, ctx => _settings.UseRacials.Value),
-            CombatBlocks.OffensiveRacial("Berserking", 2.51f, ctx => _settings.UseRacials.Value),
+            // --- cooldowns (racials are appended by the shared Racials bundle at the 2.5 band) ---
             Skill.Spell("Combustion").Priority(2.6f).On(Targets.Self)
                  .When(ctx => _settings.UseCooldowns.Value && MageCommon.IsBigFight(ctx) && !ctx.Me.HasAura("Combustion")),
 
@@ -90,6 +87,6 @@ namespace AIO3.Core.Rotations.Mage
                  .When(ctx => !ctx.Game.PlayerIsMoving),
             Skill.Spell("Scorch").Priority(11f).On(Targets.CurrentEnemy)
                  .When(ctx => !ctx.Game.PlayerIsMoving && !ctx.Game.IsSpellKnown("Fireball")),
-        });
+        }), ctx => _settings.UseRacials.Value, basePriority: 2.5f);
     }
 }

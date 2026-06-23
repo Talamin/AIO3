@@ -29,14 +29,12 @@ namespace AIO3.Core.Rotations.Warrior
 
         public IReadOnlyList<Setting> Settings => _settings.All;
 
-        public IReadOnlyList<RotationStep> BuildSteps() => new List<RotationStep>
+        public IReadOnlyList<RotationStep> BuildSteps() => Racials.With(new List<RotationStep>
         {
-            // --- survival + burst ---
+            // --- survival + burst (racials are appended by the shared Racials bundle at the 4.2 band) ---
             CombatBlocks.UseItems("Emergency heal", Consumables.HealthItems,
                 ctx => _settings.EmergencyHealthPercent.Value > 0 && ctx.Me.HealthPercent < _settings.EmergencyHealthPercent.Value,
                 priority: 0.05f),
-            CombatBlocks.OffensiveRacial("Blood Fury", 4.2f, ctx => _settings.UseRacials.Value),
-            CombatBlocks.OffensiveRacial("Berserking", 4.21f, ctx => _settings.UseRacials.Value),
             WarriorCommon.Recklessness(_settings, priority: 4.3f),
 
             // --- baseline / upkeep ---
@@ -90,6 +88,6 @@ namespace AIO3.Core.Rotations.Warrior
 
             // --- rage dump ---
             WarriorCommon.HeroicStrike(_settings, priority: 17f),
-        };
+        }, ctx => _settings.UseRacials.Value, basePriority: 4.2f);
     }
 }

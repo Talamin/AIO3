@@ -65,8 +65,7 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
   the later casters reuse: armor upkeep, Arcane Intellect, mana management (Evocation / conjured Mana Gem /
   wand) and survival (Ice Block / Ice Barrier / Mana Shield). Cast-time nukes gate on standing still while
   instants and procs (Brain Freeze, Fingers-of-Frost shatter, Hot Streak, Missile Barrage) fire on the move.
-  **Interrupts** — Counterspell, backed up by the Blood Elf **Arcane Torrent** 8-yard AoE silence (which also
-  restores a little mana) when a caster closes to melee or Counterspell is on cooldown.
+  **Interrupts** — Counterspell (a Blood Elf's Arcane Torrent silence backs it up via the shared racial bundle).
   **Kiting** — Frost Nova roots a mob as it enters the nova radius, then Blink away (with a landing-safety
   check) or a cliff-safe step back; it holds for a Polymorphed add, skips a mob about to die or a *grey*
   trivial mob several levels below you (just nuke those), and is suppressed while swimming (the product wins
@@ -92,6 +91,15 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
   single smooth motion, not a stutter. Toggle + distance are settings (default on, 7 yd).
 - **Interrupts** — `Smart` / `Always` / `Never`. `Smart` empirically learns which casts are actually
   (non-)interruptible from the combat log and persists that per character (the API flag is unreliable).
+- **Racials** — one shared, class-agnostic bundle (the equivalent of the old project's RacialManager) that
+  *every* class composes. Each racial is gated by *known-by-this-character*, so it fires only for the right
+  race on any class that race can be: **Blood Fury** (Orc), **Berserking** (Troll), **Arcane Torrent** (Blood
+  Elf — 8-yd AoE silence + resource), **War Stomp** (Tauren), **Gift of the Naaru** (Draenei), and the
+  defensive/utility racials — **Will of the Forsaken** & **Every Man for Himself** (break fear/charm/sleep),
+  **Escape Artist** (break a root), **Stoneform** (cleanse poison/disease), **Shadowmeld** (last-ditch vanish),
+  and **Cannibalize** (out-of-combat corpse heal). One *Use racials* toggle per class; the CC-breaks / cleanse /
+  panic racials take priority over the offensive ones (and the offensive racials are held while you're feared,
+  so a 2-minute cooldown isn't wasted on a cast you can't make).
 - **Auto target switching** — **on by default** (toggle per class). Among enemies already attacking you
   (it never pulls — the product still owns the opener, and it only acts with several attackers), it
   focuses the one with the lowest estimated *time-to-kill* (low health wins, minus the run-up cost of

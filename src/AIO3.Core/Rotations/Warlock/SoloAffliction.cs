@@ -49,7 +49,7 @@ namespace AIO3.Core.Rotations.Warlock
 
         // Build the core list once, then splice the demon's own special abilities (Torment / Spell Lock /
         // Firebolt) onto the end with the shared WarlockCommon.WithPetSpecials (mirrors the hunter).
-        private List<RotationStep> Build() => (List<RotationStep>)WarlockCommon.WithPetSpecials(_settings, new List<RotationStep>
+        private List<RotationStep> Build() => Racials.With(WarlockCommon.WithPetSpecials(_settings, new List<RotationStep>
         {
             // --- emergency survival ---
             CombatBlocks.UseItems("Emergency heal", Consumables.HealthItems,
@@ -88,9 +88,7 @@ namespace AIO3.Core.Rotations.Warlock
             // --- self-heal (channel → stand still; shared block owns the gate) ---
             WarlockCommon.DrainLife(_settings, priority: 2.0f),
 
-            // --- offensive racials ---
-            CombatBlocks.OffensiveRacial("Blood Fury", 2.5f, ctx => _settings.UseRacials.Value),
-            CombatBlocks.OffensiveRacial("Berserking", 2.51f, ctx => _settings.UseRacials.Value),
+            // (racials are appended by the shared Racials bundle at the 2.5 band)
 
             // --- DoTs (single-target upkeep, priority order) ---
             // Haunt: short damage-multiplier debuff — keep it up (cast-time, so stand still).
@@ -119,6 +117,6 @@ namespace AIO3.Core.Rotations.Warlock
             // --- filler (cast-time → stand still) ---
             Skill.Spell("Shadow Bolt").Priority(20f).On(Targets.CurrentEnemy)
                  .When(ctx => !ctx.Game.PlayerIsMoving),
-        });
+        }), ctx => _settings.UseRacials.Value, basePriority: 2.5f);
     }
 }
