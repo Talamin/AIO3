@@ -170,6 +170,16 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Imp_keeps_Blood_Pact_on_autocast()
+        {
+            // The Imp's party stamina buff is kept on autocast too (gated on managing the pet, no separate toggle).
+            FakeGameClient g = LockGame("Imp");
+            g.PetAbilities.Add("Blood Pact");
+            Fire(g);
+            Assert.True(g.PetAutocast["Blood Pact"]);
+        }
+
+        [Fact]
         public void Pet_specials_all_skip_when_pet_management_is_off()
         {
             FakeGameClient g = LockGame("Felhunter");

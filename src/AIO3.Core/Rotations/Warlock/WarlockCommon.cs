@@ -166,14 +166,13 @@ namespace AIO3.Core.Rotations.Warlock
         /// current pet. Returned as a list so every warlock spec composes it with one call.
         ///
         /// Included: Torment (Voidwalker tank-taunt — the big solo survival win, gated on the new PetTank toggle),
-        /// Spell Lock (Felhunter — the warlock's ONLY interrupt, gated on the InterruptCasts mode), and Firebolt
-        /// (Imp ranged nuke; usually autocast, low value, harmless). Deferred: Devour Magic, Sacrifice (Voidwalker),
-        /// Seduction (Succubus), Felguard Cleave.
+        /// Spell Lock (Felhunter — the warlock's ONLY interrupt, gated on the InterruptCasts mode), and the Imp's
+        /// Firebolt (ranged nuke) + Blood Pact (party stamina buff) kept on the Imp's AUTOCAST. Deferred: Devour
+        /// Magic, Sacrifice (Voidwalker), Seduction (Succubus), Felguard Cleave.
         /// </summary>
         public static List<RotationStep> PetSpecials(WarlockSettings s)
         {
             Func<CombatContext, bool> manage = ctx => s.ManagePet.Value;
-            Func<CombatContext, bool> hasTarget = ctx => ctx.HasEnemyTarget;
 
             return new List<RotationStep>
             {
@@ -194,6 +193,10 @@ namespace AIO3.Core.Rotations.Warlock
                 // than re-triggering it every tick (which fights its cast time). The Imp then fires it itself.
                 // Auto-skips for non-Imps. Turn ImpFirebolt off to disable the autocast.
                 PetControl.Autocast(ctx => s.ManagePet.Value && s.ImpFirebolt.Value, "Firebolt", 0.96f),
+
+                // Imp Blood Pact: the party stamina buff — keep it on the Imp's autocast so it stays up. Pure
+                // benefit, so no separate toggle (just gated on managing the pet). Auto-skips for non-Imps.
+                PetControl.Autocast(manage, "Blood Pact", 0.97f),
             };
         }
 

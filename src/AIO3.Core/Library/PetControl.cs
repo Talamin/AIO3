@@ -159,27 +159,37 @@ namespace AIO3.Core.Library
                 ignoreGcd: true,
                 recastDelayMs: recastDelayMs);
 
+        // How often we re-assert a pet ability's autocast state, so it stays correct even if it gets turned off
+        // externally (a manual right-click, a UI reset). SetPetAutocast is a no-op when already correct, so these
+        // re-checks are cheap; the interval keeps the Lua scans rare.
+        private const int AutocastRecheckMs = 10000;
+
         /// <summary>Keep a pet ability on AUTOCAST (or off) to match <paramref name="enabled"/> — the right model
         /// for a cast-time, no-cooldown nuke like the Imp's Firebolt: the pet fires it itself, so we don't fight its
-        /// cast time by re-triggering every tick. Syncs the autocast state once per pet (and again if the toggle or
-        /// the pet changes); auto-skips a pet that doesn't have the ability. Off the GCD.</summary>
+        /// cast time by re-triggering every tick. Sets it immediately on a new pet or a toggle change, and
+        /// RE-ASSERTS it every <see cref="AutocastRecheckMs"/> so it stays on even if something turned it off
+        /// externally. Auto-skips a pet that doesn't have the ability. Off the GCD.</summary>
         public static RotationStep Autocast(Func<CombatContext, bool> enabled, string ability, float priority)
         {
             ulong syncedFor = 0;     // pet guid we last synced
             bool syncedState = false;
+            int nextRecheck = 0;     // Environment.TickCount at which we re-assert even if nothing changed
             return new RotationStep(
                 name: "Pet autocast " + ability,
                 priority: priority,
                 targets: Targets.Self,
                 condition: (ctx, t) => ctx.Pet != null && ctx.Pet.IsAlive && ctx.Game.PetHasAbility(ability)
-                                       && (ctx.Pet.Guid != syncedFor || syncedState != enabled(ctx)),
+                                       && (ctx.Pet.Guid != syncedFor                       // new pet
+                                           || syncedState != enabled(ctx)                  // toggle changed
+                                           || unchecked(Environment.TickCount - nextRecheck) >= 0), // periodic re-assert
                 action: (ctx, t) =>
                 {
                     bool on = enabled(ctx);
                     ctx.Game.SetPetAutocast(ability, on);
                     syncedFor = ctx.Pet.Guid;
                     syncedState = on;
-                    return CastResult.Success; // fires once per pet/toggle change, then stays quiet
+                    nextRecheck = Environment.TickCount + AutocastRecheckMs;
+                    return CastResult.Success;
                 },
                 ignoreGcd: true);
         }
