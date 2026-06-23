@@ -370,8 +370,19 @@ namespace AIO3.Adapter
             // refill mana. Set in memory only (no Save) — same as UseLuaToMove in Initialize; we re-assert on load.
             var s = wManager.wManagerSetting.CurrentSetting;
             s.TryToUseBestBagFoodDrink = on;
-            if (on) s.RestingMana = true; // a caster drinks to refill mana, not just to heal
-            DebugLog.Write($"Regen: TryToUseBestBagFoodDrink={on}" + (on ? " + RestingMana=true" : ""));
+            if (on)
+            {
+                s.RestingMana = true; // a caster drinks to refill mana, not just to heal
+
+                // Wipe any food/drink NAME WRobot still has configured. The Wholesome Vendors plugin likes to write
+                // a vendor food name here (e.g. "Freshly Baked Bread") that a mage doesn't carry, which overrides
+                // the conjured food. Clearing it once on start removes that conflict so WRobot falls back cleanly to
+                // the best conjured food/water in the bags (TryToUseBestBagFoodDrink). Memory-only, like the rest.
+                s.FoodName = "";
+                s.DrinkName = "";
+            }
+            DebugLog.Write($"Regen: TryToUseBestBagFoodDrink={on}"
+                + (on ? " + RestingMana=true + cleared Food/DrinkName" : ""));
         }
 
         private volatile float _pendingBackYards; // hand-off to the fight-loop thread (set here, consumed there)
