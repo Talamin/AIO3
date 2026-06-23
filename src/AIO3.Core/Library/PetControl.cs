@@ -189,7 +189,10 @@ namespace AIO3.Core.Library
                     syncedFor = ctx.Pet.Guid;
                     syncedState = on;
                     nextRecheck = Environment.TickCount + AutocastRecheckMs;
-                    return CastResult.Success;
+                    // Return Failed so this background maintenance NEVER consumes a rotation tick — the engine
+                    // falls through and casts the real spell the same tick. (The throttle lives in the condition
+                    // via nextRecheck, so it still only re-asserts once per interval despite the Failed result.)
+                    return CastResult.Failed;
                 },
                 ignoreGcd: true);
         }

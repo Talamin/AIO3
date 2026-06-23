@@ -143,13 +143,18 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Autocast_syncs_only_once_per_pet()
+        public void Autocast_syncs_once_then_throttles_and_never_preempts()
         {
             FakeGameClient g = Game(Pet());
             g.PetAbilities.Add("Firebolt");
             RotationStep step = PetControl.Autocast(On, "Firebolt", 0.96f);
-            Assert.NotNull(Fire(g, step)); // first tick syncs the autocast on
-            Assert.Null(Fire(g, step));    // already in the wanted state → quiet (no per-tick Lua)
+            // It returns Failed (background maintenance), so it never "fires" — and the throttle means it applies
+            // the autocast just once across several quick ticks, not every tick.
+            Assert.Null(Fire(g, step));
+            Assert.Null(Fire(g, step));
+            Assert.Null(Fire(g, step));
+            Assert.Equal(1, g.PetAutocastCalls);
+            Assert.True(g.PetAutocast["Firebolt"]);
         }
 
         // --- Heal ---

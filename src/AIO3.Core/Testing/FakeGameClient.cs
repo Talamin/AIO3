@@ -161,9 +161,14 @@ namespace AIO3.Core.Testing
         /// <summary>Current autocast state set per ability via SetPetAutocast (assert in tests). Missing = unset.</summary>
         public readonly Dictionary<string, bool> PetAutocast = new Dictionary<string, bool>();
 
+        /// <summary>How many times SetPetAutocast actually applied (the pet had the ability) — to assert throttling.</summary>
+        public int PetAutocastCalls;
+
         public void SetPetAutocast(string ability, bool on)
         {
-            if (PetAbilities.Contains(ability)) PetAutocast[ability] = on; // mirror the adapter's "only if known" guard
+            if (!PetAbilities.Contains(ability)) return; // mirror the adapter's "only if known" guard
+            PetAutocast[ability] = on;
+            PetAutocastCalls++;
         }
 
         /// <summary>Set by tests to exercise the host's "pause while repositioning" gate.</summary>
