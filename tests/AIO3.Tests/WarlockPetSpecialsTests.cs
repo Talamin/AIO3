@@ -146,26 +146,27 @@ namespace AIO3.Tests
             Assert.DoesNotContain("Spell Lock", g.PetCastLog);
         }
 
-        // --- Firebolt (Imp nuke) ---
+        // --- Firebolt (Imp nuke) — kept on AUTOCAST, not re-triggered each tick ---
 
         [Fact]
-        public void Imp_casts_Firebolt_on_the_target()
+        public void Imp_keeps_Firebolt_on_autocast()
         {
             FakeGameClient g = LockGame("Imp");
             g.PetAbilities.Add("Firebolt");
-            Assert.Equal("Pet Firebolt", Fire(g)?.Name);
-            Assert.Contains("Firebolt", g.PetCastLog);
+            Fire(g);
+            Assert.True(g.PetAutocast["Firebolt"]);   // the Imp fires it itself; we don't actively cast it
+            Assert.DoesNotContain("Firebolt", g.PetCastLog);
         }
 
         [Fact]
-        public void ImpFirebolt_toggle_off_stops_Firebolt()
+        public void ImpFirebolt_toggle_off_disables_the_autocast()
         {
             FakeGameClient g = LockGame("Imp");
             g.PetAbilities.Add("Firebolt");
             var s = new WarlockSettings();
             s.ImpFirebolt.Value = false;
-            Assert.NotEqual("Pet Firebolt", Fire(g, s)?.Name);
-            Assert.DoesNotContain("Firebolt", g.PetCastLog);
+            Fire(g, s);
+            Assert.False(g.PetAutocast["Firebolt"]);  // autocast is turned OFF, not left running
         }
 
         [Fact]

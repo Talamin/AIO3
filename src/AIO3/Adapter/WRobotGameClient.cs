@@ -775,6 +775,17 @@ namespace AIO3.Adapter
                 "if idx>0 then local s,d=GetPetActionCooldown(idx) if (d-(GetTime()-s))<=0 then CastPetAction(idx) return true end end return false");
         }
 
+        public void SetPetAutocast(string ability, bool on)
+        {
+            if (!PetHasAbility(ability)) return; // cheap (cached) — no Lua when the pet doesn't have it
+            // Proven pattern from the old PetManager: GetSpellAutocast(name,'pet') -> (autocastable, autostate);
+            // ToggleSpellAutocast flips it, so only toggle when the current state differs from what we want.
+            string want = on ? "true" : "false";
+            Lua.LuaDoString(
+                "local want=" + want + " local allowed,state=GetSpellAutocast('" + ability + "','pet') " +
+                "if allowed and state ~= want then ToggleSpellAutocast('" + ability + "','pet') end");
+        }
+
         // The current pet's action-bar ability names, scanned once per pet (5s TTL) via Lua.
         private HashSet<string> PetAbilities()
         {

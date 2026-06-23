@@ -77,12 +77,13 @@ namespace AIO3.Core.Rotations.Warlock
         /// an overlay edit swaps the demon live and an "Auto" pick fills in per spec. Used by the shared
         /// PetControl.Summon call so the spec keeps the right pet up. The <paramref name="spec"/> only matters
         /// for Auto: Demonology → Felguard, Destruction → Imp, everything else → Voidwalker; a known-spell
-        /// fallback drops to the tanky Voidwalker when the spec demon is not learned yet.</summary>
+        /// fallback drops to the best demon actually learned, ending at the Imp (the level-1 pet).</summary>
         public static string SummonSpell(WarlockSettings s, CombatContext ctx, WarlockSpec spec) =>
             "Summon " + ResolvePet(s, ctx, spec);
 
         /// <summary>Resolve which demon to summon: a manual choice wins; "Auto" picks the spec-appropriate demon,
-        /// falling back to the Voidwalker when that demon's summon spell is not known yet (low level).</summary>
+        /// then falls back to the best demon actually LEARNED — ending at the Imp, every warlock's level-1 pet —
+        /// so a low-level lock that hasn't tamed the spec demon (or even the Voidwalker) yet still summons one.</summary>
         public static string ResolvePet(WarlockSettings s, CombatContext ctx, WarlockSpec spec)
         {
             string choice = s.Pet.Value;
@@ -95,7 +96,12 @@ namespace AIO3.Core.Rotations.Warlock
                 case WarlockSpec.Destruction: preferred = "Imp"; break;
                 default: preferred = "Voidwalker"; break;
             }
-            if (ctx != null && !ctx.Game.IsSpellKnown("Summon " + preferred)) return "Voidwalker";
+            if (ctx == null) return preferred;
+
+            // The spec demon may not be learned yet at low level — fall through to the best one we DO know.
+            // The Imp is learned at level 1, so it's the guaranteed final fallback (no more "summons nothing").
+            foreach (string demon in new[] { preferred, "Voidwalker", "Imp" })
+                if (ctx.Game.IsSpellKnown("Summon " + demon)) return demon;
             return preferred;
         }
 
@@ -184,9 +190,10 @@ namespace AIO3.Core.Rotations.Warlock
                     when: ctx => s.InterruptCasts.Value != InterruptModes.Never
                                  && ctx.HasEnemyTarget && ctx.Target.IsCasting),
 
-                // Imp Firebolt: ranged nuke (usually autocast; harmless, low value). Auto-skips for non-Imps.
-                PetControl.UseAbility(ctx => s.ManagePet.Value && s.ImpFirebolt.Value, "Firebolt", 0.96f,
-                    when: hasTarget, recastDelayMs: 1500),
+                // Imp Firebolt: a cast-time ranged nuke with NO cooldown — leave it on the Imp's AUTOCAST rather
+                // than re-triggering it every tick (which fights its cast time). The Imp then fires it itself.
+                // Auto-skips for non-Imps. Turn ImpFirebolt off to disable the autocast.
+                PetControl.Autocast(ctx => s.ManagePet.Value && s.ImpFirebolt.Value, "Firebolt", 0.96f),
             };
         }
 

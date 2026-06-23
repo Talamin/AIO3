@@ -98,6 +98,60 @@ namespace AIO3.Tests
             Assert.Null(Fire(g, PetControl.Summon(On, "Call Pet", "Revive Pet", 1f)));
         }
 
+        [Fact]
+        public void Summon_does_not_double_cast_before_the_pet_appears()
+        {
+            // The summon is a multi-second cast and the pet only spawns a beat AFTER it finishes. The FC must not
+            // re-cast Summon into that "cast done, pet not here yet" gap. With the pet still absent, the recast
+            // throttle blocks the follow-up ticks, so exactly one summon is cast.
+            RotationStep step = PetControl.Summon(On, "Call Pet", "Revive Pet", 1f);
+            FakeGameClient g = Game(pet: null);
+
+            Fire(g, step);   // summon issued
+            Fire(g, step);   // pet still absent → throttled
+            Fire(g, step);   // still throttled
+
+            Assert.Single(g.CastLog.FindAll(c => c == "Call Pet"));
+        }
+
+        // --- Autocast (e.g. Imp Firebolt) ---
+
+        [Fact]
+        public void Autocast_enables_an_ability_the_pet_has()
+        {
+            FakeGameClient g = Game(Pet());
+            g.PetAbilities.Add("Firebolt");
+            Fire(g, PetControl.Autocast(On, "Firebolt", 0.96f));
+            Assert.True(g.PetAutocast["Firebolt"]);
+        }
+
+        [Fact]
+        public void Autocast_disables_when_the_toggle_is_off()
+        {
+            FakeGameClient g = Game(Pet());
+            g.PetAbilities.Add("Firebolt");
+            Fire(g, PetControl.Autocast(Off, "Firebolt", 0.96f));
+            Assert.False(g.PetAutocast["Firebolt"]);
+        }
+
+        [Fact]
+        public void Autocast_skips_a_pet_without_the_ability()
+        {
+            FakeGameClient g = Game(Pet()); // e.g. a Voidwalker — no Firebolt on its bar
+            Assert.Null(Fire(g, PetControl.Autocast(On, "Firebolt", 0.96f)));
+            Assert.DoesNotContain("Firebolt", g.PetAutocast.Keys);
+        }
+
+        [Fact]
+        public void Autocast_syncs_only_once_per_pet()
+        {
+            FakeGameClient g = Game(Pet());
+            g.PetAbilities.Add("Firebolt");
+            RotationStep step = PetControl.Autocast(On, "Firebolt", 0.96f);
+            Assert.NotNull(Fire(g, step)); // first tick syncs the autocast on
+            Assert.Null(Fire(g, step));    // already in the wanted state → quiet (no per-tick Lua)
+        }
+
         // --- Heal ---
 
         [Fact]

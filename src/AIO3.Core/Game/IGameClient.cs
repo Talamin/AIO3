@@ -45,6 +45,11 @@ namespace AIO3.Core.Game
         /// was cast. No-op (false) when the pet lacks the ability — so the same call is safe for any pet.</summary>
         bool CastPetAbility(string name);
 
+        /// <summary>Turn a pet ability's AUTOCAST on/off (e.g. the Imp's Firebolt — a cast-time nuke with no
+        /// cooldown that's best left to the pet rather than re-triggered every tick). Only toggles when the
+        /// current state differs; no-op when the pet lacks the ability. Persists per pet.</summary>
+        void SetPetAutocast(string ability, bool on);
+
         /// <summary>Whether the named pet ability is on the bar AND off cooldown. Cheap (cached per pet), so a
         /// step can gate on it without a per-tick scan and won't try to cast an ability that's recharging.</summary>
         bool PetAbilityReady(string name);

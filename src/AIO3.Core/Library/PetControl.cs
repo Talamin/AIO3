@@ -24,6 +24,13 @@ namespace AIO3.Core.Library
         // mount-up cast (mounting dismisses the pet, and casting Call Pet into it cancels the mount).
         private const int SummonGraceMs = 2000;
 
+        // After we ISSUE a summon, wait at most this long for the pet to actually appear before allowing another
+        // cast. The summon is a multi-second cast (≈10s on some servers) and the pet only spawns a beat AFTER the
+        // cast ends — so we can't size a fixed throttle to the cast time. Instead we hold off until the pet is up
+        // (cleared the moment it appears) and only fall through after this generous timeout, i.e. when the summon
+        // genuinely failed/was interrupted. This is what kills the double-cast across any cast length.
+        private const int SummonWaitMs = 15000;
+
         /// <summary>Keep a pet up: summon it with <paramref name="callSpell"/> when none exists, or revive it
         /// with <paramref name="reviveSpell"/> when it is dead. Out of combat / not mounted. If a pet we
         /// already had suddenly disappears (almost always because we just mounted), wait out a short grace
@@ -39,6 +46,7 @@ namespace AIO3.Core.Library
         {
             bool petSeen = false;
             int vanishedAt = 0;
+            int summonedAt = 0; // when we last issued a summon/revive; 0 = not waiting on one
             return new RotationStep(
                 name: "Pet summon",
                 priority: priority,
@@ -49,8 +57,8 @@ namespace AIO3.Core.Library
                     {
                         petSeen = true;
                         vanishedAt = 0;
-                        if (ctx.Pet.IsAlive) return false; // alive → nothing to do
-                        // dead → fall through to revive (no grace)
+                        if (ctx.Pet.IsAlive) { summonedAt = 0; return false; } // healthy pet → done; clear the wait
+                        // exists but dead → fall through to revive
                     }
                     else if (petSeen)
                     {
@@ -58,14 +66,24 @@ namespace AIO3.Core.Library
                         if (unchecked(Environment.TickCount - vanishedAt) < SummonGraceMs) return false;
                     }
 
-                    if (!enabled(ctx) || ctx.Game.PlayerInCombat || ctx.Game.PlayerIsMounted) return false;
+                    // A summon/revive we already cast hasn't taken effect yet — the cast is multi-second and the
+                    // pet spawns a beat after it ends. Don't cast again until the pet is up (cleared above) or this
+                    // generous timeout passes (the summon failed / was interrupted), which is what stops the
+                    // double-cast regardless of how long the summon cast actually takes.
+                    if (summonedAt != 0 && unchecked(Environment.TickCount - summonedAt) < SummonWaitMs) return false;
+                    summonedAt = 0;
+
+                    if (!enabled(ctx) || ctx.Game.PlayerInCombat || ctx.Game.PlayerIsMounted
+                        || ctx.Game.PlayerIsCasting) return false; // never start a summon on top of a running cast
                     string spell = SummonSpell(ctx, callSpell, reviveSpell);
                     return spell != null && ctx.Game.IsSpellKnown(spell) && ctx.Game.IsSpellReady(spell);
                 },
                 action: (ctx, t) =>
                 {
                     string spell = SummonSpell(ctx, callSpell, reviveSpell);
-                    return spell != null ? ctx.Game.Cast(spell, ctx.Me) : CastResult.Failed;
+                    CastResult r = spell != null ? ctx.Game.Cast(spell, ctx.Me) : CastResult.Failed;
+                    if (r == CastResult.Success) summonedAt = Environment.TickCount; // start the wait-for-pet window
+                    return r;
                 });
         }
 
@@ -140,6 +158,31 @@ namespace AIO3.Core.Library
                 action: (ctx, t) => ctx.Game.CastPetAbility(ability) ? CastResult.Success : CastResult.Failed,
                 ignoreGcd: true,
                 recastDelayMs: recastDelayMs);
+
+        /// <summary>Keep a pet ability on AUTOCAST (or off) to match <paramref name="enabled"/> — the right model
+        /// for a cast-time, no-cooldown nuke like the Imp's Firebolt: the pet fires it itself, so we don't fight its
+        /// cast time by re-triggering every tick. Syncs the autocast state once per pet (and again if the toggle or
+        /// the pet changes); auto-skips a pet that doesn't have the ability. Off the GCD.</summary>
+        public static RotationStep Autocast(Func<CombatContext, bool> enabled, string ability, float priority)
+        {
+            ulong syncedFor = 0;     // pet guid we last synced
+            bool syncedState = false;
+            return new RotationStep(
+                name: "Pet autocast " + ability,
+                priority: priority,
+                targets: Targets.Self,
+                condition: (ctx, t) => ctx.Pet != null && ctx.Pet.IsAlive && ctx.Game.PetHasAbility(ability)
+                                       && (ctx.Pet.Guid != syncedFor || syncedState != enabled(ctx)),
+                action: (ctx, t) =>
+                {
+                    bool on = enabled(ctx);
+                    ctx.Game.SetPetAutocast(ability, on);
+                    syncedFor = ctx.Pet.Guid;
+                    syncedState = on;
+                    return CastResult.Success; // fires once per pet/toggle change, then stays quiet
+                },
+                ignoreGcd: true);
+        }
 
         /// <summary>The unit the pet should be on: lowest-HP mob attacking the owner (peel), else lowest-HP
         /// mob attacking the pet (hold), else the owner's current target.</summary>
