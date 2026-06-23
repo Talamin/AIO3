@@ -45,6 +45,7 @@ namespace AIO3.Core.Rotations.Mage
 
             // --- interrupt ---
             MageCommon.Counterspell(_settings, priority: 1.0f),
+            MageCommon.ArcaneTorrent(_settings, priority: 1.05f),
 
             // --- CC an extra attacker first (the sheep holds: Frost Nova + AoE are suppressed while it's up) ---
             MageCommon.Polymorph(_settings, priority: 1.1f),

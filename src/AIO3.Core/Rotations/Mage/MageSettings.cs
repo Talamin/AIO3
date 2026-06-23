@@ -71,6 +71,12 @@ namespace AIO3.Core.Rotations.Mage
         public readonly ToggleSetting UseRacials =
             new ToggleSetting("racials", "Use racials", value: true);
 
+        /// <summary>Arcane Torrent (Blood Elf): pop the 8-yard AoE silence when an enemy is casting in melee range
+        /// of you (a backup to Counterspell — and it also restores ~8% mana), and grab the free mana when low.
+        /// Auto-skips for non-Blood-Elf. The silence half also respects the interrupt toggle.</summary>
+        public readonly ToggleSetting UseArcaneTorrent =
+            new ToggleSetting("arcaneTorrent", "Arcane Torrent (Blood Elf silence + mana)", value: true);
+
         /// <summary>Use major cooldowns (Icy Veins / Combustion / Arcane Power / Mirror Image …) on
         /// elites / bosses / packs.</summary>
         public readonly ToggleSetting UseCooldowns =
@@ -188,6 +194,7 @@ namespace AIO3.Core.Rotations.Mage
             InterruptCasts.Category = "Rotation";
             UsePolymorph.Category = "Rotation";
             UseRacials.Category = "Rotation";
+            UseArcaneTorrent.Category = "Rotation";
             UseCooldowns.Category = "Rotation";
             EmergencyHealthPercent.Category = "Rotation";
 
@@ -219,7 +226,7 @@ namespace AIO3.Core.Rotations.Mage
                 // Buffs
                 ArmorChoice, UseArcaneIntellect, UseWaterElemental, UseConjure, ConjureCount, ManageFood,
                 // Rotation
-                CombatRange, UseAoe, AoeThreshold, InterruptCasts, UsePolymorph, UseRacials, UseCooldowns, EmergencyHealthPercent,
+                CombatRange, UseAoe, AoeThreshold, InterruptCasts, UsePolymorph, UseRacials, UseArcaneTorrent, UseCooldowns, EmergencyHealthPercent,
                 // Survival
                 UseKiting, KiteYards, KiteMinTargetHealth, KiteSkipGreyLevels, UseBlink, UseIceBlock, IceBlockHealthPercent, UseIceBarrier, UseManaShield, ManaShieldHealthPercent,
                 // Mana

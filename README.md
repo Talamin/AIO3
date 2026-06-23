@@ -65,12 +65,15 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
   the later casters reuse: armor upkeep, Arcane Intellect, mana management (Evocation / conjured Mana Gem /
   wand) and survival (Ice Block / Ice Barrier / Mana Shield). Cast-time nukes gate on standing still while
   instants and procs (Brain Freeze, Fingers-of-Frost shatter, Hot Streak, Missile Barrage) fire on the move.
+  **Interrupts** — Counterspell, backed up by the Blood Elf **Arcane Torrent** 8-yard AoE silence (which also
+  restores a little mana) when a caster closes to melee or Counterspell is on cooldown.
   **Kiting** — Frost Nova roots a mob as it enters the nova radius, then Blink away (with a landing-safety
   check) or a cliff-safe step back; it holds for a Polymorphed add, skips a mob about to die or a *grey*
   trivial mob several levels below you (just nuke those), and is suppressed while swimming (the product wins
   the position fight in water, so the mage just stands and nukes).
   **Self-sufficient** — conjures its own food / water / mana gem and points WRobot at the best conjured food
-  in the bags to eat/drink; summons and directs a **Water Elemental** (Frost). Polymorphs an extra attacker
+  in the bags to eat/drink (clearing any stale named vendor food/drink a plugin left behind, once on start, so
+  it doesn't override the conjured food); summons and directs a **Water Elemental** (Frost). Polymorphs an extra attacker
   (off by default; only sheepable creature types, resolved live) and, after the kill, retargets its own sheeped
   add so it gets finished instead of waking up untended.
 - **Warlock — Affliction / Demonology / Destruction**, caster + permanent pet + DoTs on the `WarlockCommon`

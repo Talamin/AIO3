@@ -226,6 +226,41 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Arcane_Torrent_silences_a_caster_in_melee_when_Counterspell_is_down()
+        {
+            // The 8-yard AoE silence backs up Counterspell — when Counterspell is on cooldown and a caster has
+            // closed to within 8yd and is casting, pop Arcane Torrent (Blood Elf) to silence it.
+            FakeGameClient g = MageGame();
+            g.InCombatFlag = true;
+            g.SpellsOnCooldown.Add("Counterspell");      // single-target interrupt unavailable
+            FakeUnit add = AddMeleeAttacker(g);           // a mob within 8yd...
+            add.IsCasting = true;                         // ...that is casting
+            add.CastingSpellId = 133;
+            Assert.Equal("Arcane Torrent", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Arcane_Torrent_grabs_mana_when_low_in_combat()
+        {
+            // Off the GCD on a 2-min cooldown, it's free value: pop it for the ~8% mana when we're low.
+            FakeGameClient g = MageGame();
+            g.InCombatFlag = true;
+            g.MeUnit.PowerPercent = 20;                   // below the mana-gem threshold (25)
+            Assert.Equal("Arcane Torrent", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Arcane_Torrent_is_skipped_for_a_non_blood_elf()
+        {
+            // Not a Blood Elf → the racial isn't known → it auto-skips (no false cast, no error).
+            FakeGameClient g = MageGame();
+            g.InCombatFlag = true;
+            g.MeUnit.PowerPercent = 20;
+            g.UnknownSpells.Add("Arcane Torrent");
+            Assert.NotEqual("Arcane Torrent", Fire(g)?.Name);
+        }
+
+        [Fact]
         public void Skips_the_kite_for_a_grey_low_level_mob()
         {
             // A trivial mob 5+ levels below us dies in a hit or two — not worth a root + step back. Just nuke it.

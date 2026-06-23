@@ -84,6 +84,15 @@ namespace AIO3.Core.Rotations.Mage
             CombatBlocks.Interrupt("Counterspell", priority,
                 ctx => s.InterruptCasts.Value ? InterruptModes.Smart : InterruptModes.Never);
 
+        /// <summary>Arcane Torrent (Blood Elf): the 8-yard AoE silence is a backup to Counterspell — pop it when an
+        /// enemy is casting within melee range of us (multiple casters, or Counterspell on cooldown / not yet known),
+        /// gated by the interrupt toggle. It also restores ~8% mana, so we also fire it purely for the mana when low
+        /// (the cast does both at once). In combat only; auto-skips for non-Blood-Elf.</summary>
+        public static RotationStep ArcaneTorrent(MageSettings s, float priority) =>
+            CombatBlocks.ArcaneTorrent(priority, ctx => s.UseArcaneTorrent.Value && ctx.Game.PlayerInCombat
+                && ((s.InterruptCasts.Value && ctx.Enemies.Any(e => e.IsCasting && e.Distance <= MeleeRange))
+                    || ctx.Me.PowerPercent < s.ManaGemManaPercent.Value));
+
         // --- survival ---
 
         /// <summary>Ice Block (full immunity, clears debuffs) as a last resort when low and being hit.</summary>
