@@ -174,6 +174,22 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Blink_is_preferred_over_step_back_for_a_mob_rooted_at_nova_range()
+        {
+            // Frost Nova roots a mob as it crosses ~10yd, so the rooted mob sits at ~10yd — OUTSIDE true melee (8).
+            // Blink is the primary escape: it now triggers at the nova radius too, so it fires there (not the
+            // step-back). KiteBack only takes over when Blink is unavailable (covered by Kites_back_when_blink...).
+            FakeGameClient g = MageGame();
+            g.InCombatFlag = true;
+            FakeUnit add = AddMeleeAttacker(g);
+            add.Distance = 9;                        // rooted just inside the nova radius (10), beyond melee (8)
+            add.WithAura("Frost Nova", mine: true);  // we rooted it
+            g.SpellsOnCooldown.Add("Frost Nova");    // nova just cast → on CD, so it doesn't preempt Blink
+            Assert.Equal("Blink away", Fire(g)?.Name);
+            Assert.Empty(g.StepBackLog);             // and we did NOT step back
+        }
+
+        [Fact]
         public void Does_not_step_back_when_the_mob_is_not_rooted()
         {
             // The "runs backwards endlessly" bug: an unrooted mob in melee must NOT trigger a step-back (it would

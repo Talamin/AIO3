@@ -138,16 +138,19 @@ namespace AIO3.Core.Rotations.Mage
                 ignoreGcd: true,
                 recastDelayMs: 1500);
 
-        /// <summary>Blink-escape when a mob has reached melee: the adapter turns to face away, Blinks (teleports
-        /// in the facing direction), then faces back toward the target — so it actually gains distance instead of
-        /// blinking into the mob. Use it after Frost Nova (root → blink away → cast from range).</summary>
+        /// <summary>Blink-escape after the root: the adapter turns to face away, Blinks (teleports in the facing
+        /// direction), then faces back toward the target — so it gains distance instead of blinking into the mob.
+        /// This is the PRIMARY escape: it triggers at the same <see cref="FrostNovaRadius"/> as the root, so once
+        /// Frost Nova roots a mob as it crosses ~10yd, Blink (priority above <see cref="KiteBack"/>) fires the next
+        /// tick → blink away → cast from range. The cliff-safe step-back is only the fallback for when Blink isn't
+        /// known yet or is on cooldown (then this condition fails and the engine falls through to KiteBack).</summary>
         public static RotationStep Blink(MageSettings s, float priority) =>
             new RotationStep(
                 name: "Blink away",
                 priority: priority,
                 targets: Targets.Self,
                 condition: (ctx, t) => s.UseBlink.Value && ctx.Game.PlayerInCombat
-                                       && KiteWorthy(ctx, MeleeRange, s.KiteMinTargetHealth.Value, s.KiteSkipGreyLevels.Value, meleeOnly: true)
+                                       && KiteWorthy(ctx, FrostNovaRadius, s.KiteMinTargetHealth.Value, s.KiteSkipGreyLevels.Value, meleeOnly: true)
                                        && ctx.Game.IsSpellKnown("Blink") && ctx.Game.IsSpellReady("Blink"),
                 action: (ctx, t) => ctx.Game.BlinkAway() ? CastResult.Success : CastResult.Failed,
                 recastDelayMs: 2000);
