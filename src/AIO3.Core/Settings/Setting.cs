@@ -16,6 +16,15 @@ namespace AIO3.Core.Settings
         /// <summary>Tab/group the setting is shown under in the overlay (e.g. "Spec", "Rotation", "General").</summary>
         public string Category { get; set; } = "General";
 
+        /// <summary>If set, the overlay only shows this setting while the named spec is active (matched against
+        /// <c>IClassModule.ActiveSpec</c>, e.g. "Demonology"). Null = shown for every spec. Lets a spec-only knob
+        /// hide itself in the specs it doesn't apply to, so the panel only shows what's relevant to the build.</summary>
+        public string Spec { get; set; }
+
+        /// <summary>True if this setting should be shown for the given active spec. A setting with no
+        /// <see cref="Spec"/> tag always applies; a null active spec (unknown/not spec-aware) disables filtering.</summary>
+        public bool AppliesTo(string activeSpec) => Spec == null || activeSpec == null || Spec == activeSpec;
+
         protected Setting(string key, string label)
         {
             Key = key;

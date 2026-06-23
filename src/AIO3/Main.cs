@@ -72,7 +72,9 @@ public class Main : ICustomClass
             _store = new SettingsStore(profile, list);
             _store.Load(); // apply persisted values (incl. the saved spec override) before running
 
-            _overlay = new SettingsOverlay(_class.DisplayName, list);
+            // Pass the live active spec so the overlay hides settings tagged for other specs (and rebuilds when
+            // the spec changes). _class is captured; ActiveSpec updates as the module resolves the spec.
+            _overlay = new SettingsOverlay(_class.DisplayName, list, () => _class.ActiveSpec);
             _talentTrainer = new TalentTrainer();
 
             // Empirical interrupt learner: feeds the tracker from the combat log (the API's

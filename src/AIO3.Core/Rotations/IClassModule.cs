@@ -32,6 +32,11 @@ namespace AIO3.Core.Rotations
         /// (e.g. "Solo Fury"). The host uses it for the "Active: …" log line.</summary>
         string ActiveLabel { get; }
 
+        /// <summary>The bare active spec name (e.g. "Demonology"), or null if not yet resolved. The overlay shows
+        /// settings tagged for a specific spec (<see cref="Settings.Setting.Spec"/>) only while this matches, so
+        /// the panel hides knobs that don't apply to the current build. Null = no spec filtering.</summary>
+        string ActiveSpec { get; }
+
         /// <summary>Optional auto target-switching among attackers (never pulls). Read each tick by the host;
         /// off by default so it can't fight a product that owns targeting.</summary>
         bool AutoSwitchTargetEnabled { get; }

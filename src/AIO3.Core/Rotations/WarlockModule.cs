@@ -36,6 +36,7 @@ namespace AIO3.Core.Rotations
         public IReadOnlyList<Setting> Settings => _all;
         public float Range => _settings.CombatRange.Value;
         public string ActiveLabel { get; private set; } = "Solo Affliction";
+        public string ActiveSpec => _activeSpec?.ToString();
         public bool AutoSwitchTargetEnabled => _settings.AutoSwitchTarget.Value;
         public bool DebugLoggingEnabled => _settings.DebugProfiling.Value;
         // The warlock eats vendor food and conjures Healthstone/Soulstone (not food), so leave food to the

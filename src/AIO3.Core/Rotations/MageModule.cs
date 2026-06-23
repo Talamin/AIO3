@@ -34,6 +34,7 @@ namespace AIO3.Core.Rotations
         public IReadOnlyList<Setting> Settings => _all;
         public float Range => _settings.CombatRange.Value;
         public string ActiveLabel { get; private set; } = "Solo Frost";
+        public string ActiveSpec => _activeSpec?.ToString();
         public bool AutoSwitchTargetEnabled => _settings.AutoSwitchTarget.Value;
         public bool DebugLoggingEnabled => _settings.DebugProfiling.Value;
         public bool ManageBagFoodDrink => _settings.ManageFood.Value; // eat/drink the conjured food we make

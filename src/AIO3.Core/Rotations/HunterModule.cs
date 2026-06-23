@@ -34,6 +34,7 @@ namespace AIO3.Core.Rotations
         public IReadOnlyList<Setting> Settings => _all;
         public float Range => _settings.CombatRange.Value;
         public string ActiveLabel { get; private set; } = "Solo Beast Mastery";
+        public string ActiveSpec => _activeSpec?.ToString();
         public bool AutoSwitchTargetEnabled => _settings.AutoSwitchTarget.Value;
         public bool DebugLoggingEnabled => _settings.DebugProfiling.Value;
         public bool ManageBagFoodDrink => false; // hunter eats vendor food (left to the vendor plugin)

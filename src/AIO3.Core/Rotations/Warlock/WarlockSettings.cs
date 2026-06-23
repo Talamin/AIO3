@@ -43,9 +43,10 @@ namespace AIO3.Core.Rotations.Warlock
         public readonly ToggleSetting PetTank =
             new ToggleSetting("petTank", "Pet tanks (taunt off you)", value: true);
 
-        /// <summary>Let the Imp keep firing Firebolt (its ranged nuke). Usually autocast already; harmless. Auto-skips for non-Imps.</summary>
+        /// <summary>Keep the Imp's Firebolt on AUTOCAST (the Imp fires its ranged nuke itself — the right model for
+        /// a cast-time, no-cooldown ability). Off turns the autocast back off. Auto-skips for non-Imps.</summary>
         public readonly ToggleSetting ImpFirebolt =
-            new ToggleSetting("impFirebolt", "Imp casts Firebolt", value: true);
+            new ToggleSetting("impFirebolt", "Imp autocasts Firebolt", value: true);
 
         // --- Rotation ---
 
@@ -70,27 +71,27 @@ namespace AIO3.Core.Rotations.Warlock
         public readonly ChoiceSetting InterruptCasts =
             new ChoiceSetting("interrupt", "Interrupt casts (Spell Lock)", InterruptModes.Smart, InterruptModes.All);
 
-        // --- Demonology ---
+        // --- Rotation: Demonology-only (shown only while Demonology is the active spec) ---
 
         /// <summary>Keep Demonic Empowerment up on the demon (spec buff; auto-skips if unknown / petless).</summary>
         public readonly ToggleSetting DemonicEmpowerment =
-            new ToggleSetting("demonicEmpowerment", "Demonology: Demonic Empowerment on pet", value: true);
+            new ToggleSetting("demonicEmpowerment", "Demonic Empowerment on pet", value: true);
 
         /// <summary>Cast Soul Fire when a Decimation/Molten-Core-style proc is up (gated on the buff; auto-skips
         /// if Soul Fire is unknown). Off the proc it stays behind Shadow Bolt, so leaving this on is harmless.</summary>
         public readonly ToggleSetting UseSoulFire =
-            new ToggleSetting("soulFire", "Demonology: Soul Fire on proc", value: true);
+            new ToggleSetting("soulFire", "Soul Fire on proc", value: true);
 
-        // --- Destruction ---
+        // --- Rotation: Destruction-only (shown only while Destruction is the active spec) ---
 
         /// <summary>Use Conflagrate (consumes Immolate for a burst). Gated so it only fires while Immolate is up
         /// on the target; auto-skips if unknown.</summary>
         public readonly ToggleSetting UseConflagrate =
-            new ToggleSetting("conflagrate", "Destruction: use Conflagrate", value: true);
+            new ToggleSetting("conflagrate", "Use Conflagrate", value: true);
 
         /// <summary>Use Chaos Bolt as a nuke when known (sits between Incinerate and the Shadow Bolt fallback).</summary>
         public readonly ToggleSetting UseChaosBolt =
-            new ToggleSetting("chaosBolt", "Destruction: use Chaos Bolt", value: true);
+            new ToggleSetting("chaosBolt", "Use Chaos Bolt", value: true);
 
         /// <summary>Use an emergency healthstone/potion below this health %. 0 disables it.</summary>
         public readonly IntSetting EmergencyHealthPercent =
@@ -177,11 +178,13 @@ namespace AIO3.Core.Rotations.Warlock
             InterruptCasts.Category = "Rotation";
             EmergencyHealthPercent.Category = "Rotation";
 
-            DemonicEmpowerment.Category = "Demonology";
-            UseSoulFire.Category = "Demonology";
+            // Spec-only knobs live in the Rotation tab but tag their spec, so the overlay shows them ONLY while
+            // that spec is active (Spec strings match WarlockSpec.ToString()). No more standalone spec tabs.
+            DemonicEmpowerment.Category = "Rotation"; DemonicEmpowerment.Spec = "Demonology";
+            UseSoulFire.Category = "Rotation";        UseSoulFire.Spec = "Demonology";
 
-            UseConflagrate.Category = "Destruction";
-            UseChaosBolt.Category = "Destruction";
+            UseConflagrate.Category = "Rotation"; UseConflagrate.Spec = "Destruction";
+            UseChaosBolt.Category = "Rotation";   UseChaosBolt.Spec = "Destruction";
 
             DrainLifeHealthPercent.Category = "Survival";
             UseFear.Category = "Survival";
@@ -206,12 +209,10 @@ namespace AIO3.Core.Rotations.Warlock
                 ArmorChoice,
                 // Pet
                 Pet, ManagePet, PetHealPercent, PetTank, ImpFirebolt,
-                // Rotation
+                // Rotation (general, then the spec-only knobs that show only in their spec)
                 CombatRange, Curse, UseRacials, InterruptCasts, EmergencyHealthPercent,
-                // Demonology
-                DemonicEmpowerment, UseSoulFire,
-                // Destruction
-                UseConflagrate, UseChaosBolt,
+                DemonicEmpowerment, UseSoulFire,   // Demonology-only
+                UseConflagrate, UseChaosBolt,      // Destruction-only
                 // Survival
                 DrainLifeHealthPercent, UseFear, FearHealthPercent, UseHowl,
                 // Mana

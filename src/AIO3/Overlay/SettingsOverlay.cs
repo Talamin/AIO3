@@ -17,27 +17,38 @@ namespace AIO3.Overlay
     {
         private readonly string _rotationName;
         private readonly IReadOnlyList<Setting> _settings;
+        private readonly System.Func<string> _activeSpec; // current spec name (e.g. "Demonology"), null = no filter
         private bool _created;
+        private bool _everBuilt;
+        private string _builtForSpec;                     // the spec the current frame was built for
         private int _lastAliveCheck;
 
-        public SettingsOverlay(string rotationName, IReadOnlyList<Setting> settings)
+        public SettingsOverlay(string rotationName, IReadOnlyList<Setting> settings, System.Func<string> activeSpec = null)
         {
             _rotationName = rotationName;
             _settings = settings;
+            _activeSpec = activeSpec ?? (() => null);
         }
 
         public void EnsureCreated()
         {
             if (_settings.Count == 0) return;
 
+            // Rebuild when the active spec changes (level-up / respec / manual override) so the panel shows only
+            // the knobs that apply to the new spec. Cheap C# read — no Lua — so it's fine every pass.
+            string spec = _activeSpec();
+            if (_created && spec != _builtForSpec) _created = false;
+
             if (!_created)
             {
                 // (Re)build the frame. Each widget seeds the freshly-reset bridge from the CURRENT C# value
                 // (defaults + persisted + any live edits), so a rebuild after a reload restores the real
                 // values rather than defaults — no settings are lost.
-                Lua.LuaDoString(BuildFrameLua());
+                Lua.LuaDoString(BuildFrameLua(spec));
                 _created = true;
-                Logging.Write("[AIO3] In-game settings overlay ready — type /aio3 to toggle.");
+                _builtForSpec = spec;
+                if (!_everBuilt) Logging.Write("[AIO3] In-game settings overlay ready — type /aio3 to toggle.");
+                _everBuilt = true;
                 return;
             }
 
@@ -94,13 +105,15 @@ namespace AIO3.Overlay
         private static int WidgetHeight(Setting s) =>
             s is IntSetting ? SliderHeight : s is ChoiceSetting ? ChoiceHeight : ToggleHeight;
 
-        private string BuildFrameLua()
+        private string BuildFrameLua(string activeSpec)
         {
-            // Group settings by category, preserving first-seen order.
+            // Group settings by category, preserving first-seen order. Spec-only settings are hidden unless their
+            // spec is the active one — so an empty category simply never appears (no stray spec tabs).
             var order = new List<string>();
             var byCat = new Dictionary<string, List<Setting>>();
             foreach (Setting s in _settings)
             {
+                if (!s.AppliesTo(activeSpec)) continue;
                 if (!byCat.TryGetValue(s.Category, out List<Setting> list))
                 {
                     list = new List<Setting>();
