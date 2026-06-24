@@ -69,7 +69,9 @@ namespace AIO3.Core.Library
                     // A summon/revive we already cast hasn't taken effect yet — the cast is multi-second and the
                     // pet spawns a beat after it ends. Don't cast again until the pet is up (cleared above) or this
                     // generous timeout passes (the summon failed / was interrupted), which is what stops the
-                    // double-cast regardless of how long the summon cast actually takes.
+                    // double-cast regardless of how long the summon cast actually takes. The PlayerIsCasting gate
+                    // below ALSO blocks re-entry while the cast runs, so the action never re-fires mid-cast — which
+                    // matters because StopMovement() would cancel the in-progress summon (the Imp double-cast bug).
                     if (summonedAt != 0 && unchecked(Environment.TickCount - summonedAt) < SummonWaitMs) return false;
                     summonedAt = 0;
 
@@ -80,6 +82,14 @@ namespace AIO3.Core.Library
                 },
                 action: (ctx, t) =>
                 {
+                    // Plant the character ONCE, right before starting the cast: the adapter refuses a cast-time
+                    // spell while moving, and the product's travel movement would otherwise keep the bot moving so
+                    // the long ~10s summon never completed (the pet only appeared when it stopped to engage). The
+                    // condition's PlayerIsCasting gate stops this action from re-running mid-cast — so we never call
+                    // StopMove() during the cast, which would CANCEL it and re-summon (the Imp double-cast). Mirrors
+                    // the old AIO PetHandler, which summoned with stopMove=true (a single stop, not a per-tick one).
+                    ctx.Game.StopMovement();
+
                     string spell = SummonSpell(ctx, callSpell, reviveSpell);
                     CastResult r = spell != null ? ctx.Game.Cast(spell, ctx.Me) : CastResult.Failed;
                     if (r == CastResult.Success) summonedAt = Environment.TickCount; // start the wait-for-pet window

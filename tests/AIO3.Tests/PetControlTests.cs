@@ -99,6 +99,38 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Summon_plants_the_character_for_the_long_cast()
+        {
+            // The summon is a long cast: the adapter refuses a cast-time spell while moving, and the product
+            // re-paths during travel — so a moving bot never completed it and the pet only appeared at engage.
+            // The summon must STOP movement first so it can plant for the cast and summon proactively, OOC.
+            FakeGameClient g = Game(pet: null);
+            g.Moving = true; // traveling between mobs
+            Fire(g, PetControl.Summon(On, "Call Pet", "Revive Pet", 1f));
+            Assert.Contains("Call Pet", g.CastLog);  // no longer blocked by movement at this layer
+            Assert.True(g.StopMovementCalls > 0);     // planted the character first
+        }
+
+        [Fact]
+        public void Summon_does_not_restop_or_recast_while_the_cast_is_in_progress()
+        {
+            // The summon plants the char with one StopMovement, then the cast runs. It must NOT keep calling
+            // StopMovement each tick during the cast: StopMove() cancels the in-progress summon, and the action
+            // would then re-cast it — the Imp double-cast. While casting, the step stays fully quiet.
+            RotationStep step = PetControl.Summon(On, "Call Pet", "Revive Pet", 1f);
+            FakeGameClient g = Game(pet: null);
+
+            Fire(g, step);                          // summon issued (one cast, one stop)
+            int stopsAfterIssue = g.StopMovementCalls;
+            g.Casting = true;                       // the long summon cast is now in progress; pet not up yet
+            Fire(g, step);
+            Fire(g, step);
+
+            Assert.Single(g.CastLog.FindAll(c => c == "Call Pet")); // exactly one cast — no double-cast
+            Assert.Equal(stopsAfterIssue, g.StopMovementCalls);     // no StopMove during the cast (would cancel it)
+        }
+
+        [Fact]
         public void Summon_does_not_double_cast_before_the_pet_appears()
         {
             // The summon is a multi-second cast and the pet only spawns a beat AFTER it finishes. The FC must not

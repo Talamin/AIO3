@@ -123,6 +123,12 @@ namespace AIO3.Core.Testing
             if (unit != null) LastSetTargetGuid = unit.Guid;
         }
 
+        /// <summary>How many times <see cref="StopMovement"/> was called (the summon plants the char before its
+        /// long cast).</summary>
+        public int StopMovementCalls;
+
+        public void StopMovement() => StopMovementCalls++;
+
         /// <summary>Last value passed to <see cref="SetManageBagFoodDrink"/> (null = never called).</summary>
         public bool? ManageBagFoodDrinkSet;
 

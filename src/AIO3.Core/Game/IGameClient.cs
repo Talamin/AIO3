@@ -129,6 +129,12 @@ namespace AIO3.Core.Game
         /// <summary>Set the player's current target (so WRobot's facing/movement follows it).</summary>
         void SetTarget(IWowUnit unit);
 
+        /// <summary>Stop the player's movement (WRobot's mover). Used to plant the character so a long cast-time
+        /// spell can complete out of combat — chiefly the pet summon (~10s cast), which the product's travel
+        /// movement would otherwise break by re-pathing mid-cast. The adapter's cast path also refuses a cast-time
+        /// spell while moving, so the summon has to stand still first.</summary>
+        void StopMovement();
+
         /// <summary>Step back roughly <paramref name="yards"/> yards (to regain ranged distance). Refuses and
         /// returns false if the spot is over a ledge/cliff — so it never walks the player off an edge. Returns
         /// true if the step was started; it plays out in the background while <see cref="IsRepositioning"/> holds.</summary>

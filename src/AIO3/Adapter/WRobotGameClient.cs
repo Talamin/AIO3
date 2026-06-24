@@ -396,6 +396,8 @@ namespace AIO3.Adapter
             if (unit != null && unit.Guid != 0) ObjectManager.Me.Target = unit.Guid;
         }
 
+        public void StopMovement() => MovementManager.StopMove();
+
         public void SetManageBagFoodDrink(bool on)
         {
             // TryToUseBestBagFoodDrink makes WRobot eat/drink the best food/water it finds in the bags (the items

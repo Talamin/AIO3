@@ -79,11 +79,15 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
   caster baseline (Fel / Demon Armor, **Life Tap** for mana, Drain Life self-heal, wand). Each spec keeps its
   DoTs up (Corruption / Immolate / Unstable Affliction / the chosen Curse / Haunt) and fills with its signature
   damage — Shadow Bolt, **Conflagrate + Incinerate** (Destruction), Soul-Fire-on-proc + **Demonic Empowerment**
-  (Demonology). A **per-spec Auto pet** (Affliction → Voidwalker, Demonology → Felguard, Destruction → Imp, with
-  fallback) is summoned and commanded through the shared pet controller, including its **special abilities** —
-  **Torment** (the Voidwalker tanks mobs off the cloth caster), **Spell Lock** (the Felhunter is the warlock's
-  *only* interrupt) and the Imp's Firebolt. **Emergency Fear / Howl of Terror** break melee when you're low and
-  surrounded so you can heal. *(Built and unit-tested; not yet in-game-verified.)*
+  (Demonology). When a low, normal mob is already covered by enough DoTs to finish it, the filler nuke is
+  **held so the DoTs kill it** instead of overkilling — saving mana / Life-Tap pressure while leveling (tunable
+  HP% floor; bosses and elites are never affected). A **per-spec Auto pet** (Affliction → Voidwalker, Demonology
+  → Felguard, Destruction → Imp, with fallback) is **summoned out of combat *before* the pull** — it plants the
+  character so the long summon cast completes while travelling — and commanded through the shared pet controller,
+  including its **special abilities**: **Torment** (the Voidwalker tanks mobs off the cloth caster), **Spell Lock**
+  (the Felhunter is the warlock's *only* interrupt) and the Imp's Firebolt. **Emergency Fear / Howl of Terror**
+  break melee when you're low and surrounded so you can heal. *(Pet handling in-game-verified; rotations built and
+  unit-tested.)*
 - **Cliff-safe backpedal** — when a mob is in the hunter's face (on the pet, inside melee range), the
   hunter steps back to restore ranged distance, refusing to move over a ledge (a downward trace guards the
   destination). The hop runs *on WRobot's own fight-loop thread* and briefly cancels its move-to-range for
