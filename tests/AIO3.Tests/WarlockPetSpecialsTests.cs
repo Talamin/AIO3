@@ -59,11 +59,11 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Torment_skips_when_no_mob_is_on_us()
+        public void Torment_idle_when_the_mob_is_on_the_voidwalker()
         {
             FakeGameClient g = LockGame("Voidwalker");
             g.PetAbilities.Add("Torment");
-            g.TargetUnit.IsTargetingMe = false; // nothing on the owner → no need to taunt
+            g.TargetUnit.TargetGuid = 99; // the mob is already on the Voidwalker (guid 99) → tanked, no need to taunt
             RotationStep fired = Fire(g);
             Assert.NotEqual("Pet taunt", fired?.Name);
             Assert.DoesNotContain("Torment", g.PetCastLog);
@@ -87,6 +87,86 @@ namespace AIO3.Tests
             s.PetTank.Value = false; // owner doesn't want the demon tanking
             Assert.NotEqual("Pet taunt", Fire(g, s)?.Name);
             Assert.DoesNotContain("Torment", g.PetCastLog);
+        }
+
+        // --- Suffering (Voidwalker AoE taunt) ---
+
+        [Fact]
+        public void Voidwalker_uses_Suffering_when_surrounded()
+        {
+            FakeGameClient g = LockGame("Voidwalker");
+            g.PetAbilities.Add("Suffering");
+            // A second mob is also on us → 2 attackers → AoE-taunt them all onto the Voidwalker at once.
+            g.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, IsAttackable = true, IsTargetingMe = true, Distance = 6 });
+            Assert.Equal("Pet Suffering", Fire(g)?.Name);
+            Assert.Contains("Suffering", g.PetCastLog);
+        }
+
+        [Fact]
+        public void Suffering_skips_with_only_one_mob_on_us()
+        {
+            FakeGameClient g = LockGame("Voidwalker");
+            g.PetAbilities.Add("Suffering");
+            g.PetAbilities.Add("Torment"); // only one attacker → the single-target Torment, not the AoE Suffering
+            RotationStep fired = Fire(g);
+            Assert.NotEqual("Pet Suffering", fired?.Name);
+            Assert.DoesNotContain("Suffering", g.PetCastLog);
+        }
+
+        [Fact]
+        public void Suffering_auto_skips_on_a_pet_that_lacks_it()
+        {
+            FakeGameClient g = LockGame("Imp"); // an Imp has no Suffering on its bar
+            g.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, IsAttackable = true, IsTargetingMe = true, Distance = 6 });
+            RotationStep fired = Fire(g);
+            Assert.NotEqual("Pet Suffering", fired?.Name);
+            Assert.DoesNotContain("Suffering", g.PetCastLog);
+        }
+
+        // --- Consume Shadows (Voidwalker OOC self-heal) ---
+
+        [Fact]
+        public void Voidwalker_self_heals_with_Consume_Shadows_out_of_combat_when_hurt()
+        {
+            FakeGameClient g = LockGame("Voidwalker");
+            g.InCombatFlag = false;        // between pulls
+            g.PetUnit.HealthPercent = 50;  // the demon is hurt
+            g.PetAbilities.Add("Consume Shadows");
+            Assert.Equal("Pet Consume Shadows", Fire(g)?.Name);
+            Assert.Contains("Consume Shadows", g.PetCastLog);
+        }
+
+        [Fact]
+        public void Consume_Shadows_skips_in_combat()
+        {
+            FakeGameClient g = LockGame("Voidwalker"); // LockGame is in combat
+            g.PetUnit.HealthPercent = 50;
+            g.PetAbilities.Add("Consume Shadows");
+            RotationStep fired = Fire(g);
+            Assert.NotEqual("Pet Consume Shadows", fired?.Name);
+            Assert.DoesNotContain("Consume Shadows", g.PetCastLog);
+        }
+
+        [Fact]
+        public void Consume_Shadows_skips_when_the_pet_is_healthy()
+        {
+            FakeGameClient g = LockGame("Voidwalker");
+            g.InCombatFlag = false;
+            // pet HP defaults to 100 → no need to heal
+            g.PetAbilities.Add("Consume Shadows");
+            Assert.NotEqual("Pet Consume Shadows", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Consume_Shadows_auto_skips_before_the_voidwalker_learns_it()
+        {
+            FakeGameClient g = LockGame("Voidwalker");
+            g.InCombatFlag = false;
+            g.PetUnit.HealthPercent = 50;
+            // "Consume Shadows" NOT on the bar (a low-level Voidwalker hasn't learned it) → PetAbilityReady false
+            RotationStep fired = Fire(g);
+            Assert.NotEqual("Pet Consume Shadows", fired?.Name);
+            Assert.DoesNotContain("Consume Shadows", g.PetCastLog);
         }
 
         // --- Spell Lock (Felhunter interrupt) ---
@@ -177,6 +257,37 @@ namespace AIO3.Tests
             g.PetAbilities.Add("Blood Pact");
             Fire(g);
             Assert.True(g.PetAutocast["Blood Pact"]);
+        }
+
+        [Fact]
+        public void Imp_keeps_Fire_Shield_on_autocast()
+        {
+            // The Imp's defensive buff is kept on autocast too (pure benefit, gated on managing the pet).
+            FakeGameClient g = LockGame("Imp");
+            g.PetAbilities.Add("Fire Shield");
+            Fire(g);
+            Assert.True(g.PetAutocast["Fire Shield"]);
+        }
+
+        [Fact]
+        public void Imp_keeps_Phase_Shift_on_autocast()
+        {
+            // The Imp's survival ability is kept on autocast so it phases itself out of harm's way.
+            FakeGameClient g = LockGame("Imp");
+            g.PetAbilities.Add("Phase Shift");
+            Fire(g);
+            Assert.True(g.PetAutocast["Phase Shift"]);
+        }
+
+        [Fact]
+        public void ImpPhaseShift_toggle_off_disables_the_autocast()
+        {
+            FakeGameClient g = LockGame("Imp");
+            g.PetAbilities.Add("Phase Shift");
+            var s = new WarlockSettings();
+            s.ImpPhaseShift.Value = false;
+            Fire(g, s);
+            Assert.False(g.PetAutocast["Phase Shift"]); // autocast turned OFF, not left running
         }
 
         [Fact]

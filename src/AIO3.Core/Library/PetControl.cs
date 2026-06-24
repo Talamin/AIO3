@@ -31,6 +31,11 @@ namespace AIO3.Core.Library
         // genuinely failed/was interrupted. This is what kills the double-cast across any cast length.
         private const int SummonWaitMs = 15000;
 
+        // How long to PIN the character (cancel the product's travel re-pathing) once we start a summon, so the
+        // long ~10s cast finishes. A single StopMove isn't enough — the product re-issues a move on its next pulse
+        // and breaks the cast. Generous enough to cover the cast on slow servers; auto-expires after.
+        private const int SummonHoldMs = 12000;
+
         /// <summary>Keep a pet up: summon it with <paramref name="callSpell"/> when none exists, or revive it
         /// with <paramref name="reviveSpell"/> when it is dead. Out of combat / not mounted. If a pet we
         /// already had suddenly disappears (almost always because we just mounted), wait out a short grace
@@ -41,8 +46,14 @@ namespace AIO3.Core.Library
 
         /// <summary>Same as <see cref="Summon(Func{CombatContext,bool},string,string,float)"/> but resolves the
         /// call / revive spell names at EVAL TIME — so a runtime pet choice (e.g. the warlock's per-spec "Auto"
-        /// demon with a known-spell fallback) picks the right summon each tick.</summary>
-        public static RotationStep Summon(Func<CombatContext, bool> enabled, Func<CombatContext, string> callSpell, Func<CombatContext, string> reviveSpell, float priority)
+        /// demon with a known-spell fallback) picks the right summon each tick.
+        ///
+        /// <paramref name="desiredPetName"/> (optional) enables SWAP-BACK: when a healthy pet is up but it is not
+        /// the demon this returns (e.g. the free Imp we fell back to while out of Soul Shards), re-summon the
+        /// desired one once it's affordable again. The warlock passes its resolved demon (which already accounts
+        /// for shards, so "desired" == current while broke → no swap); a hunter leaves it null → never swaps.</summary>
+        public static RotationStep Summon(Func<CombatContext, bool> enabled, Func<CombatContext, string> callSpell,
+            Func<CombatContext, string> reviveSpell, float priority, Func<CombatContext, string> desiredPetName = null)
         {
             bool petSeen = false;
             int vanishedAt = 0;
@@ -57,7 +68,13 @@ namespace AIO3.Core.Library
                     {
                         petSeen = true;
                         vanishedAt = 0;
-                        if (ctx.Pet.IsAlive) { summonedAt = 0; return false; } // healthy pet → done; clear the wait
+                        if (ctx.Pet.IsAlive)
+                        {
+                            // Healthy pet → done, UNLESS it's the wrong demon and the desired one is now affordable
+                            // (swap-back). When swapping we deliberately do NOT clear summonedAt, so the wait below
+                            // still throttles the re-cast across the swap's cast → spawn gap.
+                            if (desiredPetName == null || WantedPetIsUp(ctx, desiredPetName)) { summonedAt = 0; return false; }
+                        }
                         // exists but dead → fall through to revive
                     }
                     else if (petSeen)
@@ -70,8 +87,7 @@ namespace AIO3.Core.Library
                     // pet spawns a beat after it ends. Don't cast again until the pet is up (cleared above) or this
                     // generous timeout passes (the summon failed / was interrupted), which is what stops the
                     // double-cast regardless of how long the summon cast actually takes. The PlayerIsCasting gate
-                    // below ALSO blocks re-entry while the cast runs, so the action never re-fires mid-cast — which
-                    // matters because StopMovement() would cancel the in-progress summon (the Imp double-cast bug).
+                    // below ALSO blocks re-entry while the cast runs.
                     if (summonedAt != 0 && unchecked(Environment.TickCount - summonedAt) < SummonWaitMs) return false;
                     summonedAt = 0;
 
@@ -82,19 +98,28 @@ namespace AIO3.Core.Library
                 },
                 action: (ctx, t) =>
                 {
-                    // Plant the character ONCE, right before starting the cast: the adapter refuses a cast-time
-                    // spell while moving, and the product's travel movement would otherwise keep the bot moving so
-                    // the long ~10s summon never completed (the pet only appeared when it stopped to engage). The
-                    // condition's PlayerIsCasting gate stops this action from re-running mid-cast — so we never call
-                    // StopMove() during the cast, which would CANCEL it and re-summon (the Imp double-cast). Mirrors
-                    // the old AIO PetHandler, which summoned with stopMove=true (a single stop, not a per-tick one).
-                    ctx.Game.StopMovement();
+                    // Pin the character for the whole cast: the adapter refuses a cast-time spell while moving, and
+                    // the product's travel movement would otherwise re-path and break the ~10s summon. HoldPosition
+                    // stops current motion AND cancels the product's move pulses for SummonHoldMs (the single
+                    // StopMove the old code used was not enough — the product just re-issued a move). The condition's
+                    // PlayerIsCasting gate keeps this action from re-running mid-cast, so the pin is set once.
+                    ctx.Game.HoldPosition(SummonHoldMs);
 
                     string spell = SummonSpell(ctx, callSpell, reviveSpell);
                     CastResult r = spell != null ? ctx.Game.Cast(spell, ctx.Me) : CastResult.Failed;
                     if (r == CastResult.Success) summonedAt = Environment.TickCount; // start the wait-for-pet window
                     return r;
                 });
+        }
+
+        /// <summary>True if we should KEEP the current pet: the desired summon resolves to no opinion, or to the
+        /// demon we already have. Used by the swap-back. The "desired" already accounts for affordability (the
+        /// warlock's resolver drops to the free Imp while out of shards), so a mismatch means a real, payable swap.</summary>
+        private static bool WantedPetIsUp(CombatContext ctx, Func<CombatContext, string> desiredPetName)
+        {
+            string want = desiredPetName(ctx);
+            return string.IsNullOrEmpty(want)
+                   || (ctx.Pet != null && string.Equals(ctx.Pet.Name, want, StringComparison.OrdinalIgnoreCase));
         }
 
         /// <summary>Heal the pet with <paramref name="mendSpell"/> when it is alive and below the
@@ -106,24 +131,26 @@ namespace AIO3.Core.Library
                                    && t.HealthPercent < belowPercent(ctx)
                                    && !t.HasAura(mendSpell));
 
-        /// <summary>Pull aggro back to the pet with its taunt (e.g. "Growl" for a hunter pet, "Torment" for
-        /// a Voidwalker) when something is attacking the owner. Auto-managed: if the pet doesn't have the
-        /// named taunt on its bar (an Imp has none), <c>PetHasAbility</c> is false and the step never fires —
-        /// so the same call is safe for every pet. The pet taunts whatever it is currently on, so pair this
-        /// with <see cref="Attack"/> which keeps it on the owner's target. Throttled to the taunt's reuse.</summary>
+        /// <summary>Keep the current target on the pet with its taunt (e.g. "Growl" for a hunter pet, "Torment"
+        /// for a Voidwalker). PROACTIVE: taunts as soon as the engaged target is NOT already on the pet — it's on
+        /// the owner or still approaching — instead of waiting for the mob to reach the squishy owner first, so
+        /// the pet snaps it onto itself early (pair with <see cref="Attack"/>, prio just above this, which sends
+        /// the pet to the target so the taunt lands from melee — the taunt's range is measured from the PET).
+        /// Idles once the mob IS on the pet (it's being tanked). Gated on <c>PetAbilityReady</c> (on the bar AND
+        /// off cooldown — a cached read), so an Imp without the taunt skips for free AND a short re-taunt throttle
+        /// can't spam Lua while the ability recovers; it simply re-taunts the moment the taunt is ready again.</summary>
         public static RotationStep Taunt(Func<CombatContext, bool> enabled, string tauntSpell, float priority) =>
             new RotationStep(
                 name: "Pet taunt",
                 priority: priority,
                 targets: Targets.CurrentEnemy,
                 condition: (ctx, t) => enabled(ctx) && ctx.Pet != null && ctx.Pet.IsAlive
-                                       && ctx.EnemiesTargetingMe >= 1
-                                       && ctx.Game.PetHasAbility(tauntSpell),
+                                       && ctx.HasEnemyTarget && ctx.Target.TargetGuid != ctx.Pet.Guid
+                                       && ctx.Game.PetAbilityReady(tauntSpell),
                 action: (ctx, t) => ctx.Game.CastPetAbility(tauntSpell) ? CastResult.Success : CastResult.Failed,
                 ignoreGcd: true,
-                // Re-taunt whenever a mob is back on the owner. The real limiter is the taunt's own cooldown
-                // (CastPetAbility checks it), so this throttle just matches it (~5s for Growl) to keep re-taunts
-                // coming without scanning the pet bar every tick while the ability is recovering.
+                // Re-taunt quickly while the mob isn't on the pet. PetAbilityReady is the real cooldown gate, so
+                // this short throttle just covers the cast → cooldown-register gap without re-issuing every tick.
                 recastDelayMs: TauntReuseMs);
 
         /// <summary>Keep the pet on the right target: prefer a mob attacking the owner (peel it onto the
@@ -150,7 +177,10 @@ namespace AIO3.Core.Library
                 ignoreGcd: true,
                 recastDelayMs: 500);
 
-        private const int TauntReuseMs = 5000;
+        // Short re-taunt throttle: the real limiter is PetAbilityReady (the taunt's actual cooldown, cached), so
+        // this only covers the brief cast → cooldown-register gap. Kept low so the pet snaps the mob back quickly
+        // when it slips to the owner (the old AIO re-taunted every ~500ms in combat).
+        private const int TauntReuseMs = 1500;
 
         /// <summary>Cast a named pet ability (e.g. "Bite", "Furious Howl", "Dash") when it's on the bar and
         /// off cooldown — auto-skipping any pet that doesn't have it. <paramref name="when"/> adds the
@@ -232,8 +262,9 @@ namespace AIO3.Core.Library
             return best;
         }
 
-        // null = nothing to do (the pet exists and is alive).
+        // A DEAD pet is revived; otherwise (no pet, OR a live pet we only reach here to SWAP — the not-swapping
+        // live-pet case already returned false in the condition) we cast the call/summon spell.
         private static string SummonSpell(CombatContext ctx, Func<CombatContext, string> callSpell, Func<CombatContext, string> reviveSpell) =>
-            ctx.Pet == null ? callSpell(ctx) : (!ctx.Pet.IsAlive ? reviveSpell(ctx) : null);
+            ctx.Pet != null && !ctx.Pet.IsAlive ? reviveSpell(ctx) : callSpell(ctx);
     }
 }

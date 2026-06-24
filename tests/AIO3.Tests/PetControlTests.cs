@@ -99,35 +99,70 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Summon_plants_the_character_for_the_long_cast()
+        public void Summon_pins_the_character_for_the_long_cast()
         {
             // The summon is a long cast: the adapter refuses a cast-time spell while moving, and the product
             // re-paths during travel — so a moving bot never completed it and the pet only appeared at engage.
-            // The summon must STOP movement first so it can plant for the cast and summon proactively, OOC.
+            // The summon must PIN the character (HoldPosition cancels the product's move pulses) so the cast runs.
             FakeGameClient g = Game(pet: null);
             g.Moving = true; // traveling between mobs
             Fire(g, PetControl.Summon(On, "Call Pet", "Revive Pet", 1f));
             Assert.Contains("Call Pet", g.CastLog);  // no longer blocked by movement at this layer
-            Assert.True(g.StopMovementCalls > 0);     // planted the character first
+            Assert.True(g.HoldPositionCalls > 0);     // pinned the character for the cast
+            Assert.True(g.LastHoldMs > 0);            // for a real (cast-covering) window
         }
 
         [Fact]
-        public void Summon_does_not_restop_or_recast_while_the_cast_is_in_progress()
+        public void Summon_does_not_repin_or_recast_while_the_cast_is_in_progress()
         {
-            // The summon plants the char with one StopMovement, then the cast runs. It must NOT keep calling
-            // StopMovement each tick during the cast: StopMove() cancels the in-progress summon, and the action
-            // would then re-cast it — the Imp double-cast. While casting, the step stays fully quiet.
+            // The summon pins the char once, then the cast runs. It must NOT keep calling HoldPosition each tick
+            // during the cast (which re-issues StopMove and could cancel the cast) NOR re-cast — the Imp
+            // double-cast. While casting, the step stays fully quiet.
             RotationStep step = PetControl.Summon(On, "Call Pet", "Revive Pet", 1f);
             FakeGameClient g = Game(pet: null);
 
-            Fire(g, step);                          // summon issued (one cast, one stop)
-            int stopsAfterIssue = g.StopMovementCalls;
+            Fire(g, step);                          // summon issued (one cast, one pin)
+            int pinsAfterIssue = g.HoldPositionCalls;
             g.Casting = true;                       // the long summon cast is now in progress; pet not up yet
             Fire(g, step);
             Fire(g, step);
 
             Assert.Single(g.CastLog.FindAll(c => c == "Call Pet")); // exactly one cast — no double-cast
-            Assert.Equal(stopsAfterIssue, g.StopMovementCalls);     // no StopMove during the cast (would cancel it)
+            Assert.Equal(pinsAfterIssue, g.HoldPositionCalls);      // no re-pin during the cast
+        }
+
+        // --- swap-back (re-summon the desired demon once it's affordable again) ---
+
+        [Fact]
+        public void Summon_swaps_back_to_the_desired_pet_when_it_differs()
+        {
+            FakeGameClient g = Game(Pet()); // a healthy pet...
+            g.PetUnit.Name = "Imp";         // ...but it's the Imp we fell back to while out of Soul Shards
+            RotationStep step = PetControl.Summon(On, ctx => "Summon Voidwalker", ctx => "Summon Voidwalker", 1f,
+                desiredPetName: ctx => "Voidwalker"); // shards are back → the desired demon is the Voidwalker again
+            Assert.Equal("Pet summon", Fire(g, step)?.Name);
+            Assert.Contains("Summon Voidwalker", g.CastLog);
+        }
+
+        [Fact]
+        public void Summon_keeps_the_pet_when_it_already_matches_the_desired()
+        {
+            FakeGameClient g = Game(Pet());
+            g.PetUnit.Name = "Voidwalker";
+            RotationStep step = PetControl.Summon(On, ctx => "Summon Voidwalker", ctx => "Summon Voidwalker", 1f,
+                desiredPetName: ctx => "Voidwalker");
+            Assert.Null(Fire(g, step)); // already the desired pet → no re-summon
+            Assert.Empty(g.CastLog);
+        }
+
+        [Fact]
+        public void Summon_without_a_desired_name_never_swaps()
+        {
+            FakeGameClient g = Game(Pet());
+            g.PetUnit.Name = "Imp";
+            // No desiredPetName (the string overload / a hunter pet) → a healthy pet is left alone, whatever it is.
+            Assert.Null(Fire(g, PetControl.Summon(On, "Call Pet", "Revive Pet", 1f)));
+            Assert.Empty(g.CastLog);
         }
 
         [Fact]
@@ -272,14 +307,25 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Taunt_idle_when_nothing_is_on_me()
+        public void Taunt_idle_when_the_mob_is_already_on_the_pet()
         {
             FakeGameClient g = Game(Pet());
             g.PetAbilities.Add("Growl");
-            // Nothing targeting us (pet is holding aggro) → no need to taunt.
+            g.TargetUnit.TargetGuid = 99; // the mob is already attacking the pet (guid 99) → it's being tanked
 
             Assert.Null(Fire(g, PetControl.Taunt(On, "Growl", 1f)));
             Assert.Empty(g.PetCastLog);
+        }
+
+        [Fact]
+        public void Taunt_proactively_pulls_a_mob_that_is_not_on_the_pet_yet()
+        {
+            FakeGameClient g = Game(Pet());
+            g.PetAbilities.Add("Growl");
+            g.TargetUnit.TargetGuid = 0; // engaged target not on the pet (approaching / on the owner) → taunt early
+
+            Assert.Equal("Pet taunt", Fire(g, PetControl.Taunt(On, "Growl", 1f))?.Name);
+            Assert.Contains("Growl", g.PetCastLog);
         }
 
         [Fact]

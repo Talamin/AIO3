@@ -215,6 +215,7 @@ namespace AIO3.Tests
         public void Summons_the_Felguard_by_default_for_Demonology()
         {
             FakeGameClient g = LockGame(withPet: false);
+            g.ItemCounts["Soul Shard"] = 1; // a shard to pay the Felguard summon (else it falls back to the Imp)
             Assert.Equal("Pet summon", Fire(g)?.Name);
             Assert.Contains("Summon Felguard", g.CastLog); // Auto → Felguard
         }
@@ -223,7 +224,8 @@ namespace AIO3.Tests
         public void Falls_back_to_Voidwalker_when_the_Felguard_is_unlearned()
         {
             FakeGameClient g = LockGame(withPet: false);
-            g.UnknownSpells.Add("Summon Felguard"); // low-level demo without the Felguard yet
+            g.ItemCounts["Soul Shard"] = 1;          // a shard to pay the Voidwalker summon
+            g.UnknownSpells.Add("Summon Felguard");  // low-level demo without the Felguard yet
             Assert.Equal("Pet summon", Fire(g)?.Name);
             Assert.Contains("Summon Voidwalker", g.CastLog);
         }
@@ -232,6 +234,7 @@ namespace AIO3.Tests
         public void Manual_pet_choice_overrides_Auto()
         {
             FakeGameClient g = LockGame(withPet: false);
+            g.ItemCounts["Soul Shard"] = 1; // a shard to pay the Succubus summon
             var s = new WarlockSettings();
             s.Pet.Value = "Succubus";
             Assert.Equal("Pet summon", Fire(g, s)?.Name);

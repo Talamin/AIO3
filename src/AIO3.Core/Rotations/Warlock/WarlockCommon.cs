@@ -114,11 +114,29 @@ namespace AIO3.Core.Rotations.Warlock
 
         /// <summary>Resolve which demon to summon: a manual choice wins; "Auto" picks the spec-appropriate demon,
         /// then falls back to the best demon actually LEARNED — ending at the Imp, every warlock's level-1 pet —
-        /// so a low-level lock that hasn't tamed the spec demon (or even the Voidwalker) yet still summons one.</summary>
+        /// so a low-level lock that hasn't tamed the spec demon (or even the Voidwalker) yet still summons one.
+        /// FINAL fallback: every demon EXCEPT the Imp costs a Soul Shard, so with no shards left we drop to the
+        /// (free) Imp — otherwise the summon silently fails on the missing reagent and we play petless. (The old
+        /// fightclass did the same: PetHandler.SummonPet gated on Spell.IsSpellUsable, which is false out of
+        /// reagents, falling through its chain to the Imp.)</summary>
         public static string ResolvePet(WarlockSettings s, CombatContext ctx, WarlockSpec spec)
         {
-            string choice = s.Pet.Value;
-            if (choice != "Auto") return choice;
+            string resolved = ResolvePreferredPet(s, ctx, spec);
+
+            // Out of Soul Shards? Drop to the free Imp (the Imp is the only shard-free summon, learned at level 1).
+            if (ctx != null && resolved != "Imp"
+                && ctx.Game.CountItems(Consumables.SoulShards) == 0
+                && ctx.Game.IsSpellKnown("Summon Imp"))
+                return "Imp";
+
+            return resolved;
+        }
+
+        /// <summary>The PREFERRED demon (manual choice, or the Auto spec pick falling through to the best LEARNED
+        /// demon), WITHOUT the out-of-shards Imp fallback. This is "what we want", independent of affordability.</summary>
+        private static string ResolvePreferredPet(WarlockSettings s, CombatContext ctx, WarlockSpec spec)
+        {
+            if (s.Pet.Value != "Auto") return s.Pet.Value;
 
             string preferred;
             switch (spec)
@@ -130,10 +148,21 @@ namespace AIO3.Core.Rotations.Warlock
             if (ctx == null) return preferred;
 
             // The spec demon may not be learned yet at low level — fall through to the best one we DO know.
-            // The Imp is learned at level 1, so it's the guaranteed final fallback (no more "summons nothing").
+            string resolved = preferred;
             foreach (string demon in new[] { preferred, "Voidwalker", "Imp" })
-                if (ctx.Game.IsSpellKnown("Summon " + demon)) return demon;
-            return preferred;
+                if (ctx.Game.IsSpellKnown("Summon " + demon)) { resolved = demon; break; }
+            return resolved;
+        }
+
+        /// <summary>The demon the SWAP-BACK should switch TO right now, or null = "keep the current pet". It's the
+        /// preferred demon ONLY when it's currently affordable (a Soul Shard, or it's the free Imp) — i.e. when the
+        /// shard-fallback in <see cref="ResolvePet"/> did NOT kick in. This makes the swap-back ONLY upgrade from
+        /// the fallback Imp to the wanted demon once shards are back; it never DOWNGRADES a real demon to the Imp
+        /// just because we're momentarily broke (that bug downgraded a healthy Voidwalker to an Imp at 0 shards).</summary>
+        public static string DesiredPetForSwap(WarlockSettings s, CombatContext ctx, WarlockSpec spec)
+        {
+            string preferred = ResolvePreferredPet(s, ctx, spec);
+            return ResolvePet(s, ctx, spec) == preferred ? preferred : null;
         }
 
         /// <summary>The curse spell to maintain, from the chosen curse setting. Resolved at eval time so an
@@ -231,6 +260,10 @@ namespace AIO3.Core.Rotations.Warlock
 
         // --- pet specials (mirror HunterCommon.PetSpecials) ---
 
+        /// <summary>Heal the Voidwalker with its own (free) Consume Shadows channel out of combat when it drops
+        /// below this HP%, so it tanks the next pull near full.</summary>
+        private const double ConsumeShadowsHealthPercent = 80;
+
         /// <summary>
         /// The demon's own special abilities, cast via its action bar — each auto-skips when THIS demon
         /// doesn't have it (a Voidwalker has Torment but no Spell Lock, a Felhunter has Spell Lock, an Imp has
@@ -249,8 +282,16 @@ namespace AIO3.Core.Rotations.Warlock
 
             return new List<RotationStep>
             {
-                // Voidwalker Torment: taunt mobs off the cloth caster so the Voidwalker TANKS them. Auto-skips
-                // for Imp / Felhunter (no Torment) via PetHasAbility. Gated on ManagePet + the PetTank toggle.
+                // Voidwalker Suffering: the AoE taunt — pull MULTIPLE mobs off the cloth caster onto the
+                // Voidwalker at once (PBAoE around the pet). Gated like Torment (ManagePet + PetTank) plus "2+
+                // enemies on us"; sits just above the single-target Torment so it wins when we're surrounded.
+                // Auto-skips for non-Voidwalkers and before it's learned (PetAbilityReady).
+                PetControl.UseAbility(ctx => s.ManagePet.Value && s.PetTank.Value, "Suffering", 0.90f,
+                    when: ctx => ctx.EnemiesTargetingMe >= 2, recastDelayMs: 3000),
+
+                // Voidwalker Torment: single-target taunt — taunt a mob off the cloth caster so the Voidwalker
+                // TANKS it. Auto-skips for Imp / Felhunter (no Torment) via PetHasAbility. Gated on ManagePet +
+                // the PetTank toggle.
                 PetControl.Taunt(ctx => s.ManagePet.Value && s.PetTank.Value, "Torment", 0.91f),
 
                 // Felhunter Spell Lock: the warlock's only interrupt. Fire when the target is casting and the mode
@@ -262,6 +303,15 @@ namespace AIO3.Core.Rotations.Warlock
                     when: ctx => s.InterruptCasts.Value != InterruptModes.Never
                                  && ctx.HasEnemyTarget && ctx.Target.IsCasting),
 
+                // Voidwalker Consume Shadows: the demon's OWN out-of-combat self-heal — channel it between fights
+                // when it's hurt, so it tanks the next pull near full. FREE (no Life-Tap-style HP cost to us,
+                // unlike Health Funnel). OOC only (it's a channel — the pet can't act while healing). Auto-skips
+                // for non-Voidwalkers AND before the Voidwalker learns it at a later level (PetAbilityReady reads
+                // the pet's bar — if it's not on the bar yet, the step simply never fires).
+                PetControl.UseAbility(manage, "Consume Shadows", 0.93f,
+                    when: ctx => !ctx.Game.PlayerInCombat && ctx.Pet.HealthPercent < ConsumeShadowsHealthPercent,
+                    recastDelayMs: 6000),
+
                 // Imp Firebolt: a cast-time ranged nuke with NO cooldown — leave it on the Imp's AUTOCAST rather
                 // than re-triggering it every tick (which fights its cast time). The Imp then fires it itself.
                 // Auto-skips for non-Imps. Turn ImpFirebolt off to disable the autocast.
@@ -270,6 +320,16 @@ namespace AIO3.Core.Rotations.Warlock
                 // Imp Blood Pact: the party stamina buff — keep it on the Imp's autocast so it stays up. Pure
                 // benefit, so no separate toggle (just gated on managing the pet). Auto-skips for non-Imps.
                 PetControl.Autocast(manage, "Blood Pact", 0.97f),
+
+                // Imp Fire Shield: a defensive buff (fire damage to melee attackers + fire resistance) the Imp
+                // keeps on the owner. Pure benefit, so no separate toggle (gated on managing the pet). Auto-skips
+                // for non-Imps and before the Imp learns it (PetHasAbility).
+                PetControl.Autocast(manage, "Fire Shield", 0.99f),
+
+                // Imp Phase Shift: a survival ability — the Imp phases itself out of harm's way. Kept on autocast
+                // (gated on the ImpPhaseShift toggle since it interrupts the Imp's DPS while phased). Auto-skips
+                // for non-Imps.
+                PetControl.Autocast(ctx => s.ManagePet.Value && s.ImpPhaseShift.Value, "Phase Shift", 0.98f),
             };
         }
 

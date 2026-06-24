@@ -236,6 +236,7 @@ namespace AIO3.Tests
         public void Summons_the_voidwalker_when_petless_out_of_combat()
         {
             FakeGameClient g = LockGame(withPet: false);
+            g.ItemCounts["Soul Shard"] = 1; // a shard to pay the Voidwalker summon (else it falls back to the Imp)
             Assert.Equal("Pet summon", Fire(g)?.Name);
             Assert.Contains("Summon Voidwalker", g.CastLog);
         }
@@ -244,6 +245,7 @@ namespace AIO3.Tests
         public void Summons_the_chosen_demon()
         {
             FakeGameClient g = LockGame(withPet: false);
+            g.ItemCounts["Soul Shard"] = 1; // a shard to pay the Felhunter summon
             var s = new WarlockSettings();
             s.Pet.Value = "Felhunter";
             Assert.Equal("Pet summon", Fire(g, s)?.Name);

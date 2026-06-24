@@ -53,6 +53,12 @@ namespace AIO3.Core.Rotations.Warlock
         public readonly ToggleSetting ImpFirebolt =
             new ToggleSetting("impFirebolt", "Imp autocasts Firebolt", value: true);
 
+        /// <summary>Keep the Imp's Phase Shift on AUTOCAST — the Imp phases out of harm's way on its own (a survival
+        /// ability). Off turns the autocast back off; turn it off if you'd rather the Imp never interrupt its DPS to
+        /// phase. Auto-skips for non-Imps.</summary>
+        public readonly ToggleSetting ImpPhaseShift =
+            new ToggleSetting("impPhaseShift", "Imp autocasts Phase Shift", value: true);
+
         // --- Rotation ---
 
         /// <summary>Combat distance reported to WRobot (ICustomClass.Range). A warlock casts at range; the wand
@@ -198,6 +204,7 @@ namespace AIO3.Core.Rotations.Warlock
             PetHealPercent.Category = "Pet";
             PetTank.Category = "Pet";
             ImpFirebolt.Category = "Pet";
+            ImpPhaseShift.Category = "Pet";
 
             CombatRange.Category = "Rotation";
             Curse.Category = "Rotation";
@@ -239,7 +246,7 @@ namespace AIO3.Core.Rotations.Warlock
                 // Buffs
                 ArmorChoice, CreateHealthstone,
                 // Pet
-                Pet, ManagePet, PetHealPercent, PetTank, ImpFirebolt,
+                Pet, ManagePet, PetHealPercent, PetTank, ImpFirebolt, ImpPhaseShift,
                 // Rotation (general, then the spec-only knobs that show only in their spec)
                 CombatRange, Curse, UseRacials, InterruptCasts, LetDotsFinishHealthPercent,
                 UseDrainSoul, DrainSoulHealthPercent, SoulShardKeep, EmergencyHealthPercent,

@@ -63,6 +63,12 @@ namespace AIO3.Core.Testing
         public int TalentTab; // highest talent tab (0 = none)
         public string StanceName = "";
 
+        /// <summary>The player's combo points on the current target (0..5), returned by <see cref="ComboPoints"/>.</summary>
+        public int ComboPointCount;
+
+        /// <summary>Whether the player is stealthed, returned by <see cref="PlayerIsStealthed"/>.</summary>
+        public bool Stealthed;
+
         /// <summary>Names of spells that were cast, in order.</summary>
         public readonly List<string> CastLog = new List<string>();
 
@@ -76,6 +82,8 @@ namespace AIO3.Core.Testing
         public WowClass PlayerClass => Class;
         public int HighestTalentTab => TalentTab;
         public string ActiveStanceName => StanceName;
+        public int ComboPoints => ComboPointCount;
+        public bool PlayerIsStealthed => Stealthed;
         public IReadOnlyList<IWowUnit> Enemies => EnemyList;
         public IReadOnlyList<IWowUnit> Party => PartyList;
 
@@ -123,11 +131,12 @@ namespace AIO3.Core.Testing
             if (unit != null) LastSetTargetGuid = unit.Guid;
         }
 
-        /// <summary>How many times <see cref="StopMovement"/> was called (the summon plants the char before its
-        /// long cast).</summary>
-        public int StopMovementCalls;
+        /// <summary>How many times <see cref="HoldPosition"/> was called (the summon pins the char for its long
+        /// cast) and the last hold duration requested.</summary>
+        public int HoldPositionCalls;
+        public int LastHoldMs;
 
-        public void StopMovement() => StopMovementCalls++;
+        public void HoldPosition(int ms) { HoldPositionCalls++; LastHoldMs = ms; }
 
         /// <summary>Last value passed to <see cref="SetManageBagFoodDrink"/> (null = never called).</summary>
         public bool? ManageBagFoodDrinkSet;

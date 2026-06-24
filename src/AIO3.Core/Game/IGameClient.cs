@@ -63,6 +63,15 @@ namespace AIO3.Core.Game
         /// <summary>Name of the player's active stance/shapeshift form (e.g. "Berserker Stance"), or "".</summary>
         string ActiveStanceName { get; }
 
+        /// <summary>The player's combo points on the current target (0..5). Target-relative — WoW tracks combo
+        /// points per target, so this is already the count that the finishers (Eviscerate / Slice and Dice /
+        /// Rupture) would consume. 0 for non-rogue/feral classes.</summary>
+        int ComboPoints { get; }
+
+        /// <summary>True while the player is stealthed (the "Stealth" buff is up). Lets rogue steps skip the
+        /// out-of-stealth abilities while opening from stealth (casting "Stealth" itself is a normal cast).</summary>
+        bool PlayerIsStealthed { get; }
+
         /// <summary>Enemies near the player (already range-filtered by the adapter).</summary>
         IReadOnlyList<IWowUnit> Enemies { get; }
 
@@ -129,11 +138,12 @@ namespace AIO3.Core.Game
         /// <summary>Set the player's current target (so WRobot's facing/movement follows it).</summary>
         void SetTarget(IWowUnit unit);
 
-        /// <summary>Stop the player's movement (WRobot's mover). Used to plant the character so a long cast-time
-        /// spell can complete out of combat — chiefly the pet summon (~10s cast), which the product's travel
-        /// movement would otherwise break by re-pathing mid-cast. The adapter's cast path also refuses a cast-time
-        /// spell while moving, so the summon has to stand still first.</summary>
-        void StopMovement();
+        /// <summary>Pin the character in place for <paramref name="ms"/> milliseconds: stop any current movement
+        /// AND cancel the product's travel re-pathing (the move-to / path pulses) for that window. Used so a long
+        /// cast-time spell completes out of combat — chiefly the pet summon (~10s cast), which the product would
+        /// otherwise break by re-pathing mid-cast (a single StopMove isn't enough; it re-issues a move on its next
+        /// pulse). The hold auto-expires after <paramref name="ms"/>.</summary>
+        void HoldPosition(int ms);
 
         /// <summary>Step back roughly <paramref name="yards"/> yards (to regain ranged distance). Refuses and
         /// returns false if the spot is over a ledge/cliff — so it never walks the player off an edge. Returns

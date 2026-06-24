@@ -54,13 +54,15 @@ namespace AIO3.Core.Rotations.Warlock
 
             // --- buffs ---
             WarlockCommon.Armor(_settings, priority: 0.5f),
-            // Keep a Healthstone stocked (OOC) so the emergency-heal item above always has one to use.
-            WarlockCommon.CreateHealthstone(_settings, priority: 0.45f),
+            // Keep a Healthstone stocked (OOC). Priority sits BELOW the pet summon (0.6) so summoning the demon
+            // gets first claim on a Soul Shard — a Healthstone is only made from a surplus shard, never the pet's.
+            WarlockCommon.CreateHealthstone(_settings, priority: 0.85f),
 
             // --- pet upkeep (all skip when petless; Auto resolves to Felguard, else Voidwalker if unlearned) ---
             PetControl.Summon(ctx => _settings.ManagePet.Value,
                 ctx => WarlockCommon.SummonSpell(_settings, ctx, WarlockSpec.Demonology),
-                ctx => WarlockCommon.SummonSpell(_settings, ctx, WarlockSpec.Demonology), priority: 0.6f),
+                ctx => WarlockCommon.SummonSpell(_settings, ctx, WarlockSpec.Demonology), priority: 0.6f,
+                desiredPetName: ctx => WarlockCommon.DesiredPetForSwap(_settings, ctx, WarlockSpec.Demonology)),
             PetControl.Attack(ctx => _settings.ManagePet.Value, priority: 0.7f),
             // Health Funnel the demon when low (opt-in; channelled, so only while standing still and we have HP).
             PetControl.Heal(

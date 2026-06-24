@@ -27,6 +27,7 @@ namespace AIO3.Tests
         public void Auto_affliction_uses_the_Voidwalker_once_learned()
         {
             var g = new FakeGameClient { Class = WowClass.Warlock }; // all spells known
+            g.ItemCounts["Soul Shard"] = 1;                          // a shard to pay the Voidwalker summon
             Assert.Equal("Voidwalker", WarlockCommon.ResolvePet(new WarlockSettings(), Ctx(g), WarlockSpec.Affliction));
         }
 
@@ -50,9 +51,29 @@ namespace AIO3.Tests
         public void A_manual_choice_is_respected()
         {
             var g = new FakeGameClient { Class = WowClass.Warlock };
+            g.ItemCounts["Soul Shard"] = 1; // a shard to pay the Felhunter summon
             var s = new WarlockSettings();
             s.Pet.Value = "Felhunter";
             Assert.Equal("Felhunter", WarlockCommon.ResolvePet(s, Ctx(g), WarlockSpec.Affliction));
+        }
+
+        // --- out of Soul Shards: every demon but the Imp costs one, so fall back to the free Imp ---
+
+        [Fact]
+        public void Out_of_shards_falls_back_to_the_Imp()
+        {
+            var g = new FakeGameClient { Class = WowClass.Warlock }; // Voidwalker learned...
+            // ...but no Soul Shard (ItemCounts empty) → can't pay the Voidwalker summon → the free Imp.
+            Assert.Equal("Imp", WarlockCommon.ResolvePet(new WarlockSettings(), Ctx(g), WarlockSpec.Affliction));
+        }
+
+        [Fact]
+        public void A_manual_choice_falls_back_to_the_Imp_when_out_of_shards()
+        {
+            var g = new FakeGameClient { Class = WowClass.Warlock }; // no shard
+            var s = new WarlockSettings();
+            s.Pet.Value = "Felhunter"; // chosen, but unaffordable without a shard → the free Imp instead of petless
+            Assert.Equal("Imp", WarlockCommon.ResolvePet(s, Ctx(g), WarlockSpec.Affliction));
         }
     }
 }

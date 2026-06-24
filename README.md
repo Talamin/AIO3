@@ -82,10 +82,14 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
   (Demonology). When a low, normal mob is already covered by enough DoTs to finish it, the filler nuke is
   **held so the DoTs kill it** instead of overkilling — saving mana / Life-Tap pressure while leveling (tunable
   HP% floor; bosses and elites are never affected). A **per-spec Auto pet** (Affliction → Voidwalker, Demonology
-  → Felguard, Destruction → Imp, with fallback) is **summoned out of combat *before* the pull** — it plants the
-  character so the long summon cast completes while travelling — and commanded through the shared pet controller,
-  including its **special abilities**: **Torment** (the Voidwalker tanks mobs off the cloth caster), **Spell Lock**
-  (the Felhunter is the warlock's *only* interrupt) and the Imp's Firebolt. **Emergency Fear / Howl of Terror**
+  → Felguard, Destruction → Imp) is **summoned out of combat *before* the pull** — it PINS the character (cancelling
+  the bot's travel re-pathing) so the long summon cast completes — and **falls back to the free Imp when out of Soul
+  Shards**, then **swaps back** to the wanted demon once a shard is harvested (never downgrading a healthy one). It's
+  commanded through the shared pet controller, including its **special abilities**: the Voidwalker **proactively
+  taunts** (Torment as soon as a mob leaves the pet, not after it reaches you) and **AoE-taunts** (Suffering when
+  surrounded), self-heals out of combat (**Consume Shadows**), and tanks mobs off the cloth caster; the Felhunter
+  **Spell Lock** is the warlock's *only* interrupt; and the Imp keeps **Firebolt / Blood Pact / Fire Shield / Phase
+  Shift** on autocast. **Emergency Fear / Howl of Terror**
   break melee when you're low and surrounded so you can heal. A self-sustaining **Soul Shard economy** keeps the
   reagent stocked: **Drain Soul** harvests a shard off a dying mob when shards run low (it's a 4× execute under
   25% HP, so it costs no damage), and **Create Healthstone** restocks the emergency-heal item out of combat — so

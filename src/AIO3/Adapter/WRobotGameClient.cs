@@ -61,18 +61,41 @@ namespace AIO3.Adapter
         // A backpedal hop runs on its own worker thread (see StepBack); true while it holds the back key.
         private volatile bool _repositioning;
 
+        // HoldPosition window: while Now < _holdUntil we cancel the product's travel pulses so a long cast (the
+        // pet summon) isn't broken by re-pathing. Set by HoldPosition; the movement-pulse handlers read it.
+        private volatile int _holdUntil;
+
         private static int Now => Environment.TickCount;
 
         public WRobotGameClient()
         {
             ObjectManagerEvents.OnObjectManagerPulsed += OnObjectManagerPulsed;
             wManager.Events.FightEvents.OnFightLoop += OnFightLoop; // backpedal runs here (see OnFightLoop)
+            // Hold-position-during-summon: cancel travel re-pathing while _holdUntil is in the future. Both hooks,
+            // like the old AIO's AutoPartyResurrect — OnMovementPulse pins path-following, OnMoveToPulse pins a
+            // direct MoveTo. They fire on WRobot's movement thread, so keep the handlers tiny and never throw.
+            wManager.Events.MovementEvents.OnMovementPulse += OnMovementPulseHold;
+            wManager.Events.MovementEvents.OnMoveToPulse += OnMoveToPulseHold;
         }
 
         public void Dispose()
         {
             ObjectManagerEvents.OnObjectManagerPulsed -= OnObjectManagerPulsed;
             wManager.Events.FightEvents.OnFightLoop -= OnFightLoop;
+            wManager.Events.MovementEvents.OnMovementPulse -= OnMovementPulseHold;
+            wManager.Events.MovementEvents.OnMoveToPulse -= OnMoveToPulseHold;
+        }
+
+        private bool Holding => unchecked(Now - _holdUntil) < 0; // true while the pin window is still in the future
+
+        private void OnMovementPulseHold(System.Collections.Generic.List<robotManager.Helpful.Vector3> points, System.ComponentModel.CancelEventArgs cancelable)
+        {
+            try { if (Holding) cancelable.Cancel = true; } catch { /* never throw on the movement thread */ }
+        }
+
+        private void OnMoveToPulseHold(robotManager.Helpful.Vector3 point, System.ComponentModel.CancelEventArgs cancelable)
+        {
+            try { if (Holding) cancelable.Cancel = true; } catch { /* never throw on the movement thread */ }
         }
 
         // Runs on WRobot's object-manager thread after each pulse. Must never throw (would break the OM).
@@ -151,6 +174,12 @@ namespace AIO3.Adapter
                 return _stance;
             }
         }
+
+        // WoWPlayer.ComboPoint is an Int32 (0..5), already relative to the current target — no Lua needed.
+        public int ComboPoints => ObjectManager.Me.ComboPoint;
+
+        // Stealth is a normal player buff; HaveBuff is a cheap memory read.
+        public bool PlayerIsStealthed => ObjectManager.Me.HaveBuff("Stealth");
 
         public IWowUnit Target
         {
@@ -396,7 +425,11 @@ namespace AIO3.Adapter
             if (unit != null && unit.Guid != 0) ObjectManager.Me.Target = unit.Guid;
         }
 
-        public void StopMovement() => MovementManager.StopMove();
+        public void HoldPosition(int ms)
+        {
+            _holdUntil = Now + ms;       // pin window — the movement-pulse handlers cancel re-pathing until then
+            MovementManager.StopMove();  // and kill any motion already in progress
+        }
 
         public void SetManageBagFoodDrink(bool on)
         {
@@ -799,7 +832,11 @@ namespace AIO3.Adapter
                 _petBarGuid = 0;
                 return _petAbilities;
             }
-            if (guid == _petBarGuid && unchecked(Now - _petBarAt) < 5000) return _petAbilities;
+            // The pet's action bar is static per demon (a warlock pet never learns new abilities; a re-tamed
+            // hunter pet changes its GUID, invalidating the cache immediately above), so cache it for a long TTL.
+            // The old 5s TTL re-ran the ~14ms GetPetActionInfo Lua scan every 5s even OOC/idle, which showed up
+            // as "Pet autocast Firebolt 14ms" in the perf log (the first PetHasAbility caller after each expiry).
+            if (guid == _petBarGuid && unchecked(Now - _petBarAt) < 60000) return _petAbilities;
 
             string raw = Lua.LuaDoString<string>(
                 "local t='' for i=1,10 do local n=GetPetActionInfo(i) if n then t=t..n..'|' end end return t");
