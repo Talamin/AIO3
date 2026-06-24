@@ -19,6 +19,11 @@ namespace AIO3.Core.Rotations.Warlock
             new ChoiceSetting("armor", "Armor", "Auto",
                 new[] { "Auto", "Fel Armor", "Demon Armor", "Demon Skin" });
 
+        /// <summary>Create a Healthstone out of combat when we carry none and have a Soul Shard to spend — the
+        /// emergency-heal step uses it, so without this the supply runs dry.</summary>
+        public readonly ToggleSetting CreateHealthstone =
+            new ToggleSetting("createHs", "Create a Healthstone when missing", value: true);
+
         // --- Pet ---
 
         /// <summary>Which demon to summon. Auto picks per spec at eval time (Demonology → Felguard, Destruction
@@ -76,6 +81,21 @@ namespace AIO3.Core.Rotations.Warlock
         /// mana and Life-Tap (health) pressure while leveling. Bosses/elites are never affected. 0 disables it.</summary>
         public readonly IntSetting LetDotsFinishHealthPercent =
             new IntSetting("dotsFinishHp", "Let DoTs finish below HP%", value: 20, min: 0, max: 60, step: 5);
+
+        /// <summary>Harvest a Soul Shard with Drain Soul on a low, dying mob when we're short on shards. Shards are
+        /// the reagent for Healthstones / Soulstones, so without this the emergency Healthstone has no supply. The
+        /// channel also deals damage and fits the same window as "let the DoTs finish".</summary>
+        public readonly ToggleSetting UseDrainSoul =
+            new ToggleSetting("drainSoul", "Drain Soul for shards", value: true);
+
+        /// <summary>Only Drain Soul a target at or below this HP% — you only keep the shard if the mob dies, so this
+        /// targets a dying mob.</summary>
+        public readonly IntSetting DrainSoulHealthPercent =
+            new IntSetting("drainSoulHp", "Drain Soul at/below HP%", value: 25, min: 0, max: 60, step: 5);
+
+        /// <summary>Only harvest while we hold this many Soul Shards or fewer (stop draining once stocked).</summary>
+        public readonly IntSetting SoulShardKeep =
+            new IntSetting("shardKeep", "Keep up to N Soul Shards", value: 3, min: 0, max: 20, step: 1);
 
         // --- Rotation: Demonology-only (shown only while Demonology is the active spec) ---
 
@@ -171,6 +191,7 @@ namespace AIO3.Core.Rotations.Warlock
         public WarlockSettings()
         {
             ArmorChoice.Category = "Buffs";
+            CreateHealthstone.Category = "Buffs";
 
             Pet.Category = "Pet";
             ManagePet.Category = "Pet";
@@ -183,6 +204,9 @@ namespace AIO3.Core.Rotations.Warlock
             UseRacials.Category = "Rotation";
             InterruptCasts.Category = "Rotation";
             LetDotsFinishHealthPercent.Category = "Rotation";
+            UseDrainSoul.Category = "Rotation";
+            DrainSoulHealthPercent.Category = "Rotation";
+            SoulShardKeep.Category = "Rotation";
             EmergencyHealthPercent.Category = "Rotation";
 
             // Spec-only knobs live in the Rotation tab but tag their spec, so the overlay shows them ONLY while
@@ -213,11 +237,12 @@ namespace AIO3.Core.Rotations.Warlock
             _all = new Setting[]
             {
                 // Buffs
-                ArmorChoice,
+                ArmorChoice, CreateHealthstone,
                 // Pet
                 Pet, ManagePet, PetHealPercent, PetTank, ImpFirebolt,
                 // Rotation (general, then the spec-only knobs that show only in their spec)
-                CombatRange, Curse, UseRacials, InterruptCasts, LetDotsFinishHealthPercent, EmergencyHealthPercent,
+                CombatRange, Curse, UseRacials, InterruptCasts, LetDotsFinishHealthPercent,
+                UseDrainSoul, DrainSoulHealthPercent, SoulShardKeep, EmergencyHealthPercent,
                 DemonicEmpowerment, UseSoulFire,   // Demonology-only
                 UseConflagrate, UseChaosBolt,      // Destruction-only
                 // Survival

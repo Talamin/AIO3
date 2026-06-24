@@ -58,6 +58,8 @@ namespace AIO3.Core.Rotations.Warlock
 
             // --- buffs ---
             WarlockCommon.Armor(_settings, priority: 0.5f),
+            // Keep a Healthstone stocked (OOC) so the emergency-heal item above always has one to use.
+            WarlockCommon.CreateHealthstone(_settings, priority: 0.45f),
 
             // --- pet upkeep (all skip when petless) ---
             // Summon the chosen demon when none exists; "Revive Pet" never exists for a warlock (a dead demon is
@@ -102,6 +104,9 @@ namespace AIO3.Core.Rotations.Warlock
             CombatBlocks.MaintainMyDebuff("Corruption", DotRefreshMs, priority: 8f),
             // Unstable Affliction is cast-time — stand still.
             CombatBlocks.MaintainCastDebuff("Unstable Affliction", DotRefreshMs, priority: 9f),
+
+            // --- Soul Shard harvest (on a dying mob when shards are low; replaces the filler nuke here) ---
+            WarlockCommon.DrainSoul(_settings, priority: 9.5f),
 
             // --- procs ---
             // Shadow Trance (Nightfall) makes the next Shadow Bolt instant — spend it on the move too. Hold it

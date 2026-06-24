@@ -54,6 +54,8 @@ namespace AIO3.Core.Rotations.Warlock
 
             // --- buffs ---
             WarlockCommon.Armor(_settings, priority: 0.5f),
+            // Keep a Healthstone stocked (OOC) so the emergency-heal item above always has one to use.
+            WarlockCommon.CreateHealthstone(_settings, priority: 0.45f),
 
             // --- pet upkeep (all skip when petless; Auto resolves to Felguard, else Voidwalker if unlearned) ---
             PetControl.Summon(ctx => _settings.ManagePet.Value,
@@ -93,6 +95,9 @@ namespace AIO3.Core.Rotations.Warlock
             CombatBlocks.MaintainMyDebuff("Corruption", DotRefreshMs, priority: 8f),
             // Immolate is cast-time — stand still; the block also guards against re-queueing it mid-cast.
             CombatBlocks.MaintainCastDebuff("Immolate", DotRefreshMs, priority: 9f),
+
+            // --- Soul Shard harvest (on a dying mob when shards are low; sits above the Soul Fire / filler) ---
+            WarlockCommon.DrainSoul(_settings, priority: 9.5f),
 
             // --- proc spender ---
             // Soul Fire is a hard-hitting cast normally made instant/cheap by a Demonology proc (Decimation /

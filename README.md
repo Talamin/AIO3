@@ -86,8 +86,10 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
   character so the long summon cast completes while travelling — and commanded through the shared pet controller,
   including its **special abilities**: **Torment** (the Voidwalker tanks mobs off the cloth caster), **Spell Lock**
   (the Felhunter is the warlock's *only* interrupt) and the Imp's Firebolt. **Emergency Fear / Howl of Terror**
-  break melee when you're low and surrounded so you can heal. *(Pet handling in-game-verified; rotations built and
-  unit-tested.)*
+  break melee when you're low and surrounded so you can heal. A self-sustaining **Soul Shard economy** keeps the
+  reagent stocked: **Drain Soul** harvests a shard off a dying mob when shards run low (it's a 4× execute under
+  25% HP, so it costs no damage), and **Create Healthstone** restocks the emergency-heal item out of combat — so
+  the Healthstone supply never runs dry. *(Rotations, shard economy and pet handling in-game-verified.)*
 - **Cliff-safe backpedal** — when a mob is in the hunter's face (on the pet, inside melee range), the
   hunter steps back to restore ranged distance, refusing to move over a ledge (a downward trace guards the
   destination). The hop runs *on WRobot's own fight-loop thread* and briefly cancels its move-to-range for

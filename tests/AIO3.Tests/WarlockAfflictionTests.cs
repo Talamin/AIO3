@@ -379,5 +379,65 @@ namespace AIO3.Tests
             s.LetDotsFinishHealthPercent.Value = 0; // disabled → always nuke
             Assert.False(WarlockCommon.DotsWillFinishTarget(CombatContext.Capture(g), s));
         }
+
+        // --- Soul Shard economy (Drain Soul harvest + Create Healthstone) ---
+
+        [Fact]
+        public void Drains_Soul_on_a_dying_mob_when_shards_are_low()
+        {
+            FakeGameClient g = LockGame();    // DoTs up, full health/mana
+            g.TargetUnit.HealthPercent = 20;  // dying (≤ 25 default), no shards held → harvest one
+            Assert.Equal("Drain Soul", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Does_not_Drain_Soul_when_shards_are_stocked()
+        {
+            FakeGameClient g = LockGame();
+            g.TargetUnit.HealthPercent = 20;
+            g.ItemCounts["Soul Shard"] = 4;   // above the keep count (3) → no need to harvest
+            g.ItemCounts["Healthstone"] = 1;  // and don't create one either (isolate the Drain Soul check)
+            Assert.NotEqual("Drain Soul", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Does_not_Drain_Soul_on_a_healthy_mob()
+        {
+            FakeGameClient g = LockGame();    // target at full health → not a harvest target
+            Assert.NotEqual("Drain Soul", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Does_not_Drain_Soul_on_an_elite()
+        {
+            FakeGameClient g = LockGame();
+            g.TargetUnit.HealthPercent = 20;
+            g.TargetUnit.IsElite = true;      // a channel on a tough mob isn't worth it
+            Assert.NotEqual("Drain Soul", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Creates_a_Healthstone_when_missing_and_a_shard_is_available()
+        {
+            FakeGameClient g = LockGame();
+            g.ItemCounts["Soul Shard"] = 1;   // a shard to spend, no Healthstone in bags → create one (OOC)
+            Assert.Equal("Create Healthstone", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Does_not_create_a_Healthstone_without_a_shard()
+        {
+            FakeGameClient g = LockGame();    // no shard → can't create (no reagent)
+            Assert.NotEqual("Create Healthstone", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Does_not_create_a_Healthstone_when_one_is_already_in_the_bags()
+        {
+            FakeGameClient g = LockGame();
+            g.ItemCounts["Soul Shard"] = 1;
+            g.ItemCounts["Healthstone"] = 1;  // already stocked
+            Assert.NotEqual("Create Healthstone", Fire(g)?.Name);
+        }
     }
 }

@@ -57,6 +57,8 @@ namespace AIO3.Core.Rotations.Warlock
 
             // --- buffs ---
             WarlockCommon.Armor(_settings, priority: 0.5f),
+            // Keep a Healthstone stocked (OOC) so the emergency-heal item above always has one to use.
+            WarlockCommon.CreateHealthstone(_settings, priority: 0.45f),
 
             // --- pet upkeep (all skip when petless; Auto resolves to Imp, else Voidwalker if unlearned) ---
             PetControl.Summon(ctx => _settings.ManagePet.Value,
@@ -97,6 +99,9 @@ namespace AIO3.Core.Rotations.Warlock
                  .When(ctx => _settings.UseConflagrate.Value && ctx.Target.HasMyAura("Immolate")),
             // Corruption is instant.
             CombatBlocks.MaintainMyDebuff("Corruption", DotRefreshMs, priority: 9f),
+
+            // --- Soul Shard harvest (on a dying mob when shards are low; sits above the filler nukes) ---
+            WarlockCommon.DrainSoul(_settings, priority: 9.5f),
 
             // --- filler nukes (cast-time → stand still) ---
             // All three fillers skip once the DoTs will finish a low, normal mob on their own (saves mana /

@@ -7,6 +7,19 @@ namespace AIO3.Core.Data
     /// </summary>
     public static class Consumables
     {
+        /// <summary>Warlock Healthstone ranks (lowest→highest). Used to decide whether to Create Healthstone
+        /// (warlocks carry exactly one; create it when we have none and a Soul Shard to spend). Subset of
+        /// <see cref="HealthItems"/>, which also includes potions the create-check must ignore.</summary>
+        public static readonly string[] Healthstones =
+        {
+            "Minor Healthstone", "Lesser Healthstone", "Healthstone", "Greater Healthstone",
+            "Major Healthstone", "Master Healthstone", "Fel Healthstone", "Demonic Healthstone"
+        };
+
+        /// <summary>The warlock Soul Shard (the reagent for Healthstone / Soulstone / Soul Fire / summons). Counted
+        /// to decide when to harvest more via Drain Soul and whether we can afford to create a stone.</summary>
+        public static readonly string[] SoulShards = { "Soul Shard" };
+
         public static readonly string[] HealthItems =
         {
             // Healthstones (warlock)

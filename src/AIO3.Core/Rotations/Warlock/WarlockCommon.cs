@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AIO3.Core.Combat;
+using AIO3.Core.Data;
 using AIO3.Core.Dsl;
 using AIO3.Core.Engine;
 using AIO3.Core.Game;
@@ -72,6 +73,36 @@ namespace AIO3.Core.Rotations.Warlock
                  .When(ctx => s.UseWand.Value
                               && ctx.Me.PowerPercent < s.WandManaPercent.Value
                               && !ctx.Game.IsCurrentSpell("Shoot")).OffGcd();
+
+        // --- Soul Shard economy (Drain Soul to harvest, Create Healthstone to consume) ---
+
+        /// <summary>
+        /// Harvest a Soul Shard: channel Drain Soul on a LOW, dying mob when we're short on shards. Soul Shards are
+        /// the reagent for Healthstones / Soulstones (and Soul Fire / summons), so without this the emergency
+        /// Healthstone has no supply. Gated on <c>UseDrainSoul</c> + the target at/below <c>DrainSoulHealthPercent</c>
+        /// + holding no more than <c>SoulShardKeep</c> shards; skips bosses/elites (a channel on a tough mob isn't
+        /// worth it, and you only keep the shard if it dies) and stands still (it's a channel). Sits just above the
+        /// filler nuke so it replaces it on a dying mob — the same window "let the DoTs finish" otherwise idles in.
+        /// The cheap HP/elite checks short-circuit before the cached <c>CountItems</c> Lua read, so it stays off the
+        /// hot path until a mob is actually low.
+        /// </summary>
+        public static RotationStep DrainSoul(WarlockSettings s, float priority) =>
+            Skill.Spell("Drain Soul").Priority(priority).On(Targets.CurrentEnemy)
+                 .When((ctx, t) => s.UseDrainSoul.Value
+                                   && t.HealthPercent <= s.DrainSoulHealthPercent.Value
+                                   && !t.IsElite && !t.IsBoss()
+                                   && ctx.Game.CountItems(Consumables.SoulShards) <= s.SoulShardKeep.Value
+                                   && !ctx.Game.PlayerIsMoving);
+
+        /// <summary>Create a Healthstone out of combat when we carry none and have a Soul Shard to spend — keeps the
+        /// emergency-heal item (which uses <see cref="Consumables.Healthstones"/>) supplied. OOC + not mounted +
+        /// stationary (it's a cast). Skips cleanly when unknown / no shard / one already in the bags.</summary>
+        public static RotationStep CreateHealthstone(WarlockSettings s, float priority) =>
+            Skill.Spell("Create Healthstone").Priority(priority).On(Targets.Self)
+                 .When(ctx => s.CreateHealthstone.Value
+                              && !ctx.Game.PlayerInCombat && !ctx.Game.PlayerIsMounted && !ctx.Game.PlayerIsMoving
+                              && ctx.Game.CountItems(Consumables.Healthstones) == 0
+                              && ctx.Game.CountItems(Consumables.SoulShards) > 0);
 
         /// <summary>The summon spell for the chosen demon (e.g. "Summon Voidwalker"). Resolved at eval time so
         /// an overlay edit swaps the demon live and an "Auto" pick fills in per spec. Used by the shared
