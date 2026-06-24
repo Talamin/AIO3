@@ -122,5 +122,35 @@ namespace AIO3.Tests
             var engine = new RotationEngine(new List<RotationStep> { CombatBlocks.MaintainCastDebuff("Immolate", 3000, 1f) });
             Assert.Null(engine.Tick(CombatContext.Capture(game)));
         }
+
+        [Fact]
+        public void MaintainCastDebuff_does_not_recast_in_the_apply_window()
+        {
+            // After the cast ends, the debuff isn't visible for ~2.5s (server latency) AND we're no longer "casting
+            // it", so the IsCurrentSpell guard no longer applies. The post-cast grace must still stop a second cast
+            // in that window (the Immolate double-cast from the logs). The fake never lands the aura, so a second
+            // tick would re-cast without the throttle.
+            FakeGameClient game = Game(out _);
+            var engine = new RotationEngine(new List<RotationStep> { CombatBlocks.MaintainCastDebuff("Immolate", 3000, 1f) });
+            CombatContext ctx = CombatContext.Capture(game);
+
+            Assert.Equal("Immolate", engine.Tick(ctx)?.Name);                  // first application
+            Assert.Null(engine.Tick(ctx));                                     // within the grace → no second cast
+            Assert.Single(game.CastLog.FindAll(c => c == "Immolate"));
+        }
+
+        [Fact]
+        public void MaintainMyDebuff_does_not_recast_in_the_apply_window()
+        {
+            // Instant DoT: the aura still takes ~0.6-1.1s to become visible, so the same post-cast grace stops the
+            // Corruption double-cast.
+            FakeGameClient game = Game(out _);
+            var engine = new RotationEngine(new List<RotationStep> { CombatBlocks.MaintainMyDebuff("Corruption", 2000, 1f) });
+            CombatContext ctx = CombatContext.Capture(game);
+
+            Assert.Equal("Corruption", engine.Tick(ctx)?.Name);               // first application
+            Assert.Null(engine.Tick(ctx));                                    // within the grace → no double-cast
+            Assert.Single(game.CastLog.FindAll(c => c == "Corruption"));
+        }
     }
 }

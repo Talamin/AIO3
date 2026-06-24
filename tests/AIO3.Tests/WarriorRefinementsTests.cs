@@ -103,16 +103,19 @@ namespace AIO3.Tests
         [Fact]
         public void MaintainMyDebuff_casts_when_missing_or_expiring_but_not_while_fresh()
         {
+            // A fresh step per scenario: the new post-cast apply-grace only matters on a rapid SECOND fire of the
+            // SAME step instance, but in real play "missing" and "expiring" are ~15s apart so it never interferes.
+            // Reusing one instance here (all three fires in the same millisecond) would hit the throttle and mask
+            // the condition under test. The throttle itself is covered by CombatBlocksTests.
             FakeGameClient g = Game();
-            RotationStep step = CombatBlocks.MaintainMyDebuff("Rend", minMsLeft: 3000, priority: 1f);
 
-            Assert.Equal("Rend", Fire(g, step)?.Name); // missing
+            Assert.Equal("Rend", Fire(g, CombatBlocks.MaintainMyDebuff("Rend", minMsLeft: 3000, priority: 1f))?.Name); // missing
 
             g.TargetUnit.WithAura("Rend", mine: true, timeLeftMs: 1000);
-            Assert.Equal("Rend", Fire(g, step)?.Name); // expiring
+            Assert.Equal("Rend", Fire(g, CombatBlocks.MaintainMyDebuff("Rend", minMsLeft: 3000, priority: 1f))?.Name); // expiring
 
             g.TargetUnit.WithAura("Rend", mine: true, timeLeftMs: 9000);
-            Assert.Null(Fire(g, step)); // fresh
+            Assert.Null(Fire(g, CombatBlocks.MaintainMyDebuff("Rend", minMsLeft: 3000, priority: 1f))); // fresh
         }
 
         [Fact]

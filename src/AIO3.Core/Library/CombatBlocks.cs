@@ -84,22 +84,35 @@ namespace AIO3.Core.Library
                  .When(ctx => !ctx.Me.HasAura(spell) && !HasAnyAura(ctx, supersededBy))
                  .Build();
 
+        // After we apply a DoT, the debuff isn't visible in our per-tick snapshot until the server round-trips —
+        // ~0.6-1.1s for an instant cast, ~2.5s measured from the START of a cast-time spell. Without a throttle the
+        // maintain step sees the aura "missing" in that gap and casts a SECOND time (the Immolate / Corruption
+        // double-cast seen in the debug logs). A short post-cast throttle (the recast delay timer only starts on a
+        // SUCCESSFUL cast) suppresses the re-cast until the aura has had time to land. DoTs last 12-24s, so this
+        // never delays a genuine refresh (which only happens when <minMsLeft remains).
+        private const int InstantDebuffApplyGraceMs = 1500; // instant DoTs (Corruption, Rend) — apply latency
+        private const int CastDebuffApplyGraceMs = 3000;    // cast-time DoTs (Immolate, UA, Haunt) — cast time + latency
+
         /// <summary>
         /// Keep our own debuff up on the current enemy: cast when it is missing OR about to expire
-        /// (less than <paramref name="minMsLeft"/> remaining). Reusable by any DoT/debuff spec.
+        /// (less than <paramref name="minMsLeft"/> remaining). Reusable by any DoT/debuff spec. A post-cast grace
+        /// (<see cref="InstantDebuffApplyGraceMs"/>) stops a second cast in the window before the freshly applied
+        /// debuff becomes visible (the instant-DoT double-cast).
         /// </summary>
         public static RotationStep MaintainMyDebuff(string spell, int minMsLeft, float priority) =>
             Skill.Spell(spell)
                  .Priority(priority)
                  .On(Targets.CurrentEnemy)
-                 .When(ctx => !ctx.Target.HasMyAura(spell) || ctx.Target.MyAuraTimeLeftMs(spell) < minMsLeft);
+                 .When(ctx => !ctx.Target.HasMyAura(spell) || ctx.Target.MyAuraTimeLeftMs(spell) < minMsLeft)
+                 .RecastDelay(InstantDebuffApplyGraceMs);
 
         /// <summary>
         /// Maintain a CAST-TIME self-debuff (a DoT like Immolate / Unstable Affliction / Haunt): refresh it when
         /// missing or under <paramref name="minMsLeft"/> remaining, but only while standing still AND not already
-        /// casting it. The "not already casting it" guard (<see cref="IGameClient.IsCurrentSpell"/>) is what stops
-        /// the cast-queue window from queueing a SECOND cast in the ~400ms before the first cast's debuff lands —
-        /// the double-cast (the debuff isn't on the target yet, so the bare missing-aura check is still true).
+        /// casting it. Two guards stop the double-cast: <see cref="IGameClient.IsCurrentSpell"/> blocks a queued
+        /// second cast DURING the cast, and the post-cast grace (<see cref="CastDebuffApplyGraceMs"/>) covers the
+        /// gap AFTER the cast ends but before the debuff becomes visible (server latency) — without it the bare
+        /// missing-aura check re-cast a second Immolate ~2.5s after the first (seen in the logs).
         /// <paramref name="extraGate"/> adds an optional extra condition (e.g. "only when UA isn't known").
         /// </summary>
         public static RotationStep MaintainCastDebuff(string spell, int minMsLeft, float priority,
@@ -110,7 +123,8 @@ namespace AIO3.Core.Library
                  .When(ctx => (extraGate == null || extraGate(ctx))
                               && (!ctx.Target.HasMyAura(spell) || ctx.Target.MyAuraTimeLeftMs(spell) < minMsLeft)
                               && !ctx.Game.PlayerIsMoving
-                              && !ctx.Game.IsCurrentSpell(spell));
+                              && !ctx.Game.IsCurrentSpell(spell))
+                 .RecastDelay(CastDebuffApplyGraceMs);
 
         /// <summary>
         /// Use the first ready item from <paramref name="names"/> when <paramref name="when"/> holds
