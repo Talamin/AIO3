@@ -99,15 +99,19 @@ namespace AIO3.Core.Rotations.Warlock
             CombatBlocks.MaintainMyDebuff("Corruption", DotRefreshMs, priority: 9f),
 
             // --- filler nukes (cast-time → stand still) ---
+            // All three fillers skip once the DoTs will finish a low, normal mob on their own (saves mana /
+            // Life-Tap). Conflagrate above is left ungated: it is instant, on a cooldown, and only speeds the kill.
             // Chaos Bolt is a hard-hitting cooldown nuke — fire when ready (its readiness gate throttles it).
             Skill.Spell("Chaos Bolt").Priority(12f).On(Targets.CurrentEnemy)
-                 .When(ctx => _settings.UseChaosBolt.Value && !ctx.Game.PlayerIsMoving),
+                 .When(ctx => _settings.UseChaosBolt.Value && !ctx.Game.PlayerIsMoving
+                              && !WarlockCommon.DotsWillFinishTarget(ctx, _settings)),
             // Incinerate is the Destruction filler (bonus on an Immolate'd target). Replaces Shadow Bolt once known.
             Skill.Spell(Incinerate).Priority(18f).On(Targets.CurrentEnemy)
-                 .When(ctx => !ctx.Game.PlayerIsMoving),
+                 .When(ctx => !ctx.Game.PlayerIsMoving && !WarlockCommon.DotsWillFinishTarget(ctx, _settings)),
             // Shadow Bolt is the fallback filler before Incinerate is learned (auto-skips once Incinerate wins).
             Skill.Spell("Shadow Bolt").Priority(20f).On(Targets.CurrentEnemy)
-                 .When(ctx => !ctx.Game.IsSpellKnown(Incinerate) && !ctx.Game.PlayerIsMoving),
+                 .When(ctx => !ctx.Game.IsSpellKnown(Incinerate) && !ctx.Game.PlayerIsMoving
+                              && !WarlockCommon.DotsWillFinishTarget(ctx, _settings)),
         }), ctx => _settings.UseRacials.Value, basePriority: 2.5f);
     }
 }

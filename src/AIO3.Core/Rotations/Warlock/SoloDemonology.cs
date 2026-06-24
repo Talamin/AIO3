@@ -101,11 +101,13 @@ namespace AIO3.Core.Rotations.Warlock
             Skill.Spell("Soul Fire").Priority(15f).On(Targets.CurrentEnemy)
                  .When(ctx => _settings.UseSoulFire.Value
                               && (ctx.Me.HasAura("Decimation") || ctx.Me.HasAura("Molten Core"))
-                              && !ctx.Game.PlayerIsMoving),
+                              && !ctx.Game.PlayerIsMoving
+                              && !WarlockCommon.DotsWillFinishTarget(ctx, _settings)),
 
             // --- filler (cast-time → stand still) ---
+            // Skip the filler once the DoTs will finish a low, normal mob on their own — saves mana / Life-Tap.
             Skill.Spell("Shadow Bolt").Priority(20f).On(Targets.CurrentEnemy)
-                 .When(ctx => !ctx.Game.PlayerIsMoving),
+                 .When(ctx => !ctx.Game.PlayerIsMoving && !WarlockCommon.DotsWillFinishTarget(ctx, _settings)),
         }), ctx => _settings.UseRacials.Value, basePriority: 2.5f);
     }
 }

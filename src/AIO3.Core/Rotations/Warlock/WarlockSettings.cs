@@ -71,6 +71,12 @@ namespace AIO3.Core.Rotations.Warlock
         public readonly ChoiceSetting InterruptCasts =
             new ChoiceSetting("interrupt", "Interrupt casts (Spell Lock)", InterruptModes.Smart, InterruptModes.All);
 
+        /// <summary>Stop casting the filler nuke once a NORMAL mob is below this HP% AND carries at least two of our
+        /// ticking DoTs — let the DoTs finish it instead of overkilling with another Shadow Bolt / Incinerate. Saves
+        /// mana and Life-Tap (health) pressure while leveling. Bosses/elites are never affected. 0 disables it.</summary>
+        public readonly IntSetting LetDotsFinishHealthPercent =
+            new IntSetting("dotsFinishHp", "Let DoTs finish below HP%", value: 20, min: 0, max: 60, step: 5);
+
         // --- Rotation: Demonology-only (shown only while Demonology is the active spec) ---
 
         /// <summary>Keep Demonic Empowerment up on the demon (spec buff; auto-skips if unknown / petless).</summary>
@@ -176,6 +182,7 @@ namespace AIO3.Core.Rotations.Warlock
             Curse.Category = "Rotation";
             UseRacials.Category = "Rotation";
             InterruptCasts.Category = "Rotation";
+            LetDotsFinishHealthPercent.Category = "Rotation";
             EmergencyHealthPercent.Category = "Rotation";
 
             // Spec-only knobs live in the Rotation tab but tag their spec, so the overlay shows them ONLY while
@@ -210,7 +217,7 @@ namespace AIO3.Core.Rotations.Warlock
                 // Pet
                 Pet, ManagePet, PetHealPercent, PetTank, ImpFirebolt,
                 // Rotation (general, then the spec-only knobs that show only in their spec)
-                CombatRange, Curse, UseRacials, InterruptCasts, EmergencyHealthPercent,
+                CombatRange, Curse, UseRacials, InterruptCasts, LetDotsFinishHealthPercent, EmergencyHealthPercent,
                 DemonicEmpowerment, UseSoulFire,   // Demonology-only
                 UseConflagrate, UseChaosBolt,      // Destruction-only
                 // Survival

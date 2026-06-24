@@ -302,5 +302,82 @@ namespace AIO3.Tests
             g.ReadyItems.Add("Healthstone");
             Assert.Equal("Emergency heal", Fire(g)?.Name);
         }
+
+        // --- let the DoTs finish a dying mob (stop overkilling with the filler) ---
+
+        [Fact]
+        public void Stops_nuking_when_the_DoTs_will_finish_a_low_mob()
+        {
+            FakeGameClient g = LockGame();   // full DoT coverage, mana/HP full
+            g.TargetUnit.HealthPercent = 15; // below the default 20% floor
+            Assert.NotEqual("Shadow Bolt", Fire(g)?.Name); // let the DoTs finish it — no filler nuke
+        }
+
+        [Fact]
+        public void Holds_the_Shadow_Trance_proc_when_the_DoTs_will_finish_the_mob()
+        {
+            FakeGameClient g = LockGame();
+            g.TargetUnit.HealthPercent = 15;
+            g.MeUnit.WithAura("Shadow Trance"); // a proc we'd normally spend — save it for the next pull
+            Assert.NotEqual("Shadow Bolt", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Still_nukes_a_low_elite()
+        {
+            FakeGameClient g = LockGame();
+            g.TargetUnit.HealthPercent = 15;
+            g.TargetUnit.IsElite = true; // big HP pool → DoTs won't finish it → keep nuking
+            Assert.Equal("Shadow Bolt", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void DotsWillFinishTarget_true_for_a_low_normal_mob_with_coverage()
+        {
+            FakeGameClient g = LockGame();
+            g.TargetUnit.HealthPercent = 15;
+            Assert.True(WarlockCommon.DotsWillFinishTarget(CombatContext.Capture(g), new WarlockSettings()));
+        }
+
+        [Fact]
+        public void DotsWillFinishTarget_false_with_only_one_dot()
+        {
+            FakeGameClient g = LockGame();
+            g.TargetUnit.HealthPercent = 15;
+            g.TargetUnit.Auras.Remove("Haunt");
+            g.TargetUnit.Auras.Remove("Curse of Agony");
+            g.TargetUnit.Auras.Remove("Unstable Affliction"); // only Corruption left → 1 DoT < 2
+            Assert.False(WarlockCommon.DotsWillFinishTarget(CombatContext.Capture(g), new WarlockSettings()));
+        }
+
+        [Fact]
+        public void DotsWillFinishTarget_false_when_the_dots_are_about_to_expire()
+        {
+            FakeGameClient g = LockGame();
+            g.TargetUnit.HealthPercent = 15;
+            // All but Corruption are about to fall off → they don't count toward finishing the mob.
+            g.TargetUnit.WithAura("Haunt", mine: true, timeLeftMs: 500);
+            g.TargetUnit.WithAura("Curse of Agony", mine: true, timeLeftMs: 500);
+            g.TargetUnit.WithAura("Unstable Affliction", mine: true, timeLeftMs: 500);
+            Assert.False(WarlockCommon.DotsWillFinishTarget(CombatContext.Capture(g), new WarlockSettings()));
+        }
+
+        [Fact]
+        public void DotsWillFinishTarget_false_above_the_floor()
+        {
+            FakeGameClient g = LockGame();
+            g.TargetUnit.HealthPercent = 25; // above the default 20% floor
+            Assert.False(WarlockCommon.DotsWillFinishTarget(CombatContext.Capture(g), new WarlockSettings()));
+        }
+
+        [Fact]
+        public void DotsWillFinishTarget_false_when_disabled()
+        {
+            FakeGameClient g = LockGame();
+            g.TargetUnit.HealthPercent = 15;
+            var s = new WarlockSettings();
+            s.LetDotsFinishHealthPercent.Value = 0; // disabled → always nuke
+            Assert.False(WarlockCommon.DotsWillFinishTarget(CombatContext.Capture(g), s));
+        }
     }
 }

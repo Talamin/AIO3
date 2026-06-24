@@ -104,13 +104,16 @@ namespace AIO3.Core.Rotations.Warlock
             CombatBlocks.MaintainCastDebuff("Unstable Affliction", DotRefreshMs, priority: 9f),
 
             // --- procs ---
-            // Shadow Trance (Nightfall) makes the next Shadow Bolt instant — spend it on the move too.
+            // Shadow Trance (Nightfall) makes the next Shadow Bolt instant — spend it on the move too. Hold it
+            // when the DoTs will finish a dying mob (the proc carries to the next pull instead of overkilling).
             Skill.Spell("Shadow Bolt").Priority(10f).On(Targets.CurrentEnemy)
-                 .When(ctx => ctx.Me.HasAura("Shadow Trance")),
+                 .When(ctx => ctx.Me.HasAura("Shadow Trance")
+                              && !WarlockCommon.DotsWillFinishTarget(ctx, _settings)),
 
             // --- filler (cast-time → stand still) ---
+            // Skip the filler once the DoTs will finish a low, normal mob on their own — saves mana / Life-Tap.
             Skill.Spell("Shadow Bolt").Priority(20f).On(Targets.CurrentEnemy)
-                 .When(ctx => !ctx.Game.PlayerIsMoving),
+                 .When(ctx => !ctx.Game.PlayerIsMoving && !WarlockCommon.DotsWillFinishTarget(ctx, _settings)),
         }), ctx => _settings.UseRacials.Value, basePriority: 2.5f);
     }
 }

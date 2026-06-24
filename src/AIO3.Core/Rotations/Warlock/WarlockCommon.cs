@@ -156,6 +156,48 @@ namespace AIO3.Core.Rotations.Warlock
         public static int MeleeingMe(CombatContext ctx) =>
             ctx.Enemies.Count(e => e.IsAlive && e.IsTargetingMe && e.Distance <= MeleeRange);
 
+        // --- "let the DoTs finish it" (stop nuking a dying trash mob; save mana / GCDs while leveling) ---
+
+        /// <summary>How many of OUR ticking DoTs the target must carry before we trust them to finish it off.</summary>
+        private const int DotsToFinishCount = 2;
+
+        /// <summary>A DoT must have at least this long left to count toward finishing the mob (else it falls off first).</summary>
+        private const int DotsFinishMinTimeLeftMs = 2000;
+
+        /// <summary>The damaging single-target DoTs a leveling warlock lays down — counted as "coverage" on a dying
+        /// mob. Curse of Doom is a single delayed nuke, not a finishing DoT, so it is intentionally excluded; the
+        /// leveling curse is Agony (the ramping ticking DoT).</summary>
+        private static readonly string[] FinishingDots =
+            { "Corruption", "Immolate", "Unstable Affliction", "Haunt", "Curse of Agony" };
+
+        /// <summary>
+        /// True when the current target is a low, normal mob carrying enough of OUR ticking DoTs that they will
+        /// finish it without another hard cast — so the filler nuke (Shadow Bolt / Incinerate / Soul Fire) can be
+        /// skipped. While leveling this saves mana and Life-Tap (health) pressure and avoids overkill GCDs on a mob
+        /// that is already dead; the freed time goes to the next pull. Gated by
+        /// <see cref="WarlockSettings.LetDotsFinishHealthPercent"/> (0 = off, always nuke).
+        ///
+        /// Deliberately a simple HP% + DoT-coverage heuristic, not a precise time-to-die model: the only cost of a
+        /// false "let it die" is the mob dying a moment slower (never a survival risk), and a precise model needs
+        /// absolute target HP + per-DoT tick damage we don't track yet. Bosses/elites are excluded — their HP pool
+        /// dwarfs DoT damage, so a % floor there would drop the nuke far too early.
+        /// </summary>
+        public static bool DotsWillFinishTarget(CombatContext ctx, WarlockSettings s)
+        {
+            int floor = s.LetDotsFinishHealthPercent.Value;
+            if (floor <= 0 || !ctx.HasEnemyTarget) return false;
+
+            IWowUnit target = ctx.Target;
+            if (target.HealthPercent > floor) return false;
+            if (target.IsElite || target.IsBoss()) return false; // huge HP pool — DoTs won't finish it; keep nuking
+
+            int active = 0;
+            foreach (string dot in FinishingDots)
+                if (target.MyAuraTimeLeftMs(dot) >= DotsFinishMinTimeLeftMs && ++active >= DotsToFinishCount)
+                    return true;
+            return false;
+        }
+
         // --- pet specials (mirror HunterCommon.PetSpecials) ---
 
         /// <summary>
