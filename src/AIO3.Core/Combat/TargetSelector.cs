@@ -29,9 +29,24 @@ namespace AIO3.Core.Combat
 
         public static IWowUnit Pick(CombatContext ctx)
         {
-            // Only enemies already attacking us are candidates — this is what stops the FC ever pulling.
+            // Pet → owner: a caster/hunter mob fighting us through its PET is the real threat — kill the owner
+            // and the pet follows. So if our current target is an enemy pet whose owner is up, switch straight
+            // to the owner (works even when the pet is the only thing on us). This is NOT a pull: the pet is
+            // already attacking us, so its owner is already in the fight. Only redirect to an owner that's
+            // present in the scan and attackable. (Gated by AutoSwitchTarget — Pick only runs when it's on.)
+            if (ctx.HasEnemyTarget && ctx.Target.IsPet())
+            {
+                IWowUnit owner = OwnerOf(ctx, ctx.Target);
+                if (owner != null) return owner;
+            }
+
+            // Only enemies already attacking us are candidates — this is what stops the FC ever pulling. Each
+            // attacking pet is swapped for its (present, attackable) owner so we commit to the owner, and an
+            // owner + its pet both on us collapse to a single candidate (no thrashing between the two).
             var attackers = ctx.Enemies
                 .Where(e => e.IsAlive && e.IsAttackable && e.IsTargetingMe)
+                .Select(e => OwnerOf(ctx, e) ?? e)
+                .Distinct()
                 .ToList();
 
             // Nothing to manage unless we're fighting more than one enemy.
@@ -50,6 +65,16 @@ namespace AIO3.Core.Combat
             if (current == null) return best;                       // not on an attacker → take the best
             if (best != null && bestTtk < Ttk(current) * SwitchMargin) return best;
             return null;                                            // keep current
+        }
+
+        /// <summary>The present, attackable, alive owner of an enemy pet — the enemy whose Guid matches the
+        /// pet's <see cref="IWowUnit.PetOwnerGuid"/>. Null when the unit isn't a pet or its owner isn't in the
+        /// scan (then the pet stays the candidate).</summary>
+        private static IWowUnit OwnerOf(CombatContext ctx, IWowUnit unit)
+        {
+            if (unit == null || !unit.IsPet()) return null;
+            ulong ownerGuid = unit.PetOwnerGuid;
+            return ctx.Enemies.FirstOrDefault(e => e.Guid == ownerGuid && e.IsAlive && e.IsAttackable);
         }
 
         /// <summary>Estimated seconds to remove an enemy: run-up to melee + kill time from its health.</summary>

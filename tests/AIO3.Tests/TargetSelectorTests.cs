@@ -17,6 +17,17 @@ namespace AIO3.Tests
             IsTargetingMe = targetingMe
         };
 
+        private static FakeUnit Pet(ulong guid, ulong ownerGuid, float distance, bool targetingMe = false, double hp = 100) => new FakeUnit
+        {
+            Guid = guid,
+            PetOwnerGuid = ownerGuid, // non-zero → IsPet()
+            Reaction = Reaction.Hostile,
+            IsAttackable = true,
+            HealthPercent = hp,
+            Distance = distance,
+            IsTargetingMe = targetingMe
+        };
+
         private static IWowUnit Pick(FakeGameClient g) => TargetSelector.Pick(CombatContext.Capture(g));
 
         [Fact]
@@ -118,6 +129,64 @@ namespace AIO3.Tests
             g.EnemyList.Add(farDying);
 
             Assert.Same(near, Pick(g));
+        }
+
+        // --- pet → owner redirect (a caster/hunter fighting us through its pet) ---
+
+        [Fact]
+        public void Switches_from_an_enemy_pet_to_its_owner()
+        {
+            // We're on the pet (the product tagged it); its owner — the real threat — is up and on us. Kill the owner.
+            var g = new FakeGameClient();
+            FakeUnit owner = Enemy(1, distance: 25, targetingMe: true);
+            FakeUnit pet = Pet(2, ownerGuid: 1, distance: 5, targetingMe: true);
+            g.TargetUnit = pet;
+            g.EnemyList.Add(owner);
+            g.EnemyList.Add(pet);
+
+            Assert.Same(owner, Pick(g));
+        }
+
+        [Fact]
+        public void Redirects_to_the_owner_even_when_the_pet_is_the_only_thing_on_us()
+        {
+            // Only the pet is meleeing us, but its owner is present (it summoned the pet attacking us), so
+            // going for the owner is not a pull.
+            var g = new FakeGameClient();
+            FakeUnit owner = Enemy(1, distance: 28, targetingMe: false);
+            FakeUnit pet = Pet(2, ownerGuid: 1, distance: 5, targetingMe: true);
+            g.TargetUnit = pet;
+            g.EnemyList.Add(owner);
+            g.EnemyList.Add(pet);
+
+            Assert.Same(owner, Pick(g));
+        }
+
+        [Fact]
+        public void Does_not_thrash_between_an_owner_and_its_pet()
+        {
+            // Already on the owner, with both the owner and its (lower-health) pet on us — they collapse to one
+            // candidate, so there's nothing to switch to (no oscillation back to the pet on a TTK whim).
+            var g = new FakeGameClient();
+            FakeUnit owner = Enemy(1, distance: 25, targetingMe: true);
+            FakeUnit pet = Pet(2, ownerGuid: 1, distance: 5, targetingMe: true, hp: 20);
+            g.TargetUnit = owner;
+            g.EnemyList.Add(owner);
+            g.EnemyList.Add(pet);
+
+            Assert.Null(Pick(g));
+        }
+
+        [Fact]
+        public void Stays_on_the_pet_when_its_owner_is_not_in_range()
+        {
+            // The pet's owner isn't in the scan (off-screen / already dead) → nothing better to switch to.
+            var g = new FakeGameClient();
+            FakeUnit pet = Pet(2, ownerGuid: 99, distance: 5, targetingMe: true); // owner 99 not present
+            g.TargetUnit = pet;
+            g.EnemyList.Add(pet);
+
+            Assert.Null(Pick(g));
         }
 
         [Fact]

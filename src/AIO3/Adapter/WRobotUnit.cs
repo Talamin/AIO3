@@ -30,12 +30,14 @@ namespace AIO3.Adapter
         public double HealthPercent => _unit.HealthPercent;
         public double PowerPercent => _unit.ManaPercentage;
         public int Rage => (int)_unit.Rage;
+        public int Energy => (int)_unit.Energy; // WoWUnit.Energy is a UInt32 (absolute energy, 0..100)
         public float Distance => _unit.GetDistance;
         public bool IsCasting => _unit.IsCast;
         public int CastingSpellId => _unit.CastingSpellId;
         public bool IsTargetingMe => _unit.IsTargetingMe;
         public bool IsTargetingMyPet => _unit.IsTargetingMyPet;
         public ulong TargetGuid => _unit.Target; // WoWUnit.Target is the GUID of this unit's current target
+        public ulong PetOwnerGuid => _unit.PetOwnerGuid; // SummonedBy, else CreatedBy; 0 when not a pet
         public bool IsAttackable => _unit.IsAttackable;
         public bool IsElite => _unit.IsElite;
         public bool IsCaster => _unit.MaxMana > 0; // has a mana pool → casts from range; don't kite, burst it

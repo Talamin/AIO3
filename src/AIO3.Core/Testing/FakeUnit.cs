@@ -14,6 +14,7 @@ namespace AIO3.Core.Testing
         public double HealthPercent { get; set; } = 100;
         public double PowerPercent { get; set; } = 100;
         public int Rage { get; set; }
+        public int Energy { get; set; }
         public float Distance { get; set; }
         public bool IsCasting { get; set; }
         public int CastingSpellId { get; set; }
@@ -21,6 +22,7 @@ namespace AIO3.Core.Testing
         public bool IsTargetingMe { get; set; }
         public bool IsTargetingMyPet { get; set; }
         public ulong TargetGuid { get; set; }
+        public ulong PetOwnerGuid { get; set; } // 0 = not a pet; set to an owner's Guid to make this a pet
         public bool IsAttackable { get; set; } = true;
         public bool IsElite { get; set; }
         public bool IsCaster { get; set; } // has a mana pool → kite logic treats it as a caster (burst, don't kite)

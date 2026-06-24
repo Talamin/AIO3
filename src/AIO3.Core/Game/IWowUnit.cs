@@ -27,6 +27,10 @@ namespace AIO3.Core.Game
         /// <summary>Current rage (0..100ish). Warrior/Druid; 0 for other classes.</summary>
         int Rage { get; }
 
+        /// <summary>Current energy (0..100, absolute). Rogue/Druid (cat); 0 for other classes. Use this for
+        /// rogue builder gating (e.g. Sinister Strike costs ~40 energy); PowerPercent already covers % gating.</summary>
+        int Energy { get; }
+
         /// <summary>Distance to the local player ("Me"), in yards.</summary>
         float Distance { get; }
 
@@ -45,6 +49,12 @@ namespace AIO3.Core.Game
         /// <summary>GUID of the unit this unit is currently targeting, or 0. Used for pet/target
         /// coordination (e.g. "is my pet already attacking my target?").</summary>
         ulong TargetGuid { get; }
+
+        /// <summary>GUID of the unit that summoned/owns this one (a hostile caster's or hunter's combat pet),
+        /// or 0 when it is not a pet. Lets the target selector switch from an enemy pet to its owner — the real
+        /// threat (kill the owner and the pet follows). The adapter reads WoWUnit.PetOwnerGuid (SummonedBy, else
+        /// CreatedBy).</summary>
+        ulong PetOwnerGuid { get; }
 
         /// <summary>Whether the player may actually attack this unit (false for friendly NPCs).</summary>
         bool IsAttackable { get; }
@@ -79,5 +89,9 @@ namespace AIO3.Core.Game
 
         /// <summary>True if the unit's entry is in the ported boss list.</summary>
         public static bool IsBoss(this IWowUnit unit) => unit != null && Data.BossList.Contains(unit.Entry);
+
+        /// <summary>True if this unit is a pet/guardian (it has an owner). Mirrors WoWUnit.IsPet
+        /// (<c>PetOwnerGuid != 0</c>) — used to redirect from an enemy pet to its owner.</summary>
+        public static bool IsPet(this IWowUnit unit) => unit != null && unit.PetOwnerGuid != 0;
     }
 }
