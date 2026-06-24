@@ -69,6 +69,10 @@ namespace AIO3.Core.Combat
 
         public int EnemyCount => Enemies.Count;
 
+        /// <summary>The player's combo points on the current target (0..5) — convenience over <see cref="Game"/>
+        /// so rogue/feral finisher gates read <c>ctx.ComboPoints</c> like they read <c>ctx.Me.Energy</c>.</summary>
+        public int ComboPoints => Game.ComboPoints;
+
         public int EnemiesTargetingMe => Enemies.Count(e => e.IsTargetingMe);
 
         /// <summary>Number of enemies within <paramref name="yards"/> of the player (AoE sizing).</summary>
