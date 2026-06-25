@@ -54,6 +54,8 @@ namespace AIO3.Core.Testing
         public bool SwimmingFlag;
         public bool RootedFlag;
         public bool CannibalizeCorpseFlag;
+        public bool RestingFlag;     // sitting/eating to recover, for PlayerIsResting
+        public bool HarmfulAuraFlag; // a debuff/DoT on the player, for PlayerHasHarmfulAura
 
         /// <summary>Dispel types currently on the player ("Poison"/"Disease"/…) for PlayerHasDebuffType.</summary>
         public readonly HashSet<string> DebuffTypes = new HashSet<string>();
@@ -101,6 +103,8 @@ namespace AIO3.Core.Testing
         public bool PlayerIsRooted => RootedFlag;
         public bool PlayerHasDebuffType(string dispelType) => DebuffTypes.Contains(dispelType);
         public bool HasCannibalizeCorpseNearby() => CannibalizeCorpseFlag;
+        public bool PlayerIsResting => RestingFlag;
+        public bool PlayerHasHarmfulAura() => HarmfulAuraFlag;
         public bool ProductIsFighting => ProductFightingFlag;
         public bool PlayerIsAutoAttacking => AutoAttacking;
 

@@ -303,6 +303,34 @@ namespace AIO3.Adapter
             ObjectManager.GetObjectWoWUnit().Any(u => u.IsDead && u.GetDistance <= 8f
                 && WRobotUnit.CachedCreatureTypeIs(u.Entry, "Humanoid", "Undead"));
 
+        // Rest/regen phase: WRobot exposes no readable "currently regenerating" engine state to a FightClass
+        // (scout-verified), so infer it from the Food/Drink auras — the clear, reliable signal that the bot is
+        // eating/drinking to recover. Cheap memory reads; only consulted in the out-of-combat stealth-opener window.
+        public bool PlayerIsResting
+        {
+            get
+            {
+                WoWUnit me = ObjectManager.Me;
+                return me.HaveBuff("Food") || me.HaveBuff("Drink");
+            }
+        }
+
+        private int _harmfulAuraAt;
+        private bool _harmfulAura;
+
+        // Any harmful aura (debuff) on the player, including physical bleeds. WRobot's Aura type can't classify
+        // auras as harmful (scout-verified), but Blizzard's UnitDebuff lists debuffs only — slot 1 is occupied iff
+        // the player carries at least one debuff. Cached briefly; only consulted in the stealth-opener window.
+        public bool PlayerHasHarmfulAura()
+        {
+            if (unchecked(Now - _harmfulAuraAt) >= 250)
+            {
+                _harmfulAuraAt = Now;
+                _harmfulAura = Lua.LuaDoString<bool>("return UnitDebuff('player', 1) ~= nil");
+            }
+            return _harmfulAura;
+        }
+
         // WRobot's own fight state — true throughout a fight including the approach. Mirrors how the old
         // AIO gated its combat rotation, so we only act when the product has committed to a target.
         public bool ProductIsFighting => Fight.InFight;

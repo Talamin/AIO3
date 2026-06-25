@@ -141,6 +141,52 @@ namespace AIO3.Tests
             Assert.Null(Fire(g));
         }
 
+        // --- stealth opener (opt-in) ---
+
+        [Fact]
+        public void Cheap_Shot_opens_from_stealth_by_default()
+        {
+            var s = new RogueSettings();
+            s.UseStealth.Value = true; // stealth opening on; opener defaults to Cheap Shot
+            var g = RogueGame();
+            g.Stealthed = true;        // in stealth, already in melee (Distance 5)
+            Assert.Equal("Cheap Shot", Fire(g, new SoloCombat(s))?.Name);
+        }
+
+        [Fact]
+        public void Garrote_opens_from_stealth_when_selected()
+        {
+            var s = new RogueSettings();
+            s.UseStealth.Value = true;
+            s.StealthOpener.Value = "Garrote";
+            var g = RogueGame();
+            g.Stealthed = true;
+            Assert.Equal("Garrote", Fire(g, new SoloCombat(s))?.Name);
+        }
+
+        [Fact]
+        public void No_stealth_opener_when_the_toggle_is_off()
+        {
+            var s = new RogueSettings(); // UseStealth off by default
+            var g = RogueGame();
+            g.Stealthed = true;
+            g.ComboPointCount = 0;
+            // Opener gated on the stealth toggle → nothing opens; the builder waits out the stealth → null.
+            Assert.Null(Fire(g, new SoloCombat(s)));
+        }
+
+        [Fact]
+        public void No_stealth_opener_when_not_stealthed()
+        {
+            var s = new RogueSettings();
+            s.UseStealth.Value = true;  // opener enabled...
+            s.UseRacials.Value = false; // keep in-combat racials from preempting the builder
+            var g = RogueGame();
+            g.InCombatFlag = true;      // ...but in combat and not stealthed → no OOC stealth, no opener
+            g.ComboPointCount = 0;
+            Assert.Equal("Sinister Strike", Fire(g, new SoloCombat(s))?.Name);
+        }
+
         // --- Blade Flurry on a pack ---
 
         [Fact]

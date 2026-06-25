@@ -130,6 +130,23 @@ namespace AIO3.Core.Rotations.Rogue
                  .When(ctx => s.UseStealth.Value
                               && !ctx.Game.PlayerInCombat
                               && !ctx.Game.PlayerIsStealthed
-                              && !ctx.Game.PlayerIsMounted);
+                              && !ctx.Game.PlayerIsMounted
+                              && !ctx.Game.PlayerIsResting        // don't break off eating/drinking to recover
+                              && !ctx.Game.PlayerHasHarmfulAura()); // a DoT tick would instantly break stealth
+
+        /// <summary>Stealth opener — the first strike of a stealth-opened fight, the spell chosen by the
+        /// <see cref="RogueSettings.StealthOpener"/> dropdown: Cheap Shot (positional-free, 4s stun + 2 combo
+        /// points) or Garrote (bleed + silence, but must be cast from BEHIND the target). Fires only while
+        /// stealthed and in melee range (the engine's range gate), so it breaks stealth to start the fight and
+        /// the normal build-and-finish loop takes over. Sits above auto-attack so it lands before the swing
+        /// breaks stealth. The RecastDelay is a safety net: if the chosen opener can't land (e.g. Garrote when
+        /// not behind, or out of energy) it isn't re-issued every tick — auto-attack then opens instead.
+        /// Unknown/unusable spell auto-skips (IsSpellKnown), so a low-level rogue just opens with auto-attack.</summary>
+        public static RotationStep Opener(RogueSettings s, string spell, float priority) =>
+            Skill.Spell(spell).Priority(priority).On(Targets.CurrentEnemy)
+                 .When(ctx => s.UseStealth.Value
+                              && s.StealthOpener.Value == spell
+                              && ctx.Game.PlayerIsStealthed)
+                 .RecastDelay(2000);
     }
 }

@@ -136,5 +136,35 @@ namespace AIO3.Tests
             g.Stealthed = true; // already stealthed → done
             Assert.Null(Fire(g, RogueCommon.Stealth(s, 1f)));
         }
+
+        [Fact]
+        public void Stealth_waits_through_the_regeneration_phase()
+        {
+            var s = new RogueSettings();
+            s.UseStealth.Value = true;
+            var g = Game();
+            g.InCombatFlag = false; // out of combat, not stealthed...
+
+            g.RestingFlag = true;   // ...but sitting to eat/drink → don't break off the rest to stealth
+            Assert.Null(Fire(g, RogueCommon.Stealth(s, 1f)));
+
+            g.RestingFlag = false;  // rest finished → open from stealth
+            Assert.Equal("Stealth", Fire(g, RogueCommon.Stealth(s, 1f))?.Name);
+        }
+
+        [Fact]
+        public void Stealth_holds_while_a_dot_is_on_the_rogue()
+        {
+            var s = new RogueSettings();
+            s.UseStealth.Value = true;
+            var g = Game();
+            g.InCombatFlag = false;
+
+            g.HarmfulAuraFlag = true; // a lingering DoT/bleed would instantly break stealth → don't bother
+            Assert.Null(Fire(g, RogueCommon.Stealth(s, 1f)));
+
+            g.HarmfulAuraFlag = false; // debuff gone → safe to open from stealth
+            Assert.Equal("Stealth", Fire(g, RogueCommon.Stealth(s, 1f))?.Name);
+        }
     }
 }

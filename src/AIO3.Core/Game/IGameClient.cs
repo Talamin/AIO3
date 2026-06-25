@@ -117,6 +117,17 @@ namespace AIO3.Core.Game
         /// can feed on (an out-of-combat heal). Creature type comes from the per-entry cache (mobs we fought).</summary>
         bool HasCannibalizeCorpseNearby();
 
+        /// <summary>True while the player is in the rest/regeneration phase — eating/drinking to recover. WRobot
+        /// exposes no readable "am I regenerating" engine state to a FightClass, so this reads the Food/Drink
+        /// auras (the clear, reliable signal). Lets the rogue's stealth opener stay out of the rest phase.</summary>
+        bool PlayerIsResting { get; }
+
+        /// <summary>True if the player currently has any harmful aura (a debuff) — a DoT, bleed, poison, slow, etc.
+        /// WRobot's aura API can't classify auras as harmful, but Blizzard's UnitDebuff lists debuffs only, so this
+        /// catches even physical bleeds (which carry no dispel type). Lets the rogue avoid opening from stealth
+        /// while a debuff is on it, since a DoT tick would instantly break stealth.</summary>
+        bool PlayerHasHarmfulAura();
+
         /// <summary>True when the WRobot product is engaged in a fight (its own fight state, set during
         /// the approach too). The rotation only runs while this (or actual combat) holds, so the FC
         /// never acts — or moves (Charge) — while the product is merely navigating.</summary>

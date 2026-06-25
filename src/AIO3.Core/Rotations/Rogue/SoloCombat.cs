@@ -54,6 +54,10 @@ namespace AIO3.Core.Rotations.Rogue
             // --- opener ---
             // Stealth out of combat (opt-in) so the fight can start from stealth; never fights the product's pull.
             RogueCommon.Stealth(_settings, priority: 0.4f),
+            // The stealth opener (opt-in): Cheap Shot (default) or Garrote, per settings. Above auto-attack (1f)
+            // so it lands before the swing breaks stealth; only the spell matching the dropdown passes its gate.
+            RogueCommon.Opener(_settings, "Cheap Shot", priority: 0.6f),
+            RogueCommon.Opener(_settings, "Garrote", priority: 0.6f),
 
             // --- baseline / upkeep ---
             CombatBlocks.AutoAttack(priority: 1f),

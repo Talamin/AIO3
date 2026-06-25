@@ -44,6 +44,13 @@ namespace AIO3.Core.Rotations.Rogue
         public readonly ToggleSetting UseStealth =
             new ToggleSetting("stealth", "Open from Stealth", value: false);
 
+        /// <summary>Which strike opens a stealth-opened fight (only used when "Open from Stealth" is on). Cheap
+        /// Shot is the default: positional-free (no need to be behind), a 4s stun, and 2 combo points to kick off
+        /// the finisher loop. Garrote is the alternative (a bleed + silence) but must be cast from BEHIND the
+        /// target — if it can't land the opener is skipped and auto-attack starts the fight instead.</summary>
+        public readonly ChoiceSetting StealthOpener =
+            new ChoiceSetting("stealthOpener", "Stealth opener", "Cheap Shot", new[] { "Cheap Shot", "Garrote" });
+
         /// <summary>Sprint to close the gap to a target out of melee range. A movement tool, so it's a toggle —
         /// turn off if a product owns movement (it only fires while the product is committed to a fight).</summary>
         public readonly ToggleSetting UseSprint =
@@ -126,6 +133,7 @@ namespace AIO3.Core.Rotations.Rogue
             FinisherComboPoints.Category = "Rotation";
             UseRupture.Category = "Rotation";
             UseStealth.Category = "Rotation";
+            StealthOpener.Category = "Rotation";
             UseSprint.Category = "Rotation";
             UseRacials.Category = "Rotation";
             UseCooldowns.Category = "Rotation";
@@ -150,7 +158,7 @@ namespace AIO3.Core.Rotations.Rogue
             _all = new Setting[]
             {
                 // Rotation (general, then the Combat-only knobs that show only in Combat)
-                CombatRange, InterruptMode, FinisherComboPoints, UseRupture, UseStealth, UseSprint,
+                CombatRange, InterruptMode, FinisherComboPoints, UseRupture, UseStealth, StealthOpener, UseSprint,
                 UseRacials, UseCooldowns,
                 BladeFlurryEnemies, AdrenalineRushEnemies, KillingSpreeEnemies, // Combat-only
                 // Survival
