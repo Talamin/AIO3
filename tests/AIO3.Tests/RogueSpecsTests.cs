@@ -47,5 +47,20 @@ namespace AIO3.Tests
             Assert.NotEmpty(RogueTalents.For(RogueSpec.Assassination));
             Assert.Same(RogueTalents.For(RogueSpec.Combat), RogueTalents.For(RogueSpec.Subtlety));
         }
+
+        [Fact]
+        public void Assassination_finisher_defaults_to_Eviscerate_and_suppresses_Envenom()
+        {
+            var s = new RogueSettings();
+            // Poisons are deferred, so the default dump is Eviscerate, not Envenom.
+            Assert.Equal("Eviscerate", s.AssassinationFinisher.Value);
+            Assert.False(s.UseEnvenomFinisher); // "Eviscerate" → Envenom suppressed
+
+            s.AssassinationFinisher.Value = "Envenom";
+            Assert.True(s.UseEnvenomFinisher);  // explicit Envenom
+
+            s.AssassinationFinisher.Value = "Auto";
+            Assert.True(s.UseEnvenomFinisher);  // Auto still allows Envenom (auto-skips via IsSpellKnown when unlearned)
+        }
     }
 }

@@ -5,15 +5,16 @@ using AIO3.Core.Settings;
 namespace AIO3.Core.Rotations.Rogue
 {
     /// <summary>
-    /// Live-tunable settings shared by all rogue specs (Combat now; Assassination will reuse the same instance
-    /// when it lands). One instance is edited by the in-game overlay and read by the active rotation every tick;
+    /// Live-tunable settings shared by all rogue specs (Combat and Assassination share this one instance). One
+    /// instance is edited by the in-game overlay and read by the active rotation every tick;
     /// thresholds are read at eval time so overlay edits take effect live. The rogue is a melee, energy +
     /// combo-point class, so it brings the melee baseline knobs (combat range, Kick interrupt, finisher CP
     /// threshold) plus a Survival tab for the defensive cooldowns (Evasion / Cloak of Shadows).
     ///
-    /// Combat-only knobs (Blade Flurry / Adrenaline Rush / Killing Spree enemy counts) live in the Rotation tab
-    /// but tag <c>Setting.Spec = "Combat"</c>, so the overlay shows them ONLY while Combat is the active spec —
-    /// the same pattern the Warlock uses for its spec-only knobs.
+    /// Combat-only knobs (Blade Flurry / Adrenaline Rush / Killing Spree enemy counts) and Assassination-only knobs
+    /// (Rupture / Hunger for Blood / Cold Blood toggles, finisher choice) live in the Rotation tab but tag
+    /// <c>Setting.Spec</c>, so the overlay shows each ONLY while its spec is active — the same pattern the Warlock
+    /// uses for its spec-only knobs.
     /// </summary>
     public sealed class RogueSettings
     {
@@ -44,12 +45,12 @@ namespace AIO3.Core.Rotations.Rogue
         public readonly ToggleSetting UseStealth =
             new ToggleSetting("stealth", "Open from Stealth", value: false);
 
-        /// <summary>Which strike opens a stealth-opened fight (only used when "Open from Stealth" is on). Cheap
-        /// Shot is the default: positional-free (no need to be behind), a 4s stun, and 2 combo points to kick off
-        /// the finisher loop. Garrote is the alternative (a bleed + silence) but must be cast from BEHIND the
-        /// target — if it can't land the opener is skipped and auto-attack starts the fight instead.</summary>
+        /// <summary>Which strike opens a stealth-opened fight (only used when "Open from Stealth" is on). Auto (the
+        /// default) lets the FC pick by position: Garrote when we're BEHIND the target (a bleed + silence) else
+        /// Cheap Shot from the FRONT (positional-free, 4s stun, 2 combo points) — so Garrote is only chosen when it
+        /// will actually land. Force "Cheap Shot" or "Garrote" to override the positional pick.</summary>
         public readonly ChoiceSetting StealthOpener =
-            new ChoiceSetting("stealthOpener", "Stealth opener", "Cheap Shot", new[] { "Cheap Shot", "Garrote" });
+            new ChoiceSetting("stealthOpener", "Stealth opener", "Auto", new[] { "Auto", "Cheap Shot", "Garrote" });
 
         /// <summary>Sprint to close the gap to a target out of melee range. A movement tool, so it's a toggle —
         /// turn off if a product owns movement (it only fires while the product is committed to a fight).</summary>
@@ -82,6 +83,43 @@ namespace AIO3.Core.Rotations.Rogue
         public readonly IntSetting KillingSpreeEnemies =
             new IntSetting("killingSpree", "Killing Spree: min enemies", value: 2, min: 1, max: 6, step: 1);
 
+        // --- Rotation: Assassination-only (shown only while Assassination is the active spec) ---
+
+        /// <summary>Use Fan of Knives when at least this many enemies are within melee (its instant AoE is wasted on
+        /// a single target). Assassination-only — Combat cleaves with Blade Flurry instead.</summary>
+        public readonly IntSetting FanOfKnivesEnemies =
+            new IntSetting("fanOfKnives", "Fan of Knives: min enemies", value: 3, min: 2, max: 6, step: 1);
+
+        /// <summary>Keep Rupture up on durable targets — Assassination leans on the bleed (it enables Hunger for
+        /// Blood and is core to the tree's damage), so this defaults ON, unlike Combat's UseRupture. Still gated to
+        /// elites/bosses (trash dies before a bleed pays off) and skips bleed-immune creatures.</summary>
+        public readonly ToggleSetting AssassinationUseRupture =
+            new ToggleSetting("assassRupture", "Use Rupture (bleed finisher)", value: true);
+
+        /// <summary>Maintain Hunger for Blood (a damage buff that needs a bleed on the target). Auto-skips when the
+        /// talent isn't taken. Assassination-only.</summary>
+        public readonly ToggleSetting UseHungerForBlood =
+            new ToggleSetting("hungerForBlood", "Use Hunger for Blood", value: true);
+
+        /// <summary>Pair Cold Blood (guaranteed-crit cooldown) with a finisher on elites/bosses/packs. Also gated by
+        /// the shared "Use cooldowns" toggle. Auto-skips when the talent isn't taken. Assassination-only.</summary>
+        public readonly ToggleSetting UseColdBlood =
+            new ToggleSetting("coldBlood", "Use Cold Blood with finishers", value: true);
+
+        /// <summary>Which finisher Assassination spends combo points on. Defaults to Eviscerate because poisons are
+        /// deferred to the player/product — Envenom with 0 Deadly Poison stacks hits weaker than Eviscerate, so until
+        /// you poison your weapons Eviscerate is the better dump. Switch to Envenom (the signature finisher, which
+        /// scales with Deadly Poison stacks) or Auto (Envenom when it's known, else Eviscerate) once you apply
+        /// poisons. Assassination-only.</summary>
+        public readonly ChoiceSetting AssassinationFinisher =
+            new ChoiceSetting("assassFinisher", "Finisher", "Eviscerate", new[] { "Auto", "Envenom", "Eviscerate" });
+
+        /// <summary>True when the rotation should use Envenom as the finisher: explicitly chosen, or "Auto" — the
+        /// Envenom step still auto-skips via IsSpellKnown when it isn't learned, so Auto falls back to Eviscerate
+        /// for a low-level rogue. "Eviscerate" suppresses Envenom outright.</summary>
+        public bool UseEnvenomFinisher =>
+            AssassinationFinisher.Value == "Envenom" || AssassinationFinisher.Value == "Auto";
+
         // --- Survival ---
 
         /// <summary>Use Evasion (dodge cooldown) below this health %. 0 disables the HP trigger (Evasion still
@@ -98,6 +136,17 @@ namespace AIO3.Core.Rotations.Rogue
         /// resistance). Auto-skips when Cloak is unknown.</summary>
         public readonly ToggleSetting UseCloakOfShadows =
             new ToggleSetting("cloak", "Cloak of Shadows on magic debuff", value: true);
+
+        /// <summary>Use Recuperate (a combo-point finisher that heals over time) as a low-HP self-heal. A survival
+        /// spend: when low it takes priority over the offensive finishers, so a finisher-worthy bar goes into the
+        /// HoT instead of damage. Auto-skips until the talent is learned.</summary>
+        public readonly ToggleSetting UseRecuperate =
+            new ToggleSetting("recuperate", "Use Recuperate (self-heal finisher)", value: true);
+
+        /// <summary>Spend a finisher on Recuperate (the healing-over-time HoT) below this health %. Reads at eval
+        /// time so an overlay edit applies live.</summary>
+        public readonly IntSetting RecuperateHealthPercent =
+            new IntSetting("recuperateHp", "Recuperate below HP%", value: 50, min: 0, max: 90, step: 5);
 
         /// <summary>Use an emergency healthstone/potion below this health %. 0 disables it.</summary>
         public readonly IntSetting EmergencyHealthPercent =
@@ -144,9 +193,18 @@ namespace AIO3.Core.Rotations.Rogue
             AdrenalineRushEnemies.Category = "Rotation"; AdrenalineRushEnemies.Spec = "Combat";
             KillingSpreeEnemies.Category = "Rotation";   KillingSpreeEnemies.Spec = "Combat";
 
+            // Assassination-only knobs, same pattern (shown only while Assassination is the active spec).
+            AssassinationUseRupture.Category = "Rotation"; AssassinationUseRupture.Spec = "Assassination";
+            UseHungerForBlood.Category = "Rotation";       UseHungerForBlood.Spec = "Assassination";
+            UseColdBlood.Category = "Rotation";            UseColdBlood.Spec = "Assassination";
+            AssassinationFinisher.Category = "Rotation";   AssassinationFinisher.Spec = "Assassination";
+            FanOfKnivesEnemies.Category = "Rotation";      FanOfKnivesEnemies.Spec = "Assassination";
+
             EvasionHealthPercent.Category = "Survival";
             EvasionEnemies.Category = "Survival";
             UseCloakOfShadows.Category = "Survival";
+            UseRecuperate.Category = "Survival";
+            RecuperateHealthPercent.Category = "Survival";
             EmergencyHealthPercent.Category = "Survival";
 
             ContentMode.Category = "Spec";
@@ -161,8 +219,11 @@ namespace AIO3.Core.Rotations.Rogue
                 CombatRange, InterruptMode, FinisherComboPoints, UseRupture, UseStealth, StealthOpener, UseSprint,
                 UseRacials, UseCooldowns,
                 BladeFlurryEnemies, AdrenalineRushEnemies, KillingSpreeEnemies, // Combat-only
+                AssassinationUseRupture, UseHungerForBlood, UseColdBlood, AssassinationFinisher,
+                FanOfKnivesEnemies, // Assassination-only
                 // Survival
-                EvasionHealthPercent, EvasionEnemies, UseCloakOfShadows, EmergencyHealthPercent,
+                EvasionHealthPercent, EvasionEnemies, UseCloakOfShadows,
+                UseRecuperate, RecuperateHealthPercent, EmergencyHealthPercent,
                 // Spec
                 ContentMode, AutoAssignTalents,
                 // General

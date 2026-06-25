@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using AIO3.Core.Data;
-using AIO3.Core.Dsl;
 using AIO3.Core.Engine;
 using AIO3.Core.Library;
 using AIO3.Core.Settings;
@@ -67,6 +66,12 @@ namespace AIO3.Core.Rotations.Rogue
 
             // (racials are appended by the shared Racials bundle at the 2.5 band)
 
+            // --- survival finisher (shared block) ---
+            // Recuperate: when low on HP, spend a finisher-worthy combo bar on the self-heal HoT instead of damage.
+            // Sits at 2.9f — above EVERY offensive CP-spender (SnD 5 / Rupture 6 / Eviscerate 7) and above the
+            // cooldown→finisher band (Adrenaline Rush 3 / Cold Blood 3 in Assassination) — so survival wins the bar.
+            RogueCommon.Recuperate(_settings, priority: 2.9f),
+
             // --- burst cooldowns (shared RogueCommon blocks; gated on UseCooldowns, on a pack or a lone
             // elite/boss, mirroring WarriorCommon.Recklessness — so a future Group Combat rotation reuses them) ---
             RogueCommon.AdrenalineRush(_settings, priority: 3f),
@@ -77,16 +82,15 @@ namespace AIO3.Core.Rotations.Rogue
 
             // --- finishers (spend combo points) ---
             // Slice and Dice upkeep: the core attack-speed buff — refresh whenever it's down and we have a CP.
-            RogueCommon.SliceAndDice(SnDMinComboPoints, priority: 5f),
+            RogueCommon.SliceAndDice(_settings, SnDMinComboPoints, priority: 5f),
             // Rupture (opt-in) bleed on durable targets, then Eviscerate as the damage finisher at the CP threshold.
             RogueCommon.Rupture(_settings, priority: 6f),
             RogueCommon.Eviscerate(_settings, priority: 7f),
 
             // --- builder / filler ---
-            // Sinister Strike: the combo-point builder. Lowest priority so finishers/upkeep win when ready; it
-            // fills every other GCD. Not while stealthed (the opener goes first). Energy/known gating is automatic.
-            Skill.Spell("Sinister Strike").Priority(10f).On(Targets.CurrentEnemy)
-                 .When(ctx => RogueCommon.NotStealthed(ctx)),
+            // Sinister Strike: the combo-point builder (shared block). Lowest priority so finishers/upkeep win when
+            // ready; it fills every other GCD.
+            RogueCommon.SinisterStrike(_settings, priority: 10f),
 
         }, ctx => _settings.UseRacials.Value, basePriority: 2.5f);
     }

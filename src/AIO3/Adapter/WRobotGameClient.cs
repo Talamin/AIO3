@@ -334,6 +334,19 @@ namespace AIO3.Adapter
             return _harmfulAura;
         }
 
+        // ~150° rear cone (full cone width) — a generous "behind" with margin, so a positional ability (Garrote/
+        // Shred) is only chosen when we're comfortably behind, not at the very edge where the cast would fail.
+        private const float BehindArcRadians = 2.618f;
+
+        // Is the local player in the current target's rear arc? WoWUnit.IsBehind(target.Position, target.Rotation,
+        // arc) hard-wires me=ObjectManager.Me.Position (scout-verified); Rotation is radians, 0=east, CCW. Pure
+        // memory reads, no Lua. Class-agnostic positional check (rogue Garrote opener now; feral Shred later).
+        public bool PlayerIsBehindTarget()
+        {
+            WoWUnit t = ObjectManager.Target;
+            return t != null && t.IsValid && t.IsBehind(t.Position, t.Rotation, BehindArcRadians);
+        }
+
         // WRobot's own fight state — true throughout a fight including the approach. Mirrors how the old
         // AIO gated its combat rotation, so we only act when the product has committed to a target.
         public bool ProductIsFighting => Fight.InFight;

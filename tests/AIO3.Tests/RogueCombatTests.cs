@@ -90,6 +90,31 @@ namespace AIO3.Tests
             Assert.Equal("Eviscerate", Fire(g)?.Name);
         }
 
+        [Fact]
+        public void Slice_and_Dice_yields_to_the_finisher_at_full_combo_points()
+        {
+            var g = RogueGame();
+            g.ComboPointCount = 3; // SnD is DOWN, but a finisher-worthy bar belongs in Eviscerate, not an SnD refresh
+            Assert.Equal("Eviscerate", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Slice_and_Dice_refreshes_with_low_combo_points_on_a_healthy_target()
+        {
+            var g = RogueGame();
+            g.ComboPointCount = 2; // below the finisher threshold, healthy mob → refresh the buff cheaply
+            Assert.Equal("Slice and Dice", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Slice_and_Dice_skips_a_dying_target()
+        {
+            var g = RogueGame();
+            g.ComboPointCount = 2;           // below the finisher threshold...
+            g.TargetUnit.HealthPercent = 30; // ...and the mob is dying → don't waste CP refreshing SnD, build instead
+            Assert.Equal("Sinister Strike", Fire(g)?.Name);
+        }
+
         // --- Eviscerate finisher at the CP threshold ---
 
         [Fact]
@@ -147,9 +172,31 @@ namespace AIO3.Tests
         public void Cheap_Shot_opens_from_stealth_by_default()
         {
             var s = new RogueSettings();
-            s.UseStealth.Value = true; // stealth opening on; opener defaults to Cheap Shot
+            s.UseStealth.Value = true; // stealth on; default opener "Auto" → Cheap Shot when not behind
             var g = RogueGame();
-            g.Stealthed = true;        // in stealth, already in melee (Distance 5)
+            g.Stealthed = true;        // in stealth, already in melee (Distance 5), not behind (default)
+            Assert.Equal("Cheap Shot", Fire(g, new SoloCombat(s))?.Name);
+        }
+
+        [Fact]
+        public void Auto_opener_uses_Garrote_when_behind_the_target()
+        {
+            var s = new RogueSettings(); // StealthOpener defaults to "Auto"
+            s.UseStealth.Value = true;
+            var g = RogueGame();
+            g.Stealthed = true;
+            g.BehindTargetFlag = true;   // FC sees we're behind → Auto picks the behind opener
+            Assert.Equal("Garrote", Fire(g, new SoloCombat(s))?.Name);
+        }
+
+        [Fact]
+        public void Auto_opener_uses_Cheap_Shot_from_the_front()
+        {
+            var s = new RogueSettings();
+            s.UseStealth.Value = true;
+            var g = RogueGame();
+            g.Stealthed = true;
+            g.BehindTargetFlag = false;  // not behind → Auto picks the positional-free front opener
             Assert.Equal("Cheap Shot", Fire(g, new SoloCombat(s))?.Name);
         }
 
@@ -158,9 +205,10 @@ namespace AIO3.Tests
         {
             var s = new RogueSettings();
             s.UseStealth.Value = true;
-            s.StealthOpener.Value = "Garrote";
+            s.StealthOpener.Value = "Garrote"; // explicit override beats the Auto positional pick
             var g = RogueGame();
             g.Stealthed = true;
+            g.BehindTargetFlag = false;        // even when NOT behind, the explicit choice still fires Garrote
             Assert.Equal("Garrote", Fire(g, new SoloCombat(s))?.Name);
         }
 
@@ -290,8 +338,55 @@ namespace AIO3.Tests
             var g = RogueGame();
             g.KnownSpells.Add("Sinister Strike");
             g.KnownSpells.Add("Auto Attack"); // already auto-attacking, so AutoAttack step won't fire
-            g.ComboPointCount = 3; // even at a "finisher" count, Eviscerate is unknown → skip to the builder
+            g.ComboPointCount = 1; // below the finisher threshold → the builder fills the GCD (Eviscerate is unknown)
             Assert.Equal("Sinister Strike", Fire(g)?.Name);
+        }
+
+        // --- Sinister Strike caps the build at the finisher threshold (no overbuild) ---
+
+        [Fact]
+        public void Sinister_Strike_stops_building_at_the_finisher_threshold()
+        {
+            var g = RogueGame();
+            g.MeUnit.WithAura("Slice and Dice"); // keep SnD upkeep out of the way
+            g.ComboPointCount = 3;               // at the threshold → Eviscerate fires, the builder no longer overbuilds
+            Assert.Equal("Eviscerate", Fire(g)?.Name);
+        }
+
+        // --- Blade Flurry fresh-fight gate ---
+
+        [Fact]
+        public void Blade_Flurry_skips_a_half_dead_pack()
+        {
+            var g = RogueGame();
+            g.MeUnit.WithAura("Slice and Dice"); // keep finishers/upkeep out of the way
+            g.ComboPointCount = 0;
+            g.TargetUnit.HealthPercent = 50; // half-dead pack → don't pop the cleave cooldown
+            g.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 6, IsAttackable = true });
+            Assert.Equal("Sinister Strike", Fire(g)?.Name); // builds instead of Blade Flurry
+        }
+
+        // --- Recuperate: the low-HP self-heal finisher wins the combo bar over the damage finishers ---
+
+        [Fact]
+        public void Recuperate_wins_the_bar_over_Eviscerate_when_low()
+        {
+            var g = RogueGame();
+            g.MeUnit.WithAura("Slice and Dice"); // SnD up so upkeep doesn't compete
+            g.MeUnit.HealthPercent = 40;         // below the default 50 heal threshold
+            g.ComboPointCount = 3;               // finisher-worthy bar — survival takes it
+            Assert.Equal("Recuperate", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Recuperate_skipped_when_the_HoT_is_already_up()
+        {
+            var g = RogueGame();
+            g.MeUnit.WithAura("Slice and Dice");
+            g.MeUnit.WithAura("Recuperate"); // HoT already ticking → spend the bar on damage instead
+            g.MeUnit.HealthPercent = 40;
+            g.ComboPointCount = 3;
+            Assert.Equal("Eviscerate", Fire(g)?.Name);
         }
     }
 }

@@ -128,6 +128,12 @@ namespace AIO3.Core.Game
         /// while a debuff is on it, since a DoT tick would instantly break stealth.</summary>
         bool PlayerHasHarmfulAura();
 
+        /// <summary>True if the local player is in the current target's REAR arc — the positional check for
+        /// behind-only abilities (the rogue's Garrote/Ambush opener; later the feral druid's Shred). Computed from
+        /// the target's facing + both positions (WoWUnit.IsBehind), so a spec can pick a behind ability when behind
+        /// and a front alternative otherwise. False when there's no target. Class-agnostic — reuse it anywhere.</summary>
+        bool PlayerIsBehindTarget();
+
         /// <summary>True when the WRobot product is engaged in a fight (its own fight state, set during
         /// the approach too). The rotation only runs while this (or actual combat) holds, so the FC
         /// never acts — or moves (Charge) — while the product is merely navigating.</summary>

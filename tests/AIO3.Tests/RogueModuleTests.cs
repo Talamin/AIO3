@@ -37,22 +37,30 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Phase1_runs_the_combat_rotation_for_every_spec()
+        public void Each_tab_resolves_to_its_shipped_rotation()
         {
-            // Only the Combat rotation ships now; Assassination/Subtlety fall back to it (the talent build still
-            // tracks the detected spec — see Talent_build_follows_the_active_spec).
+            // Assassination and Combat each ship a rotation; Subtlety has none yet and falls back to Combat.
             var m = new RogueModule();
-            Assert.Contains("Combat", m.ResolveRotation(1).Name); // Assassination tab
-            Assert.Contains("Combat", m.ResolveRotation(2).Name); // Combat tab
-            Assert.Contains("Combat", m.ResolveRotation(3).Name); // Subtlety tab
+            Assert.Contains("Assassination", m.ResolveRotation(1).Name); // Assassination tab → SoloAssassination
+            Assert.Contains("Combat", m.ResolveRotation(2).Name);        // Combat tab → SoloCombat
+            Assert.Contains("Combat", m.ResolveRotation(3).Name);        // Subtlety tab → falls back to SoloCombat
         }
 
         [Fact]
-        public void Assassination_label_shows_the_fallback_to_combat()
+        public void Assassination_label_names_the_assassination_spec()
         {
             var m = new RogueModule();
             m.ResolveRotation(1); // Assassination tab
             Assert.Contains("Assassination", m.ActiveLabel);
+            Assert.DoesNotContain("→Combat", m.ActiveLabel); // it ships its own rotation now, not a fallback
+        }
+
+        [Fact]
+        public void Subtlety_label_shows_the_fallback_to_combat()
+        {
+            var m = new RogueModule();
+            m.ResolveRotation(3); // Subtlety tab — not built
+            Assert.Contains("Subtlety", m.ActiveLabel);
             Assert.Contains("Combat", m.ActiveLabel); // "...→Combat" makes the fallback explicit
         }
 

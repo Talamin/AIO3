@@ -7,14 +7,14 @@ using AIO3.Core.Settings;
 namespace AIO3.Core.Rotations
 {
     /// <summary>
-    /// Rogue class implementation: an energy + combo-point melee striker. Phase 1 ships the Solo Combat leveling
-    /// spec only — it shares the <see cref="RogueSettings"/> and the <see cref="RogueCommon"/> melee baseline
-    /// (Slice and Dice / Eviscerate / Evasion / Cloak / Sprint / Stealth). Assassination resolves here (so its
-    /// talent build still auto-applies) but maps to the Combat rotation until SoloAssassination lands; Subtlety
-    /// is not built. The rotation is rebuilt only when the spec or mode changes, so the host can swap the engine
-    /// by reference comparison.
+    /// Rogue class implementation: an energy + combo-point melee striker. Ships the Solo Combat and Solo
+    /// Assassination leveling specs — both share the <see cref="RogueSettings"/> and the <see cref="RogueCommon"/>
+    /// melee baseline (Slice and Dice / Eviscerate / Rupture / Evasion / Cloak / Sprint / Stealth / openers).
+    /// Assassination adds Mutilate / Envenom / Hunger for Blood / Cold Blood on top; Subtlety is not built and
+    /// falls back to Combat. The rotation is rebuilt only when the spec or mode changes, so the host can swap the
+    /// engine by reference comparison.
     ///
-    /// TODO (later phases): SoloAssassination spec, poisons (ApplyPoison), Subtlety.
+    /// TODO (later phases): poisons (ApplyPoison), Subtlety.
     /// </summary>
     public sealed class RogueModule : IClassModule
     {
@@ -54,15 +54,18 @@ namespace AIO3.Core.Rotations
             _activeSpec = desired;
             _activeMode = mode;
             _rotation = Build(desired);
-            // Only the Combat rotation exists in Phase 1; Assassination/Subtlety fall back to it (label reflects it).
-            string specLabel = desired == RogueSpec.Combat ? "Combat" : desired + "→Combat";
+            // Combat and Assassination ship rotations; Subtlety falls back to Combat (label reflects the fallback).
+            string specLabel = desired == RogueSpec.Assassination ? "Assassination"
+                             : desired == RogueSpec.Combat ? "Combat"
+                             : desired + "→Combat";
             ActiveLabel = (mode == "Group" ? "Group→Solo " : "Solo ") + specLabel;
             return _rotation;
         }
 
-        // Phase 1 builds only the Combat rotation; every spec falls back to it (the talent build still tracks the
-        // detected spec via DesiredTalentBuild). Replace the Assassination case when SoloAssassination lands.
-        private IRotation Build(RogueSpec spec) => new SoloCombat(_settings);
+        // Assassination runs SoloAssassination; Combat (and Subtlety, which has no rotation yet) runs SoloCombat.
+        // Every spec shares the one RogueSettings instance, so spec-only knobs show via Setting.Spec.
+        private IRotation Build(RogueSpec spec) =>
+            spec == RogueSpec.Assassination ? new SoloAssassination(_settings) : (IRotation)new SoloCombat(_settings);
 
         public string[] DesiredTalentBuild() =>
             _settings.AutoAssignTalents.Value && _activeSpec.HasValue

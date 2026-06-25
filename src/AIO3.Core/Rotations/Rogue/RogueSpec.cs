@@ -12,9 +12,8 @@ namespace AIO3.Core.Rotations.Rogue
     /// talent tab order is Assassination (1), Combat (2), Subtlety (3); 0 = no points spent yet.
     ///
     /// Combat is the solo leveling spec, so it is the Auto default (and the fallback for "no points yet" or any
-    /// unrecognised value). Only Combat ships a rotation in this phase — Assassination resolves here so the right
-    /// talent build still auto-applies, but the module maps it to the Combat rotation until SoloAssassination
-    /// lands (a later phase). Subtlety is intentionally not built.
+    /// unrecognised value). Combat and Assassination both ship rotations; Subtlety resolves here so its talent
+    /// build still auto-applies, but the module maps it to the Combat rotation (it is intentionally not built).
     /// </summary>
     public static class RogueSpecs
     {
