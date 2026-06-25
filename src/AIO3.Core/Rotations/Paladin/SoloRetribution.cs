@@ -39,6 +39,7 @@ namespace AIO3.Core.Rotations.Paladin
             PaladinCommon.DivineProtection(_settings, priority: 0.2f),
             PaladinCommon.ArtOfWarFlash(_settings, priority: 0.4f),   // free instant heal from the proc
             PaladinCommon.HolyLightSelf(_settings, priority: 0.5f),
+            PaladinCommon.HandOfFreedom(priority: 0.6f),             // off-GCD: break a root/snare so we can keep meleeing
             PaladinCommon.DivinePlea(_settings, priority: 0.7f),
 
             // --- baseline / upkeep (also maintained out of combat) ---
@@ -59,11 +60,15 @@ namespace AIO3.Core.Rotations.Paladin
                  .When(ctx => ctx.Me.HasAura("The Art of War")),
             Skill.Spell("Divine Storm").Priority(8f).On(Targets.CurrentEnemy),
             Skill.Spell("Crusader Strike").Priority(9f).On(Targets.CurrentEnemy),
+            // Leveling-Ret filler (no Art of War talent → never procs the instant arm above). In 3.3.5a Exorcism
+            // hits every creature type, so it's a valid hard-cast nuke (let IsSpellReady/range gate it). Below
+            // Crusader Strike, above the auto-attack/wand floor; the proc arm at 7.5 still wins when up.
+            Skill.Spell("Exorcism").Priority(9.5f).On(Targets.CurrentEnemy),
 
             // --- AoE (>= AoeThreshold enemies within 10y) ---
             // HP floor: don't drop an 8-tick ground AoE on a pack already about to die (old AIO's HealthPercent > 25).
             Skill.Spell("Consecration").Priority(12f).On(Targets.CurrentEnemy)
-                 .When(ctx => ctx.EnemiesWithin(10f) >= _settings.AoeThreshold.Value
+                 .When(ctx => ctx.EnemiesWithin(PaladinCommon.ConsecrationPackRadius) >= _settings.AoeThreshold.Value
                               && ctx.Target.HealthPercent > PaladinCommon.ConsecrationMinTargetHealth),
             PaladinCommon.HolyWrath(_settings, priority: 13f),
         }, ctx => _settings.UseRacials.Value, basePriority: 4f);

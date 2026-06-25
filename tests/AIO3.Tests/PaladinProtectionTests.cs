@@ -154,5 +154,53 @@ namespace AIO3.Tests
 
             Assert.Equal("Hammer of Justice", Fire(game)?.Name);
         }
+
+        [Fact]
+        public void Hand_of_Freedom_fires_when_rooted()
+        {
+            FakeGameClient game = BuffsUp(ProtGame());
+            game.RootedFlag = true;
+
+            Assert.Equal("Hand of Freedom", Fire(game)?.Name);
+            Assert.Contains("Hand of Freedom", game.CastLog);
+        }
+
+        [Fact]
+        public void Lay_on_Hands_does_not_fire_while_Forbearance_is_up()
+        {
+            // LoH applies (and is blocked by) Forbearance — at low HP with Forbearance up it must NOT keep taking the
+            // panic slot every tick (old AIO: !Me.HaveBuff("Forbearance"), SoloProtection.cs:20).
+            FakeGameClient game = BuffsUp(ProtGame());
+            game.MeUnit.HealthPercent = 10; // below the default 15
+            game.MeUnit.WithAura("Forbearance");
+
+            Assert.NotEqual("Lay on Hands", Fire(game)?.Name);
+            Assert.DoesNotContain("Lay on Hands", game.CastLog);
+        }
+
+        [Fact]
+        public void Lay_on_Hands_fires_below_threshold_without_Forbearance()
+        {
+            FakeGameClient game = BuffsUp(ProtGame());
+            game.MeUnit.HealthPercent = 10; // below the default 15, no Forbearance
+
+            Assert.Equal("Lay on Hands", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Consecration_fires_on_a_pack_spread_inside_the_wider_radius()
+        {
+            // Three enemies between 9y and 12y are outside the old 8y count but inside the 15y Consecration decision
+            // radius — the wider gate must see the pack and fire even though the target is plain trash (old AIO: 15y).
+            FakeGameClient game = BuffsUp(ProtGame());
+            game.SpellsOnCooldown.Add("Judgement of Wisdom");
+            game.SpellsOnCooldown.Add("Judgement of Light");
+            game.SpellsOnCooldown.Add("Shield of Righteousness");
+            game.SpellsOnCooldown.Add("Hammer of the Righteous");
+            game.SpellsOnCooldown.Add("Avenging Wrath"); // pack cooldown would otherwise win at this count
+            game.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 10 });
+
+            Assert.Equal("Consecration", Fire(game)?.Name); // target (5y) + add (10y) == default AoE threshold of 2
+        }
     }
 }

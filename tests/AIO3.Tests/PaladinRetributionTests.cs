@@ -130,6 +130,7 @@ namespace AIO3.Tests
             game.SpellsOnCooldown.Add("Judgement of Light");
             game.SpellsOnCooldown.Add("Divine Storm");
             game.SpellsOnCooldown.Add("Crusader Strike");
+            game.SpellsOnCooldown.Add("Exorcism");        // leveling-Ret filler would otherwise win at this priority
             game.SpellsOnCooldown.Add("Avenging Wrath"); // pack cooldown would otherwise win at this count
             game.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 6 });
 
@@ -161,6 +162,73 @@ namespace AIO3.Tests
             game.MeUnit.HealthPercent = 10; // below the default 15
 
             Assert.Equal("Lay on Hands", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Lay_on_Hands_does_not_fire_while_Forbearance_is_up()
+        {
+            // LoH applies (and is blocked by) Forbearance — so at low HP with Forbearance up it must NOT take the panic
+            // slot every tick. With nothing else to do here it should fall through and not cast LoH at all.
+            FakeGameClient game = BuffsUp(RetGame());
+            game.MeUnit.HealthPercent = 10; // below the default 15
+            game.MeUnit.WithAura("Forbearance");
+
+            Assert.NotEqual("Lay on Hands", Fire(game)?.Name);
+            Assert.DoesNotContain("Lay on Hands", game.CastLog);
+        }
+
+        [Fact]
+        public void Hand_of_Freedom_fires_when_rooted()
+        {
+            FakeGameClient game = BuffsUp(RetGame());
+            game.RootedFlag = true;
+
+            Assert.Equal("Hand of Freedom", Fire(game)?.Name);
+            Assert.Contains("Hand of Freedom", game.CastLog);
+        }
+
+        [Fact]
+        public void Exorcism_is_a_filler_without_an_Art_of_War_proc()
+        {
+            // Leveling Ret without the Art of War talent never procs the instant arm — Exorcism must still fire as a
+            // normal hard-cast filler below Crusader Strike. No proc aura here.
+            FakeGameClient game = BuffsUp(RetGame());
+            game.SpellsOnCooldown.Add("Judgement of Wisdom");
+            game.SpellsOnCooldown.Add("Judgement of Light");
+            game.SpellsOnCooldown.Add("Divine Storm");
+            game.SpellsOnCooldown.Add("Crusader Strike");
+
+            Assert.Equal("Exorcism", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Art_of_War_proc_arm_wins_over_the_Exorcism_filler()
+        {
+            // With the proc up the instant arm (7.5) must win over the plain filler (9.5) and over Divine Storm /
+            // Crusader Strike — both arms are "Exorcism", so confirm it fires above the melee strikes.
+            FakeGameClient game = BuffsUp(RetGame());
+            game.MeUnit.WithAura("The Art of War");
+            game.SpellsOnCooldown.Add("Judgement of Wisdom");
+            game.SpellsOnCooldown.Add("Judgement of Light");
+
+            Assert.Equal("Exorcism", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Consecration_fires_on_a_pack_spread_inside_the_wider_radius()
+        {
+            // A second enemy at 12y is outside the old 8y count but inside the 15y Consecration decision radius — the
+            // wider gate must still see the pack and fire Consecration (old AIO sized this at 15y).
+            FakeGameClient game = BuffsUp(RetGame());
+            game.SpellsOnCooldown.Add("Judgement of Wisdom");
+            game.SpellsOnCooldown.Add("Judgement of Light");
+            game.SpellsOnCooldown.Add("Divine Storm");
+            game.SpellsOnCooldown.Add("Crusader Strike");
+            game.SpellsOnCooldown.Add("Exorcism");        // filler would otherwise win at this priority
+            game.SpellsOnCooldown.Add("Avenging Wrath");  // pack cooldown would otherwise win at this count
+            game.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 12 });
+
+            Assert.Equal("Consecration", Fire(game)?.Name);
         }
 
         [Fact]

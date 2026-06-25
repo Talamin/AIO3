@@ -23,6 +23,11 @@ namespace AIO3.Core.Rotations.Paladin
         /// <c>HealthPercent > 25</c> floor. HP-floor heuristic (no time-to-die seam). Shared so Prot and Ret agree.</summary>
         public const int ConsecrationMinTargetHealth = 25;
 
+        /// <summary>Radius (yards) used to count the pack when deciding whether Consecration is worth dropping. The old
+        /// AIO sized this decision at 15y (<c>Enemies.Count(GetDistance &lt;= 15) &gt;= ProtConsecration</c>); an 8y
+        /// count under-reports a spread pull and skips a legitimately large pack. Shared so Prot/Ret agree.</summary>
+        public const float ConsecrationPackRadius = 15f;
+
         // --- buff upkeep (seal / aura / blessing) -------------------------------------------------
 
         /// <summary>Keep the chosen seal up (instant; safe to maintain out of combat). "Auto" picks a
@@ -97,10 +102,22 @@ namespace AIO3.Core.Rotations.Paladin
             Skill.Spell("Divine Protection").Priority(priority).On(Targets.Self)
                  .When(ctx => s.UseDivineProtection.Value && ctx.EnemiesTargetingMe >= 2);
 
-        /// <summary>Emergency full heal; long cooldown, used only when critically low (0 disables it).</summary>
+        /// <summary>Emergency full heal; long cooldown, used only when critically low (0 disables it). Lay on Hands
+        /// itself applies <c>Forbearance</c> and is BLOCKED by it, so gate on its absence — otherwise at low HP with
+        /// Forbearance up the step keeps returning Failed every tick, burning the panic slot while a real heal could
+        /// land (old AIO: <c>!Me.HaveBuff("Forbearance")</c>, SoloProtection.cs:20).</summary>
         public static RotationStep LayOnHands(PaladinSettings s, float priority) =>
             Skill.Spell("Lay on Hands").Priority(priority).On(Targets.Self)
-                 .When(ctx => s.LayOnHandsPercent.Value > 0 && ctx.Me.HealthPercent < s.LayOnHandsPercent.Value);
+                 .When(ctx => s.LayOnHandsPercent.Value > 0
+                              && ctx.Me.HealthPercent < s.LayOnHandsPercent.Value
+                              && !ctx.Me.HasAura("Forbearance"));
+
+        /// <summary>Hand of Freedom: break a root/snare so a rooted paladin doesn't just stand there. Off the GCD, so
+        /// it fires even mid-rotation. Gated on the real movement-flag bit via <c>ctx.Game.PlayerIsRooted</c> (old AIO:
+        /// <c>Me.Rooted</c>, SoloRetribution.cs:30 / SoloProtection.cs:37). IsSpellKnown auto-skips until learned.</summary>
+        public static RotationStep HandOfFreedom(float priority) =>
+            Skill.Spell("Hand of Freedom").Priority(priority).On(Targets.Self)
+                 .When(ctx => ctx.Game.PlayerIsRooted).OffGcd();
 
         /// <summary>Hard-cast Holy Light on yourself below the self-heal threshold (0 disables it).</summary>
         public static RotationStep HolyLightSelf(PaladinSettings s, float priority) =>

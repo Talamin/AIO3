@@ -41,6 +41,7 @@ namespace AIO3.Core.Rotations.Paladin
             PaladinCommon.DivineProtection(_settings, priority: 0.2f),
             PaladinCommon.ArtOfWarFlash(_settings, priority: 0.4f),   // harmless if the proc/talent is absent
             PaladinCommon.HolyLightSelf(_settings, priority: 0.5f),
+            PaladinCommon.HandOfFreedom(priority: 0.6f),             // off-GCD: break a root/snare so we can keep tanking
             PaladinCommon.DivinePlea(_settings, priority: 0.7f),
 
             // --- baseline / upkeep (also maintained out of combat) ---
@@ -70,7 +71,7 @@ namespace AIO3.Core.Rotations.Paladin
             // HP floor: don't drop an 8-tick ground AoE on a pack already about to die (old AIO's HealthPercent > 25).
             Skill.Spell("Consecration").Priority(12f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.HealthPercent > PaladinCommon.ConsecrationMinTargetHealth
-                              && (ctx.EnemiesWithin(8f) >= _settings.AoeThreshold.Value
+                              && (ctx.EnemiesWithin(PaladinCommon.ConsecrationPackRadius) >= _settings.AoeThreshold.Value
                                   || ctx.Target.IsElite || ctx.Target.IsBoss())),
             PaladinCommon.HolyWrath(_settings, priority: 13f),
         }, ctx => _settings.UseRacials.Value, basePriority: 4f);
