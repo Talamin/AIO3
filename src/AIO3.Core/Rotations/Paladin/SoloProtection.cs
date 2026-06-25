@@ -67,9 +67,11 @@ namespace AIO3.Core.Rotations.Paladin
                  .When(ctx => ctx.Game.PlayerInCombat),
 
             // --- AoE / sustained threat (pack, elite or boss; gated to save mana on lone trash) ---
+            // HP floor: don't drop an 8-tick ground AoE on a pack already about to die (old AIO's HealthPercent > 25).
             Skill.Spell("Consecration").Priority(12f).On(Targets.CurrentEnemy)
-                 .When(ctx => ctx.EnemiesWithin(8f) >= _settings.AoeThreshold.Value
-                              || ctx.Target.IsElite || ctx.Target.IsBoss()),
+                 .When(ctx => ctx.Target.HealthPercent > PaladinCommon.ConsecrationMinTargetHealth
+                              && (ctx.EnemiesWithin(8f) >= _settings.AoeThreshold.Value
+                                  || ctx.Target.IsElite || ctx.Target.IsBoss())),
             PaladinCommon.HolyWrath(_settings, priority: 13f),
         }, ctx => _settings.UseRacials.Value, basePriority: 4f);
     }

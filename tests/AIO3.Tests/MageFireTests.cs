@@ -57,6 +57,19 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Living_bomb_skips_a_dying_target()
+        {
+            // Dying-mob fix: don't re-apply the 12s Living Bomb DoT to a mob already in execute range — it dies first.
+            // Below the execute floor the Fire Blast execute (priority 6) takes the slot instead of Living Bomb (4.5).
+            FakeGameClient g = MageGame();
+            g.TargetUnit.Auras.Remove("Living Bomb");
+            g.TargetUnit.HealthPercent = MageCommon.LivingBombMinTargetHealth - 1; // in execute range
+            RotationStep fired = Fire(g);
+            Assert.NotEqual("Living Bomb", fired?.Name);
+            Assert.Equal("Fire Blast", fired?.Name);
+        }
+
+        [Fact]
         public void Combustion_on_an_elite()
         {
             FakeGameClient g = MageGame();
@@ -95,6 +108,32 @@ namespace AIO3.Tests
             var g = new FakeGameClient { Class = WowClass.Mage };
             g.MeUnit.PowerPercent = 100;
             Assert.Null(Record.Exception(() => Fire(g)));
+        }
+
+        [Fact]
+        public void Mana_shield_casts_when_low_and_meleed_by_a_healthy_target()
+        {
+            // Baseline: hurt (below the 50% Mana Shield threshold, above the 15% Ice Block panic), an enemy on us,
+            // mana to spare, the meleeing target still healthy → Mana Shield goes up.
+            FakeGameClient g = MageGame();
+            g.MeUnit.HealthPercent = 40;
+            g.TargetUnit.IsTargetingMe = true;
+            g.TargetUnit.Distance = 5;
+            Assert.Equal("Mana Shield", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Mana_shield_does_not_recast_on_a_dying_lone_target()
+        {
+            // Dying-mob fix: same low-HP + meleed setup, but the lone target is about to die (below
+            // ShieldMinTargetHealth) → don't burn mana shielding against a mob with seconds to live.
+            FakeGameClient g = MageGame();
+            g.MeUnit.HealthPercent = 40;
+            g.TargetUnit.IsTargetingMe = true;
+            g.TargetUnit.Distance = 5;
+            g.TargetUnit.HealthPercent = MageCommon.ShieldMinTargetHealth - 1; // 19% → dying lone target
+            Assert.NotEqual("Mana Shield", Fire(g)?.Name);
+            Assert.DoesNotContain("Mana Shield", g.CastLog);
         }
     }
 }

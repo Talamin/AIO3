@@ -116,6 +116,29 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Ice_barrier_does_not_recast_on_a_dying_lone_target()
+        {
+            // Dying-mob fix: don't refresh the shield as the last mob of a fight dies (HP below ShieldMinTargetHealth
+            // and no other enemy). The shield step goes quiet; the rotation falls through to something else.
+            FakeGameClient g = MageGame();
+            g.MeUnit.Auras.Remove("Ice Barrier");
+            g.TargetUnit.HealthPercent = MageCommon.ShieldMinTargetHealth - 1; // 19% → dying lone target
+            Assert.NotEqual("Ice Barrier", Fire(g)?.Name);
+            Assert.DoesNotContain("Ice Barrier", g.CastLog);
+        }
+
+        [Fact]
+        public void Ice_barrier_still_recasts_with_more_than_one_enemy()
+        {
+            // Relaxation: a pack keeps the shield earning even if the current target is dying, so it still casts.
+            FakeGameClient g = MageGame();
+            g.MeUnit.Auras.Remove("Ice Barrier");
+            g.TargetUnit.HealthPercent = 5; // current target dying...
+            g.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 30, HealthPercent = 100 });
+            Assert.Equal("Ice Barrier", Fire(g)?.Name);
+        }
+
+        [Fact]
         public void Counterspell_interrupts_a_casting_enemy()
         {
             FakeGameClient g = MageGame();

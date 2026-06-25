@@ -1,6 +1,7 @@
 using AIO3.Core.Dsl;
 using AIO3.Core.Engine;
 using AIO3.Core.Game;
+using AIO3.Core.Library;
 
 namespace AIO3.Core.Rotations.Warrior
 {
@@ -144,12 +145,23 @@ namespace AIO3.Core.Rotations.Warrior
         public static RotationStep VictoryRush(float priority) =>
             Skill.Spell("Victory Rush").Priority(priority).On(Targets.CurrentEnemy);
 
-        /// <summary>Keep Rend up (refresh when under ~3s left) — but not on bleed-immune creatures.</summary>
+        /// <summary>Rend's bleed isn't worth re-applying to a mob this low (HP%) — it dies before the DoT pays off,
+        /// so the global is better spent on a direct strike. Mirrors the old AIO's <c>HealthPercent > 50</c> gate
+        /// (an HP-floor execute heuristic; no time-to-die seam exists — same shape as RogueCommon's bleed floors).</summary>
+        public const int RendMinTargetHealth = 50;
+
+        // Rend's refresh window (re-apply when under this many ms remain). Routes through MaintainMyDebuff so the
+        // shared post-cast grace stops the apply-latency double-cast, same as Corruption/Immolate.
+        private const int RendRefreshMs = 3000;
+
+        /// <summary>Keep Rend up (refresh when under ~3s left) — but not on bleed-immune creatures, and not on a mob
+        /// about to die (HP below <see cref="RendMinTargetHealth"/>). Routes through MaintainMyDebuff for the shared
+        /// missing/expiring check + post-cast grace; the extraGate AND-s in the bleed-immune + HP-floor skips.</summary>
         public static RotationStep Rend(float priority) =>
-            Skill.Spell("Rend").Priority(priority).On(Targets.CurrentEnemy)
-                 .When(ctx => (!ctx.Target.HasMyAura("Rend") || ctx.Target.MyAuraTimeLeftMs("Rend") < 3000)
-                              && ctx.Target.CreatureType != "Elemental"
-                              && ctx.Target.CreatureType != "Mechanical");
+            CombatBlocks.MaintainMyDebuff("Rend", RendRefreshMs, priority,
+                extraGate: ctx => ctx.Target.HealthPercent > RendMinTargetHealth
+                                  && ctx.Target.CreatureType != "Elemental"
+                                  && ctx.Target.CreatureType != "Mechanical");
 
         /// <summary>
         /// Off-GCD rage dump; lowest-priority "leftover" once spare rage is above the reserve.

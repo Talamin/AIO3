@@ -38,6 +38,22 @@ namespace AIO3.Core.Rotations.Mage
         /// <summary>Instant-execute finisher threshold (Fire Blast etc.).</summary>
         public const int ExecutePercent = 10;
 
+        /// <summary>Don't re-apply Living Bomb (a 12s DoT that detonates at the end) to a mob already in execute range
+        /// — it dies before the DoT pays off. Mirrors the execute floor (reuses <see cref="ExecutePercent"/>) so the
+        /// DoT and the Fire Blast execute share one source. HP-floor heuristic (no time-to-die seam exists).</summary>
+        public const int LivingBombMinTargetHealth = ExecutePercent;
+
+        /// <summary>The shields (Ice Barrier / Mana Shield) don't re-cast on a lone target this low (HP%): a mob about
+        /// to die isn't worth a fresh shield's mana/GCD. Relaxed when more than one enemy is in the fight (the others
+        /// keep the shield earning), so only the "last mob is dying" case is skipped. HP-floor heuristic.</summary>
+        public const int ShieldMinTargetHealth = 20;
+
+        /// <summary>True when a shield (Ice Barrier / Mana Shield) is still worth (re-)casting: the lone current target
+        /// is above <see cref="ShieldMinTargetHealth"/>, OR there is more than one enemy (a pack keeps it earning even
+        /// if the current target is dying). Stops the shield refreshing as the last mob of a fight dies.</summary>
+        public static bool ShieldWorthwhile(CombatContext ctx) =>
+            ctx.EnemyCount > 1 || (ctx.HasEnemyTarget && ctx.Target.HealthPercent > ShieldMinTargetHealth);
+
         /// <summary>A fight worth spending a major cooldown on: a boss, an elite, or a pack. Includes the
         /// HasEnemyTarget check, so a Self-cast cooldown step gated on this never dereferences a null target
         /// (the NRE that bit the hunter's Bestial Wrath).</summary>
@@ -94,21 +110,25 @@ namespace AIO3.Core.Rotations.Mage
                               && ctx.Me.HealthPercent < s.IceBlockHealthPercent.Value
                               && ctx.EnemiesTargetingMe >= 1);
 
-        /// <summary>Mana Shield (mana → damage absorb) when low and being hit, with mana to spare.</summary>
+        /// <summary>Mana Shield (mana → damage absorb) when low and being hit, with mana to spare. Skips a dying lone
+        /// target (<see cref="ShieldWorthwhile"/>) so it doesn't burn mana shielding against a mob about to die.</summary>
         public static RotationStep ManaShield(MageSettings s, float priority) =>
             Skill.Spell("Mana Shield").Priority(priority).On(Targets.Self)
                  .When(ctx => s.UseManaShield.Value
                               && ctx.Me.HealthPercent < s.ManaShieldHealthPercent.Value
                               && ctx.Me.PowerPercent >= 25
                               && !ctx.Me.HasAura("Mana Shield")
-                              && ctx.EnemiesTargetingMe >= 1);
+                              && ctx.EnemiesTargetingMe >= 1
+                              && ShieldWorthwhile(ctx));
 
-        /// <summary>Keep Ice Barrier up in combat (Frost; auto-skips if not known). Needs some mana to be worth it.</summary>
+        /// <summary>Keep Ice Barrier up in combat (Frost; auto-skips if not known). Needs some mana to be worth it,
+        /// and skips a dying lone target (<see cref="ShieldWorthwhile"/>) so it doesn't refresh as the last mob dies.</summary>
         public static RotationStep IceBarrier(MageSettings s, float priority) =>
             Skill.Spell("Ice Barrier").Priority(priority).On(Targets.Self)
                  .When(ctx => s.UseIceBarrier.Value && ctx.HasEnemyTarget
                               && !ctx.Me.HasAura("Ice Barrier")
-                              && ctx.Me.PowerPercent > 20);
+                              && ctx.Me.PowerPercent > 20
+                              && ShieldWorthwhile(ctx));
 
         /// <summary>Frost Nova: root everything around us when a worthwhile mob is on US and within the nova's
         /// radius — we root it as it crosses ~10yd, not only once it's in true melee, so we get more kite distance.

@@ -137,6 +137,24 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Consecration_skips_a_dying_pack()
+        {
+            // Dying-mob fix: even with the pack count met, don't drop an 8-tick ground AoE when the (current) target
+            // is already about to die (below ConsecrationMinTargetHealth = 25).
+            FakeGameClient game = BuffsUp(RetGame());
+            game.SpellsOnCooldown.Add("Judgement of Wisdom");
+            game.SpellsOnCooldown.Add("Judgement of Light");
+            game.SpellsOnCooldown.Add("Divine Storm");
+            game.SpellsOnCooldown.Add("Crusader Strike");
+            game.SpellsOnCooldown.Add("Avenging Wrath");
+            game.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 6 });
+            game.TargetUnit.HealthPercent = PaladinCommon.ConsecrationMinTargetHealth - 1; // 24%
+
+            Assert.NotEqual("Consecration", Fire(game)?.Name);
+            Assert.DoesNotContain("Consecration", game.CastLog);
+        }
+
+        [Fact]
         public void Lay_on_Hands_when_critically_low()
         {
             FakeGameClient game = BuffsUp(RetGame());

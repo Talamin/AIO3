@@ -128,6 +128,24 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Consecration_skips_a_dying_pack()
+        {
+            // Dying-mob fix: don't drop an 8-tick ground AoE on a pack already about to die (below
+            // ConsecrationMinTargetHealth = 25). The elite trigger still qualifies, but the HP floor vetoes it.
+            FakeGameClient game = BuffsUp(ProtGame());
+            game.SpellsOnCooldown.Add("Judgement of Wisdom");
+            game.SpellsOnCooldown.Add("Judgement of Light");
+            game.SpellsOnCooldown.Add("Shield of Righteousness");
+            game.SpellsOnCooldown.Add("Hammer of the Righteous");
+            game.SpellsOnCooldown.Add("Avenging Wrath");
+            game.TargetUnit.IsElite = true;
+            game.TargetUnit.HealthPercent = PaladinCommon.ConsecrationMinTargetHealth - 1; // 24%
+
+            Assert.NotEqual("Consecration", Fire(game)?.Name);
+            Assert.DoesNotContain("Consecration", game.CastLog);
+        }
+
+        [Fact]
         public void Interrupts_a_casting_enemy_with_Hammer_of_Justice()
         {
             FakeGameClient game = ProtGame();

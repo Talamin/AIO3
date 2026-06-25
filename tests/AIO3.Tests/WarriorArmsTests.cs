@@ -115,6 +115,20 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Rend_skips_a_dying_target()
+        {
+            // Dying-mob fix: Rend's bleed isn't worth re-applying below RendMinTargetHealth (50) — it dies before the
+            // DoT pays off. So even with Rend missing and Mortal Strike down, Rend does NOT fire.
+            FakeGameClient game = ArmsGame();
+            game.SpellsOnCooldown.Add("Mortal Strike");
+            game.TargetUnit.CreatureType = "Humanoid";
+            game.TargetUnit.HealthPercent = WarriorCommon.RendMinTargetHealth - 1; // 49% → below the floor
+
+            Assert.NotEqual("Rend", Fire(game)?.Name);
+            Assert.DoesNotContain("Rend", game.CastLog);
+        }
+
+        [Fact]
         public void Slam_fills_with_spare_rage()
         {
             // Nothing else up, Rend already applied, plenty of rage → Slam is the filler.

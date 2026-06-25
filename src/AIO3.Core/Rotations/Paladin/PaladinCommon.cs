@@ -18,6 +18,11 @@ namespace AIO3.Core.Rotations.Paladin
     /// </summary>
     public static class PaladinCommon
     {
+        /// <summary>Consecration is an 8-tick (~8s) ground AoE — don't drop a fresh one on a pack already this low
+        /// (HP%); it dies before the ground effect pays off, wasting the mana/GCD. Restores the old AIO's
+        /// <c>HealthPercent > 25</c> floor. HP-floor heuristic (no time-to-die seam). Shared so Prot and Ret agree.</summary>
+        public const int ConsecrationMinTargetHealth = 25;
+
         // --- buff upkeep (seal / aura / blessing) -------------------------------------------------
 
         /// <summary>Keep the chosen seal up (instant; safe to maintain out of combat). "Auto" picks a

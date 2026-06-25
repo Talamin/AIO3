@@ -152,5 +152,32 @@ namespace AIO3.Tests
             Assert.Null(engine.Tick(ctx));                                    // within the grace → no double-cast
             Assert.Single(game.CastLog.FindAll(c => c == "Corruption"));
         }
+
+        [Fact]
+        public void MaintainMyDebuff_skips_when_the_extraGate_is_false()
+        {
+            // The new extraGate (e.g. an HP-floor) is AND-ed into the When: false → the debuff is NOT applied even
+            // though it is missing. Mirrors how MaintainCastDebuff's extraGate gates.
+            FakeGameClient game = Game(out _);
+            var engine = new RotationEngine(new List<RotationStep>
+            {
+                CombatBlocks.MaintainMyDebuff("Corruption", 2000, 1f, extraGate: ctx => false)
+            });
+            Assert.Null(engine.Tick(CombatContext.Capture(game)));
+            Assert.Empty(game.CastLog);
+        }
+
+        [Fact]
+        public void MaintainMyDebuff_applies_when_the_extraGate_is_true()
+        {
+            // extraGate true + aura missing → normal application (the null-default behaviour is unchanged; this proves
+            // a true gate does not block it).
+            FakeGameClient game = Game(out _);
+            var engine = new RotationEngine(new List<RotationStep>
+            {
+                CombatBlocks.MaintainMyDebuff("Corruption", 2000, 1f, extraGate: ctx => true)
+            });
+            Assert.Equal("Corruption", engine.Tick(CombatContext.Capture(game))?.Name);
+        }
     }
 }

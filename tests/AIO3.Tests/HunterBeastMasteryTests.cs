@@ -37,7 +37,8 @@ namespace AIO3.Tests
         private static FakeGameClient Marked(FakeGameClient g)
         {
             g.TargetUnit.WithAura("Hunter's Mark", mine: true);
-            g.TargetUnit.WithAura("Serpent Sting", mine: true);
+            // Fresh duration so the maintain (now via MaintainMyDebuff with a 1500ms refresh window) stays quiet.
+            g.TargetUnit.WithAura("Serpent Sting", mine: true, timeLeftMs: 15000);
             return g;
         }
 
@@ -91,6 +92,59 @@ namespace AIO3.Tests
             FakeGameClient g = HunterGame();
             g.TargetUnit.WithAura("Hunter's Mark", mine: true);
             Assert.Equal("Serpent Sting", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Serpent_Sting_skips_a_normal_mob_below_70_percent()
+        {
+            // Dying-mob fix (a): the floor was raised from 30 to 70 for normal mobs — a fresh 15s DoT is wasted on a
+            // mob with seconds to live. Marked, Serpent Sting missing, but below the 70% floor → it does NOT apply.
+            FakeGameClient g = HunterGame();
+            g.TargetUnit.WithAura("Hunter's Mark", mine: true);
+            g.TargetUnit.HealthPercent = HunterCommon.SerpentStingMinTargetHealth - 1; // 69%
+            Assert.NotEqual("Serpent Sting", Fire(g)?.Name);
+            Assert.DoesNotContain("Serpent Sting", g.CastLog);
+        }
+
+        [Fact]
+        public void Serpent_Sting_still_applies_to_a_low_elite()
+        {
+            // Dying-mob fix (a): on an elite the floor relaxes to 20% (a long fight outlives the DoT) — so at 50% the
+            // normal floor would have skipped, but the elite floor keeps it stinging.
+            FakeGameClient g = HunterGame();
+            g.TargetUnit.WithAura("Hunter's Mark", mine: true);
+            g.TargetUnit.IsElite = true;
+            g.TargetUnit.HealthPercent = 50; // below 70 (normal floor) but above 20 (elite floor)
+            var s = new HunterSettings();
+            s.UseCooldowns.Value = false; // Bestial Wrath / Rapid Fire fire on an elite; isolate the sting
+            Assert.Equal("Serpent Sting", Fire(g, s)?.Name);
+        }
+
+        [Fact]
+        public void Serpent_Sting_skips_an_elite_below_20_percent()
+        {
+            FakeGameClient g = HunterGame();
+            g.TargetUnit.WithAura("Hunter's Mark", mine: true);
+            g.TargetUnit.IsElite = true;
+            g.TargetUnit.HealthPercent = HunterCommon.SerpentStingMinEliteHealth - 1; // 19%
+            Assert.NotEqual("Serpent Sting", Fire(g)?.Name);
+            Assert.DoesNotContain("Serpent Sting", g.CastLog);
+        }
+
+        [Fact]
+        public void Serpent_Sting_does_not_double_apply_in_the_apply_window()
+        {
+            // Dying-mob fix (b): routing through MaintainMyDebuff added a post-cast grace, so the apply-latency
+            // double-cast (the documented Immolate/Corruption bug) can't happen — a second tick in the window is
+            // suppressed even though the fake never lands the aura.
+            FakeGameClient g = HunterGame();
+            g.TargetUnit.WithAura("Hunter's Mark", mine: true);
+            var engine = new RotationEngine(new SoloBeastMastery().BuildSteps());
+            CombatContext ctx = CombatContext.Capture(g);
+
+            Assert.Equal("Serpent Sting", engine.Tick(ctx)?.Name); // first application
+            Assert.NotEqual("Serpent Sting", engine.Tick(ctx)?.Name); // within the grace → no second cast
+            Assert.Single(g.CastLog.FindAll(c => c == "Serpent Sting"));
         }
 
         [Fact]

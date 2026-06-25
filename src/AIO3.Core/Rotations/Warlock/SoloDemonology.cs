@@ -93,12 +93,16 @@ namespace AIO3.Core.Rotations.Warlock
             // (racials are appended by the shared Racials bundle at the 2.5 band)
 
             // --- DoTs (single-target upkeep, priority order) ---
+            // Corruption / Immolate skip once the DoTs already on the mob will finish it (don't re-apply a long DoT
+            // to a dying mob it'd outlive). The curse maintain is left ungated (Curse of Agony ramps — separate).
             // The chosen curse (instant; resolved live from the setting).
             WarlockCommon.MaintainCurse(_settings, priority: 6f),
             // Corruption is instant.
-            CombatBlocks.MaintainMyDebuff("Corruption", DotRefreshMs, priority: 8f),
+            CombatBlocks.MaintainMyDebuff("Corruption", DotRefreshMs, priority: 8f,
+                extraGate: ctx => !WarlockCommon.DotsWillFinishTarget(ctx, _settings)),
             // Immolate is cast-time — stand still; the block also guards against re-queueing it mid-cast.
-            CombatBlocks.MaintainCastDebuff("Immolate", DotRefreshMs, priority: 9f),
+            CombatBlocks.MaintainCastDebuff("Immolate", DotRefreshMs, priority: 9f,
+                extraGate: ctx => !WarlockCommon.DotsWillFinishTarget(ctx, _settings)),
 
             // --- Soul Shard harvest (on a dying mob when shards are low; sits above the Soul Fire / filler) ---
             WarlockCommon.DrainSoul(_settings, priority: 9.5f),

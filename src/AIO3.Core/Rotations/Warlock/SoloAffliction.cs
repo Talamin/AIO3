@@ -97,17 +97,24 @@ namespace AIO3.Core.Rotations.Warlock
             // (racials are appended by the shared Racials bundle at the 2.5 band)
 
             // --- DoTs (single-target upkeep, priority order) ---
+            // Each maintain skips once the DoTs already on the mob will finish it (DotsWillFinishTarget) — don't
+            // re-apply a long DoT to a dying mob it'd outlive. The curse maintain is intentionally left ungated
+            // (Curse of Agony ramps — a separate decision).
             // Haunt: short damage-multiplier debuff — keep it up (cast-time, so stand still; no re-queue mid-cast).
-            CombatBlocks.MaintainCastDebuff("Haunt", HauntRefreshMs, priority: 5f),
+            CombatBlocks.MaintainCastDebuff("Haunt", HauntRefreshMs, priority: 5f,
+                extraGate: ctx => !WarlockCommon.DotsWillFinishTarget(ctx, _settings)),
             // The chosen curse (instant; resolved live from the setting).
             WarlockCommon.MaintainCurse(_settings, priority: 6f),
             // Immolate only when Unstable Affliction is NOT known (they share the slot at higher levels). Cast-time.
             CombatBlocks.MaintainCastDebuff("Immolate", DotRefreshMs, priority: 7f,
-                extraGate: ctx => !ctx.Game.IsSpellKnown("Unstable Affliction")),
+                extraGate: ctx => !ctx.Game.IsSpellKnown("Unstable Affliction")
+                                  && !WarlockCommon.DotsWillFinishTarget(ctx, _settings)),
             // Corruption is instant.
-            CombatBlocks.MaintainMyDebuff("Corruption", DotRefreshMs, priority: 8f),
+            CombatBlocks.MaintainMyDebuff("Corruption", DotRefreshMs, priority: 8f,
+                extraGate: ctx => !WarlockCommon.DotsWillFinishTarget(ctx, _settings)),
             // Unstable Affliction is cast-time — stand still.
-            CombatBlocks.MaintainCastDebuff("Unstable Affliction", DotRefreshMs, priority: 9f),
+            CombatBlocks.MaintainCastDebuff("Unstable Affliction", DotRefreshMs, priority: 9f,
+                extraGate: ctx => !WarlockCommon.DotsWillFinishTarget(ctx, _settings)),
 
             // --- Soul Shard harvest (on a dying mob when shards are low; replaces the filler nuke here) ---
             WarlockCommon.DrainSoul(_settings, priority: 9.5f),

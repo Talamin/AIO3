@@ -61,8 +61,10 @@ namespace AIO3.Core.Rotations.Paladin
             Skill.Spell("Crusader Strike").Priority(9f).On(Targets.CurrentEnemy),
 
             // --- AoE (>= AoeThreshold enemies within 10y) ---
+            // HP floor: don't drop an 8-tick ground AoE on a pack already about to die (old AIO's HealthPercent > 25).
             Skill.Spell("Consecration").Priority(12f).On(Targets.CurrentEnemy)
-                 .When(ctx => ctx.EnemiesWithin(10f) >= _settings.AoeThreshold.Value),
+                 .When(ctx => ctx.EnemiesWithin(10f) >= _settings.AoeThreshold.Value
+                              && ctx.Target.HealthPercent > PaladinCommon.ConsecrationMinTargetHealth),
             PaladinCommon.HolyWrath(_settings, priority: 13f),
         }, ctx => _settings.UseRacials.Value, basePriority: 4f);
     }

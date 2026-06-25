@@ -57,12 +57,32 @@ namespace AIO3.Core.Rotations.Hunter
             Skill.Spell("Hunter's Mark").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => !ctx.Target.HasMyAura("Hunter's Mark") && ctx.Target.HealthPercent > 50);
 
-        /// <summary>Apply Serpent Sting when missing on a target healthy enough to tick it out.</summary>
+        /// <summary>A normal mob this low (HP%) dies before a fresh Serpent Sting (a 15s/5-tick DoT) pays off, so
+        /// don't (re-)apply it — the global is better spent on a direct shot. Raised from the old 30 after the audit:
+        /// 30 still wasted a full DoT on a mob with seconds to live. HP-floor heuristic (no time-to-die seam).</summary>
+        public const int SerpentStingMinTargetHealth = 70;
+
+        /// <summary>On an elite/boss the fight is long enough that even a low-HP target outlives the DoT, so relax the
+        /// floor to this — keep stinging a big mob almost to the end.</summary>
+        public const int SerpentStingMinEliteHealth = 20;
+
+        // Serpent Sting's refresh window. Routing through MaintainMyDebuff gives the shared post-cast grace, so the
+        // apply-latency double-cast (the documented Immolate/Corruption bug) can't happen here either.
+        private const int SerpentStingRefreshMs = 1500;
+
+        /// <summary>Apply Serpent Sting when missing on a target healthy enough to tick it out: above
+        /// <see cref="SerpentStingMinTargetHealth"/> for a normal mob, relaxed to <see cref="SerpentStingMinEliteHealth"/>
+        /// for an elite/boss (a long fight). Routes through MaintainMyDebuff for the shared missing/expiring check +
+        /// post-cast grace (no apply-latency double-cast); the extraGate keeps the no-point-blank range floor and the
+        /// HP gate. Auto-skips until learned.</summary>
         public static RotationStep SerpentSting(float priority) =>
-            Skill.Spell("Serpent Sting").Priority(priority).On(Targets.CurrentEnemy)
-                 .When(ctx => ctx.Target.Distance >= RangedMin
-                              && !ctx.Target.HasMyAura("Serpent Sting")
-                              && ctx.Target.HealthPercent > 30);
+            CombatBlocks.MaintainMyDebuff("Serpent Sting", SerpentStingRefreshMs, priority,
+                extraGate: ctx => ctx.Target.Distance >= RangedMin
+                                  && ctx.Target.HealthPercent > SerpentStingFloor(ctx.Target));
+
+        /// <summary>The HP-floor below which Serpent Sting isn't worth (re-)applying — relaxed for elites/bosses.</summary>
+        private static int SerpentStingFloor(IWowUnit target) =>
+            target.IsElite || target.IsBoss() ? SerpentStingMinEliteHealth : SerpentStingMinTargetHealth;
 
         /// <summary>Ranged execute: Kill Shot under 20%.</summary>
         public static RotationStep KillShot(float priority) =>

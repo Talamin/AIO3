@@ -400,6 +400,32 @@ namespace AIO3.Tests
             Assert.False(WarlockCommon.DotsWillFinishTarget(CombatContext.Capture(g), s));
         }
 
+        [Fact]
+        public void Does_not_re_apply_Corruption_when_the_DoTs_will_finish_the_mob()
+        {
+            // Dying-mob fix: at 15% HP with full DoT coverage, DotsWillFinishTarget is true, so the Corruption
+            // maintain must NOT re-apply even though the aura is missing (Haunt/Curse/UA still cover the kill).
+            FakeGameClient g = LockGame();
+            g.TargetUnit.HealthPercent = 15;
+            g.TargetUnit.Auras.Remove("Corruption"); // missing → would normally be re-applied
+            // Don't let Drain Soul (the dying-mob harvest) confuse the assertion — stock shards so it stays quiet.
+            g.ItemCounts["Soul Shard"] = 4;
+            g.ItemCounts["Healthstone"] = 1;
+            Assert.NotEqual("Corruption", Fire(g)?.Name);
+            Assert.DoesNotContain("Corruption", g.CastLog);
+        }
+
+        [Fact]
+        public void Still_re_applies_Corruption_above_the_finish_floor()
+        {
+            // Above the floor DotsWillFinishTarget is false, so the maintain works exactly as before (regression guard
+            // that the new gate didn't break ordinary upkeep).
+            FakeGameClient g = LockGame();
+            g.TargetUnit.HealthPercent = 100;
+            g.TargetUnit.Auras.Remove("Corruption");
+            Assert.Equal("Corruption", Fire(g)?.Name);
+        }
+
         // --- Soul Shard economy (Drain Soul harvest + Create Healthstone) ---
 
         [Fact]

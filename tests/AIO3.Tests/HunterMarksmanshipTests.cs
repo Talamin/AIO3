@@ -25,7 +25,8 @@ namespace AIO3.Tests
             g.CurrentSpells.Add("Auto Shot");
             g.PetUnit = new FakeUnit { Guid = 99, Name = "Pet", IsAlive = true, HealthPercent = 100, TargetGuid = 1, Distance = 5 };
             g.TargetUnit.WithAura("Hunter's Mark", mine: true);
-            g.TargetUnit.WithAura("Serpent Sting", mine: true);
+            // Fresh duration so the maintain (now via MaintainMyDebuff with a 1500ms refresh window) stays quiet.
+            g.TargetUnit.WithAura("Serpent Sting", mine: true, timeLeftMs: 15000);
             return g;
         }
 

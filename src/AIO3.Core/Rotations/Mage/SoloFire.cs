@@ -75,7 +75,9 @@ namespace AIO3.Core.Rotations.Mage
             // --- procs / DoT / instants ---
             Skill.Spell("Pyroblast").Priority(4.0f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Me.HasAura("Hot Streak")), // instant from the proc
-            CombatBlocks.MaintainMyDebuff("Living Bomb", minMsLeft: 1500, priority: 4.5f),
+            // Don't re-apply Living Bomb to a mob already in execute range — it dies before the 12s DoT pays off.
+            CombatBlocks.MaintainMyDebuff("Living Bomb", minMsLeft: 1500, priority: 4.5f,
+                extraGate: ctx => ctx.Target.HealthPercent > MageCommon.LivingBombMinTargetHealth),
             Skill.Spell("Fire Blast").Priority(6.0f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.HealthPercent < MageCommon.ExecutePercent), // instant execute filler
 

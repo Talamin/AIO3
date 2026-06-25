@@ -98,12 +98,17 @@ namespace AIO3.Core.Library
         /// (less than <paramref name="minMsLeft"/> remaining). Reusable by any DoT/debuff spec. A post-cast grace
         /// (<see cref="InstantDebuffApplyGraceMs"/>) stops a second cast in the window before the freshly applied
         /// debuff becomes visible (the instant-DoT double-cast).
+        /// <paramref name="extraGate"/> adds an optional extra condition AND-ed into the When (mirrors
+        /// <see cref="MaintainCastDebuff"/>) — e.g. an HP-floor so the debuff isn't re-applied to a mob that dies
+        /// before it pays off, or a "the DoTs already finish it" skip. Null (the default) leaves behaviour unchanged.
         /// </summary>
-        public static RotationStep MaintainMyDebuff(string spell, int minMsLeft, float priority) =>
+        public static RotationStep MaintainMyDebuff(string spell, int minMsLeft, float priority,
+            Func<CombatContext, bool> extraGate = null) =>
             Skill.Spell(spell)
                  .Priority(priority)
                  .On(Targets.CurrentEnemy)
-                 .When(ctx => !ctx.Target.HasMyAura(spell) || ctx.Target.MyAuraTimeLeftMs(spell) < minMsLeft)
+                 .When(ctx => (extraGate == null || extraGate(ctx))
+                              && (!ctx.Target.HasMyAura(spell) || ctx.Target.MyAuraTimeLeftMs(spell) < minMsLeft))
                  .RecastDelay(InstantDebuffApplyGraceMs);
 
         /// <summary>
