@@ -210,6 +210,19 @@ namespace AIO3.Tests
             Assert.Null(Fire(game, Racials.Cannibalize(ctx => true, 1f)));
         }
 
+        [Fact]
+        public void Cannibalize_pins_position_through_the_channel()
+        {
+            FakeGameClient game = Game(out _);
+            game.InCombatFlag = false;
+            game.MeUnit.HealthPercent = 40;
+            game.CannibalizeCorpseFlag = true;
+            // It fires AND pins the bot in place for the channel, so the product can't drag it off the corpse.
+            Assert.Equal("Cannibalize", Fire(game, Racials.Cannibalize(ctx => true, 1f)));
+            Assert.Equal(1, game.HoldPositionCalls);
+            Assert.Equal(Racials.CannibalizeChannelMs, game.LastHoldMs);
+        }
+
         // --- the bundle: offensive racial wins the high slot ---
 
         [Fact]

@@ -86,7 +86,10 @@ namespace AIO3.Adapter
             wManager.Events.MovementEvents.OnMoveToPulse -= OnMoveToPulseHold;
         }
 
-        private bool Holding => unchecked(Now - _holdUntil) < 0; // true while the pin window is still in the future
+        // True while the pin window is still in the future AND we're out of combat: the moment a fight starts (an
+        // add aggros mid-summon/-channel) the pin releases so the product can move us and we defend ourselves
+        // instead of standing pinned. A hold only ever protects an out-of-combat cast (pet summon, Cannibalize).
+        private bool Holding => unchecked(Now - _holdUntil) < 0 && !ObjectManager.Me.InCombat;
 
         private void OnMovementPulseHold(System.Collections.Generic.List<robotManager.Helpful.Vector3> points, System.ComponentModel.CancelEventArgs cancelable)
         {

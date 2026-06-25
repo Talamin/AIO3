@@ -41,6 +41,11 @@ namespace AIO3.Core.Library
         /// <summary>Cannibalize (Undead): out-of-combat corpse heal below this health %.</summary>
         public const int CannibalizeHealthPercent = 50;
 
+        /// <summary>Cannibalize is a ~10s channel. We pin the bot in place for this long so a WRobot product can't
+        /// drag it off the corpse mid-channel (the pin auto-releases if a fight starts). The same value throttles
+        /// the step so it isn't re-issued every tick — re-issuing the stop would break the channel.</summary>
+        public const int CannibalizeChannelMs = 10000;
+
         /// <summary>Priority gap between racials in the bundle, so the 11 racials ladder cleanly above
         /// <c>basePriority</c> (band width ~0.05) without colliding with each other or adjacent spec steps.</summary>
         public const float RacialSpacing = 0.005f;
@@ -141,7 +146,10 @@ namespace AIO3.Core.Library
         public static RotationStep Cannibalize(Func<CombatContext, bool> enabled, float priority) =>
             Skill.Spell("Cannibalize").Priority(priority).On(Targets.Self)
                  .When(ctx => enabled(ctx) && !ctx.Game.PlayerInCombat
-                              && ctx.Me.HealthPercent < CannibalizeHealthPercent && ctx.Game.HasCannibalizeCorpseNearby()).OffGcd();
+                              && ctx.Me.HealthPercent < CannibalizeHealthPercent && ctx.Game.HasCannibalizeCorpseNearby())
+                 .Hold(CannibalizeChannelMs)        // pin through the channel so the product can't pull us off the corpse
+                 .RecastDelay(CannibalizeChannelMs) // ...and don't re-issue (re-pin) every tick while it channels
+                 .OffGcd();
 
         /// <summary>The player has a Fear / Charm / Sleep effect (the CC the Undead/Human racials break). Name-based,
         /// mirroring the old AIO — fires only when one of those exact aura names is present.</summary>

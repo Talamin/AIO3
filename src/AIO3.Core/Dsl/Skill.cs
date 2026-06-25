@@ -25,6 +25,7 @@ namespace AIO3.Core.Dsl
         private Exclusive _exclusive;
         private bool _ignoreGcd;
         private int _recastDelayMs;
+        private int _holdMs;
 
         public SpellStep(string spell) => _spell = spell;
 
@@ -45,10 +46,17 @@ namespace AIO3.Core.Dsl
         /// isn't re-issued every tick during its leap before the cooldown registers).</summary>
         public SpellStep RecastDelay(int ms) { _recastDelayMs = ms; return this; }
 
+        /// <summary>Pin the bot in place for <paramref name="ms"/> before casting, so a WRobot product can't drag
+        /// it off mid-cast/-channel (same mechanism the pet summon uses). The pin auto-releases the moment combat
+        /// starts, so adds are fought, not channelled through. Pair with <see cref="RecastDelay"/> so the hold
+        /// isn't re-issued every tick (re-issuing the stop would break the very cast/channel it protects).</summary>
+        public SpellStep Hold(int ms) { _holdMs = ms; return this; }
+
         public RotationStep Build()
         {
             string spell = _spell;
             Func<CombatContext, IWowUnit, bool> when = _when;
+            int holdMs = _holdMs;
 
             return new RotationStep(
                 name: spell,
@@ -61,7 +69,11 @@ namespace AIO3.Core.Dsl
                     if (range > 0f && t.Distance > range) return false; // out of cast range
                     return when(ctx, t);
                 },
-                action: (ctx, t) => ctx.Game.Cast(spell, t),
+                action: (ctx, t) =>
+                {
+                    if (holdMs > 0) ctx.Game.HoldPosition(holdMs); // pin in place so the product can't drag us off the cast
+                    return ctx.Game.Cast(spell, t);
+                },
                 exclusive: _exclusive,
                 ignoreGcd: _ignoreGcd,
                 recastDelayMs: _recastDelayMs);

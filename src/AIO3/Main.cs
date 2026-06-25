@@ -178,7 +178,16 @@ public class Main : ICustomClass
                 if (!mounted && !repositioning && !dead)
                 {
                     CombatContext ctx = null;
-                    _game.RunLocked(() => ctx = CombatContext.Capture(_game, _interrupts, _damageTracker));
+                    _game.RunLocked(() =>
+                    {
+                        ctx = CombatContext.Capture(_game, _interrupts, _damageTracker);
+                        // Warm the adapter's by-entry creature-type cache for the current target while we hold the
+                        // frame lock. The type is read live only for the WoW target, so without this it's cached
+                        // only when some ability's condition reads it mid-fight -- which a Combat rogue never does
+                        // (its only reader, Rupture, is off by default). An empty cache makes corpse creature-type
+                        // lookups fail, so the Undead racial Cannibalize could never find a Humanoid/Undead corpse.
+                        if (ctx?.Target != null) { _ = ctx.Target.CreatureType; }
+                    });
 
                     if (ctx != null)
                     {
