@@ -4,7 +4,7 @@ using AIO3.Core.Settings;
 namespace AIO3.Core.Rotations.Hunter
 {
     /// <summary>
-    /// Live-tunable settings for the hunter specs (Beast Mastery today). One shared instance is edited by
+    /// Live-tunable settings shared by all hunter specs (Beast Mastery / Marksmanship / Survival). One shared instance is edited by
     /// the in-game overlay and read by the active rotation every tick. The aspect thresholds are read at
     /// eval time so overlay edits take effect live.
     /// </summary>
@@ -57,9 +57,17 @@ namespace AIO3.Core.Rotations.Hunter
             new IntSetting("viperMana", "Aspect of the Viper below mana%", value: 20, min: 0, max: 100, step: 5);
 
         /// <summary>Swap back to the damage aspect (Dragonhawk / Hawk) when mana is above this %. The gap
-        /// above the Viper threshold gives hysteresis so the aspect doesn't flap at the boundary.</summary>
+        /// above the Viper threshold gives hysteresis so the aspect doesn't flap at the boundary. Default raised
+        /// to 55 (from 30) after the audit: the old FC returned to Hawk at 60 (HunterLevelSettings.cs:78), the
+        /// wide 20->60 band; the narrow 20->30 left the hunter in Hawk while nearly OOM. Return to the damage
+        /// aspect only once mana has genuinely recovered.</summary>
         public readonly IntSetting AspectHawkManaPercent =
-            new IntSetting("hawkMana", "Aspect of the Hawk above mana%", value: 30, min: 0, max: 100, step: 5);
+            new IntSetting("hawkMana", "Aspect of the Hawk above mana%", value: 55, min: 0, max: 100, step: 5);
+
+        /// <summary>Viper Sting (MM) when the target is a caster and our mana is at/below this % — drains the
+        /// target's mana into ours. Old MM used 45 (SoloMarksmanship.cs:28).</summary>
+        public readonly IntSetting ViperStingManaPercent =
+            new IntSetting("viperSting", "Viper Sting (MM) at/below mana%", value: 45, min: 0, max: 100, step: 5);
 
         /// <summary>Feign Death to drop aggro when low and the pet is alive to keep the mobs.</summary>
         public readonly ToggleSetting UseFeignDeath =
@@ -124,6 +132,7 @@ namespace AIO3.Core.Rotations.Hunter
             UseAoe.Category = "Rotation";
             AspectViperManaPercent.Category = "Rotation";
             AspectHawkManaPercent.Category = "Rotation";
+            ViperStingManaPercent.Category = "Rotation";
             UseFeignDeath.Category = "Rotation";
             UseDisengage.Category = "Rotation";
             InterruptCasts.Category = "Rotation";
@@ -142,7 +151,7 @@ namespace AIO3.Core.Rotations.Hunter
                 // Pet
                 ManagePet, PetHealPercent, UseMisdirection, UseBackpedal, BackpedalYards,
                 // Rotation
-                CombatRange, AoeThreshold, UseAoe, AspectViperManaPercent, AspectHawkManaPercent,
+                CombatRange, AoeThreshold, UseAoe, AspectViperManaPercent, AspectHawkManaPercent, ViperStingManaPercent,
                 UseFeignDeath, UseDisengage, InterruptCasts, UseRacials, UseCooldowns, EmergencyHealthPercent,
                 // Spec
                 ContentMode, AutoAssignTalents,

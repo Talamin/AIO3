@@ -54,5 +54,61 @@ namespace AIO3.Tests
             g.TargetUnit.IsCasting = true;
             Assert.Equal("Silencing Shot", Fire(g)?.Name);
         }
+
+        [Fact]
+        public void Viper_Sting_drains_a_caster_mob_when_low_on_mana()
+        {
+            // MM1: Viper Sting is MM's mana sustain vs caster mobs — fires when the target is a caster and our
+            // mana is at/below the threshold (default 45). It outranks Serpent Sting / Chimera here.
+            FakeGameClient g = Game();
+            g.TargetUnit.IsCaster = true;
+            g.MeUnit.PowerPercent = 40; // at/below the 45 threshold
+            Assert.Equal("Viper Sting", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Viper_Sting_is_skipped_on_a_non_caster()
+        {
+            // The mana drain is pointless against a melee mob (no mana pool) → never fires; the rotation
+            // continues to its normal signature shot.
+            FakeGameClient g = Game();
+            g.TargetUnit.IsCaster = false;
+            g.MeUnit.PowerPercent = 40;
+            Assert.NotEqual("Viper Sting", Fire(g)?.Name);
+            Assert.DoesNotContain("Viper Sting", g.CastLog);
+        }
+
+        [Fact]
+        public void Viper_Sting_is_skipped_with_full_mana()
+        {
+            FakeGameClient g = Game();
+            g.TargetUnit.IsCaster = true;
+            g.MeUnit.PowerPercent = 100; // above the threshold → no need to drain
+            Assert.NotEqual("Viper Sting", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Viper_Sting_is_not_reapplied_while_up()
+        {
+            FakeGameClient g = Game();
+            g.TargetUnit.IsCaster = true;
+            g.MeUnit.PowerPercent = 40;
+            g.TargetUnit.WithAura("Viper Sting", mine: true);
+            Assert.NotEqual("Viper Sting", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Chimera_fires_with_only_Viper_Sting_up()
+        {
+            // The Chimera gate was widened from "Serpent Sting up" to "Serpent OR Viper Sting up" (they're
+            // mutually exclusive), so a Viper turn on a caster doesn't stall the signature nuke.
+            FakeGameClient g = Game();
+            g.TargetUnit.Auras.Remove("Serpent Sting");       // Serpent down...
+            g.TargetUnit.WithAura("Viper Sting", mine: true); // ...but Viper up (mutually exclusive)
+            // Drop the target below the Serpent-Sting HP floor so the Serpent maintain step stays quiet and we
+            // genuinely test the widened Chimera gate (not just "Serpent re-applies first").
+            g.TargetUnit.HealthPercent = HunterCommon.SerpentStingMinTargetHealth - 1; // 69%
+            Assert.Equal("Chimera Shot", Fire(g)?.Name);
+        }
     }
 }

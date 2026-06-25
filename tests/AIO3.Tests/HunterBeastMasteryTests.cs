@@ -27,6 +27,7 @@ namespace AIO3.Tests
             g.EnemyList.Add(g.TargetUnit);
             g.MeUnit.PowerPercent = 100;                   // full mana → damage aspect
             g.MeUnit.WithAura("Aspect of the Dragonhawk"); // all spells known → Dragonhawk is the resolved aspect
+            g.MeUnit.WithAura("Trueshot Aura");            // shared AP buff up → the upkeep step stays idle
             g.CurrentSpells.Add("Auto Shot");              // already shooting → Auto Shot step idle
             if (withPet)
                 g.PetUnit = new FakeUnit { Guid = 99, Name = "Pet", IsAlive = true, HealthPercent = 100, TargetGuid = 1, Distance = 5 };
@@ -261,6 +262,69 @@ namespace AIO3.Tests
 
             Assert.Equal("Arcane Shot", Fire(g, s)?.Name);
             Assert.DoesNotContain("Kill Command", g.CastLog); // pet abilities are gated out when petless
+        }
+
+        [Fact]
+        public void Trueshot_Aura_is_kept_up_on_beast_mastery()
+        {
+            // S3: Trueshot Aura is now applied on BM too (not just MM). A BM hunter that learned it keeps it up.
+            FakeGameClient g = Marked(HunterGame());
+            g.MeUnit.Auras.Remove("Trueshot Aura"); // it dropped → BM should re-apply it
+            Assert.False(g.MeUnit.HasAura("Trueshot Aura"));
+            Assert.Equal("Trueshot Aura", Fire(g)?.Name);
+            Assert.Contains("Trueshot Aura", g.CastLog);
+        }
+
+        [Fact]
+        public void Volley_is_BM_primary_AoE_on_a_pack()
+        {
+            // BM1: Volley is BM's primary grind-AoE (channelled), ranked above Kill Shot / Multi-Shot.
+            FakeGameClient g = Marked(HunterGame());
+            g.MeUnit.WithAura("Trueshot Aura"); // keep the upkeep band quiet
+            for (ulong i = 2; i <= 4; i++) // pack of 4 in 10yd (>= AoE threshold 3)
+                g.EnemyList.Add(new FakeUnit { Guid = i, Distance = 6, IsAttackable = true, Reaction = Reaction.Hostile });
+            var s = new HunterSettings();
+            s.UseCooldowns.Value = false; // Bestial Wrath / Rapid Fire fire on a pack; isolate the AoE shot
+
+            Assert.Equal("Volley", Fire(g, s)?.Name);
+        }
+
+        [Fact]
+        public void Volley_holds_while_moving()
+        {
+            FakeGameClient g = Marked(HunterGame());
+            g.MeUnit.WithAura("Trueshot Aura");
+            for (ulong i = 2; i <= 4; i++)
+                g.EnemyList.Add(new FakeUnit { Guid = i, Distance = 6, IsAttackable = true, Reaction = Reaction.Hostile });
+            g.Moving = true; // channelled → can't start on the move
+            var s = new HunterSettings();
+            s.UseCooldowns.Value = false;
+
+            Assert.NotEqual("Volley", Fire(g, s)?.Name);
+        }
+
+        [Fact]
+        public void Aspect_returns_to_Hawk_only_above_the_raised_default()
+        {
+            // S4: the Hawk-return default was raised from 30 to 55 so the hunter doesn't leave Viper while nearly
+            // OOM. Sitting in Viper at 40% mana stays in Viper (40 < 55); it only returns above 55.
+            var s = new HunterSettings();
+            Assert.Equal(55, s.AspectHawkManaPercent.Value);
+
+            FakeGameClient g = HunterGame();
+            g.MeUnit.Auras.Remove("Aspect of the Dragonhawk");
+            g.MeUnit.WithAura("Aspect of the Viper"); // currently regenerating
+            g.MeUnit.PowerPercent = 40;               // recovered past the OLD 30 default but not the new 55
+
+            // In the hysteresis band → keeps Viper, does NOT swap back to the damage aspect yet.
+            Assert.DoesNotContain("Aspect of the Dragonhawk", g.CastLog);
+            RotationStep step = Fire(g, s);
+            Assert.True(step == null || step.Name != "Aspect" || !g.CastLog.Contains("Aspect of the Dragonhawk"));
+
+            // Once mana genuinely recovers past 55, it returns to the damage aspect.
+            g.MeUnit.PowerPercent = 60;
+            Assert.Equal("Aspect", Fire(g, s)?.Name);
+            Assert.Contains("Aspect of the Dragonhawk", g.CastLog);
         }
     }
 }

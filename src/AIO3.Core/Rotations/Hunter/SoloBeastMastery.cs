@@ -54,6 +54,8 @@ namespace AIO3.Core.Rotations.Hunter
             HunterCommon.AutoShot(priority: 1f),
             HunterCommon.Aspect(_settings, priority: 1.5f),
             HunterCommon.Misdirection(_settings, priority: 1.8f),
+            // Trueshot Aura: shared AP buff (auto-skips unless this BM hunter learned it).
+            HunterCommon.TrueshotAura(priority: 1.9f),
 
             // Intimidation interrupt: the pet's stun, so only with an alive pet and when enabled.
             Skill.Spell("Intimidation").Priority(2f).On(Targets.CurrentEnemy)
@@ -77,6 +79,8 @@ namespace AIO3.Core.Rotations.Hunter
             HunterCommon.SerpentSting(priority: 6f),
 
             // --- shots ---
+            // Volley: BM's primary grind-AoE (channelled), above Kill Shot / Multi-Shot as in the old FC.
+            HunterCommon.Volley(_settings, priority: 6.5f),
             HunterCommon.KillShot(priority: 7f),
             HunterCommon.KillCommand(priority: 8f),
             Skill.Spell("Multi-Shot").Priority(9f).On(Targets.CurrentEnemy)

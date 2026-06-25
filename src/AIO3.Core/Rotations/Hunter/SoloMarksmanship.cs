@@ -49,7 +49,7 @@ namespace AIO3.Core.Rotations.Hunter
             HunterCommon.AutoShot(priority: 1f),
             HunterCommon.Aspect(_settings, priority: 1.5f),
             HunterCommon.Misdirection(_settings, priority: 1.8f),
-            CombatBlocks.SelfBuff("Trueshot Aura", priority: 1.9f),
+            HunterCommon.TrueshotAura(priority: 1.9f),
 
             // Silencing Shot: MM's ranged interrupt.
             Skill.Spell("Silencing Shot").Priority(2f).On(Targets.CurrentEnemy)
@@ -64,13 +64,20 @@ namespace AIO3.Core.Rotations.Hunter
 
             // --- debuffs ---
             HunterCommon.HuntersMark(priority: 5f),
+            // Viper Sting: MM mana sustain vs a caster mob — drains its mana into ours. Above Serpent Sting and
+            // mutually exclusive with it (one sting per target); the Chimera/Steady gate below accepts either.
+            HunterCommon.ViperSting(_settings, priority: 5.5f),
             HunterCommon.SerpentSting(priority: 6f),
 
             // --- shots ---
             HunterCommon.KillShot(priority: 7f),
-            // Chimera Shot: signature nuke that also refreshes Serpent Sting — use it once the sting is up.
+            // Volley: channelled AoE on a pack.
+            HunterCommon.Volley(_settings, priority: 7.5f),
+            // Chimera Shot: signature nuke that also refreshes Serpent Sting — use it once EITHER sting is up
+            // (Viper counts, so a mana-drain turn on a caster doesn't stall Chimera).
             Skill.Spell("Chimera Shot").Priority(8f).On(Targets.CurrentEnemy)
-                 .When(ctx => ctx.Target.Distance >= HunterCommon.RangedMin && ctx.Target.HasMyAura("Serpent Sting")),
+                 .When(ctx => ctx.Target.Distance >= HunterCommon.RangedMin
+                              && (ctx.Target.HasMyAura("Serpent Sting") || ctx.Target.HasMyAura("Viper Sting"))),
             Skill.Spell("Aimed Shot").Priority(9f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.Distance >= HunterCommon.RangedMin),
             Skill.Spell("Multi-Shot").Priority(10f).On(Targets.CurrentEnemy)

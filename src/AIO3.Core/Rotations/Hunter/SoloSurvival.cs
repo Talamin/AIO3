@@ -48,6 +48,8 @@ namespace AIO3.Core.Rotations.Hunter
             HunterCommon.AutoShot(priority: 1f),
             HunterCommon.Aspect(_settings, priority: 1.5f),
             HunterCommon.Misdirection(_settings, priority: 1.8f),
+            // Trueshot Aura: shared AP buff (auto-skips unless this SV hunter learned it).
+            HunterCommon.TrueshotAura(priority: 1.9f),
 
             // --- cooldown (racials are appended by the shared Racials bundle at the 3.0 band) ---
             Skill.Spell("Rapid Fire").Priority(3.5f).On(Targets.Self)
@@ -60,13 +62,16 @@ namespace AIO3.Core.Rotations.Hunter
             HunterCommon.SerpentSting(priority: 6f),
 
             // --- shots ---
+            // Lock and Load: while the proc is up, Explosive Shot is free + reset — spam it ahead of everything.
+            HunterCommon.LockAndLoadExplosiveShot(priority: 6.5f),
             HunterCommon.KillShot(priority: 7f),
             HunterCommon.KillCommand(priority: 7.5f),
-            // Explosive Shot + Black Arrow: the Lock and Load engine — fire on cooldown.
-            Skill.Spell("Explosive Shot").Priority(8f).On(Targets.CurrentEnemy)
+            // Volley: channelled AoE on a pack (above the single-target Explosive engine).
+            HunterCommon.Volley(_settings, priority: 7.8f),
+            // The Lock and Load engine: Black Arrow procs LnL, so it leads — then Explosive Shot on cooldown.
+            Skill.Spell("Black Arrow").Priority(8f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.Distance >= HunterCommon.RangedMin),
-            Skill.Spell("Black Arrow").Priority(8.5f).On(Targets.CurrentEnemy)
-                 .When(ctx => ctx.Target.Distance >= HunterCommon.RangedMin),
+            HunterCommon.ExplosiveShot(priority: 8.5f),
             Skill.Spell("Aimed Shot").Priority(9f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.Distance >= HunterCommon.RangedMin),
             Skill.Spell("Multi-Shot").Priority(10f).On(Targets.CurrentEnemy)

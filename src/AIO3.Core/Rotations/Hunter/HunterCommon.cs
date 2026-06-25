@@ -57,6 +57,35 @@ namespace AIO3.Core.Rotations.Hunter
             Skill.Spell("Hunter's Mark").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => !ctx.Target.HasMyAura("Hunter's Mark") && ctx.Target.HealthPercent > 50);
 
+        /// <summary>Trueshot Aura: a shared self/raid attack-power buff. Any spec that learns it (it's a deep-MM
+        /// talent but BM/SV hunters who spend points there get it too) keeps it up; IsSpellKnown auto-skips the
+        /// specs that don't have it. Old FC kept it Always on all specs (CombatBuffs.cs:20).</summary>
+        public static RotationStep TrueshotAura(float priority) =>
+            CombatBlocks.SelfBuff("Trueshot Aura", priority);
+
+        /// <summary>Volley: BM's primary grind-AoE — a channelled ground AoE ranked above Kill Shot in the old FC
+        /// (SoloBeastMastery.cs:21, default-on while Multi-Shot defaulted off). Gated on the same player-relative
+        /// pack gate as Multi-Shot (UseAoe + EnemiesWithin(AoeRadius) >= AoeThreshold) and on standing still — it's
+        /// channelled, like Steady Shot, so it can't start on the move. IsSpellKnown auto-skips until learned.</summary>
+        public static RotationStep Volley(HunterSettings s, float priority) =>
+            Skill.Spell("Volley").Priority(priority).On(Targets.CurrentEnemy)
+                 .When(ctx => ctx.Target.Distance >= RangedMin
+                              && s.UseAoe.Value
+                              && ctx.EnemiesWithin(AoeRadius) >= s.AoeThreshold.Value
+                              && !ctx.Game.PlayerIsMoving);
+
+        /// <summary>Viper Sting: MM's mana-sustain vs caster mobs — drains the target's mana into yours. Old MM
+        /// fired it when the target is a caster and our mana is low (SoloMarksmanship.cs:28: Target.IsCaster &amp;&amp;
+        /// Me.ManaPercentage &lt;= 45). MM-only (wired into SoloMarksmanship). Mutually exclusive with Serpent Sting
+        /// (one sting at a time), so it skips when Viper is already up; the MM Chimera/Steady gate is widened to
+        /// accept EITHER sting so adding this doesn't stall the rotation.</summary>
+        public static RotationStep ViperSting(HunterSettings s, float priority) =>
+            Skill.Spell("Viper Sting").Priority(priority).On(Targets.CurrentEnemy)
+                 .When(ctx => ctx.Target.Distance >= RangedMin
+                              && ctx.Target.IsCaster
+                              && ctx.Me.PowerPercent <= s.ViperStingManaPercent.Value
+                              && !ctx.Target.HasMyAura("Viper Sting"));
+
         /// <summary>A normal mob this low (HP%) dies before a fresh Serpent Sting (a 15s/5-tick DoT) pays off, so
         /// don't (re-)apply it — the global is better spent on a direct shot. Raised from the old 30 after the audit:
         /// 30 still wasted a full DoT on a mob with seconds to live. HP-floor heuristic (no time-to-die seam).</summary>
@@ -83,6 +112,21 @@ namespace AIO3.Core.Rotations.Hunter
         /// <summary>The HP-floor below which Serpent Sting isn't worth (re-)applying — relaxed for elites/bosses.</summary>
         private static int SerpentStingFloor(IWowUnit target) =>
             target.IsElite || target.IsBoss() ? SerpentStingMinEliteHealth : SerpentStingMinTargetHealth;
+
+        /// <summary>Survival's Explosive Shot on cooldown (the steady-state filler slot). A normal ranged shot,
+        /// gated only on the no-point-blank range floor; auto-skips until learned.</summary>
+        public static RotationStep ExplosiveShot(float priority) =>
+            Skill.Spell("Explosive Shot").Priority(priority).On(Targets.CurrentEnemy)
+                 .When(ctx => ctx.Target.Distance >= RangedMin);
+
+        /// <summary>Lock and Load window: Black Arrow / trap crits reset Explosive Shot's cooldown so it can fire
+        /// 2-3x back-to-back for free. While the LnL aura is up, Explosive Shot is the single highest-value shot,
+        /// so this fires it at TOP filler priority — ahead of Kill Shot / Kill Command / everything — to spam it
+        /// before the proc expires. Reads the stack count on self (AuraStacks; no new seam). Auto-skips until
+        /// Explosive Shot is learned.</summary>
+        public static RotationStep LockAndLoadExplosiveShot(float priority) =>
+            Skill.Spell("Explosive Shot").Priority(priority).On(Targets.CurrentEnemy)
+                 .When(ctx => ctx.Target.Distance >= RangedMin && ctx.Me.AuraStacks("Lock and Load") > 0);
 
         /// <summary>Ranged execute: Kill Shot under 20%.</summary>
         public static RotationStep KillShot(float priority) =>
