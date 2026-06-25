@@ -588,7 +588,25 @@ namespace AIO3.Adapter
                     .Where(o => o != null && o.IsValid && o.IsAlive && o.IsAttackable
                                 && o.Reaction <= WReaction.Neutral && o.Guid != unit.Guid && o.GetDistance <= 40)
                     .Select(o => $"{o.Name}@{o.GetDistance:0.#}({o.Position.X:0.#},{o.Position.Y:0.#},{o.Position.Z:0.#}){(o.IsTargetingMe ? "*" : "")}"));
-                DebugLog.Write($"pos me=({mp.X:0.#},{mp.Y:0.#},{mp.Z:0.#}) hp={meUnit.HealthPercent:0}% mp={meUnit.ManaPercentage:0}% "
+                // Resource readout is class-aware: mana% is meaningless for a rogue (runs on energy + combo points)
+                // or a warrior (rage), so show the resource the rotation actually reads — plus stealth for the rogue.
+                string pwr;
+                switch (meUnit.WowClass.ToString())
+                {
+                    case "Rogue":
+                        pwr = $"energy={meUnit.Energy} cp={ObjectManager.Me.ComboPoint} stealth={(meUnit.HaveBuff("Stealth") ? "Y" : "N")}";
+                        break;
+                    case "Druid":
+                        pwr = $"mp={meUnit.ManaPercentage:0}% energy={meUnit.Energy} rage={meUnit.Rage} cp={ObjectManager.Me.ComboPoint}";
+                        break;
+                    case "Warrior":
+                        pwr = $"rage={meUnit.Rage}";
+                        break;
+                    default:
+                        pwr = $"mp={meUnit.ManaPercentage:0}%";
+                        break;
+                }
+                DebugLog.Write($"pos me=({mp.X:0.#},{mp.Y:0.#},{mp.Z:0.#}) hp={meUnit.HealthPercent:0}% {pwr} "
                     + $"| tgt {unit.Name}@{unit.GetDistance:0.#} hp={unit.HealthPercent:0}% onMe={unit.IsTargetingMe} ({tp.X:0.#},{tp.Y:0.#},{tp.Z:0.#}) "
                     + $"| auras: {auras}{petStr}"
                     + (self.Length > 0 ? $" | self: {self}" : "")
