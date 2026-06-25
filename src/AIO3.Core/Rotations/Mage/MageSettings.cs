@@ -77,6 +77,17 @@ namespace AIO3.Core.Rotations.Mage
         public readonly ToggleSetting UseCooldowns =
             new ToggleSetting("cooldowns", "Use cooldowns (Icy Veins / Combustion / Arcane Power)", value: true);
 
+        /// <summary>Arcane: ramp Arcane Blast to this many stacks, then dump (Arcane Missiles standing still,
+        /// Arcane Barrage moving). Each Arcane Blast stack raises its mana cost, so the cap trades damage for
+        /// sustain — 4 is the common solo value.</summary>
+        public readonly IntSetting ArcaneBlastStacks =
+            new IntSetting("arcaneBlastStacks", "Arcane: dump at Arcane Blast stacks", value: 4, min: 1, max: 4, step: 1);
+
+        /// <summary>Arcane: below this mana %, conserve — cap Arcane Blast at 2 stacks and lean on Arcane
+        /// Missiles / wand / Evocation so the escalating Arcane Blast cost doesn't bottom out the mana pool.</summary>
+        public readonly IntSetting ArcaneConserveManaPercent =
+            new IntSetting("arcaneConserveMana", "Arcane: conserve mana below %", value: 30, min: 0, max: 90, step: 5);
+
         /// <summary>Use an emergency healthstone/potion below this health %. 0 disables it.</summary>
         public readonly IntSetting EmergencyHealthPercent =
             new IntSetting("emergencyHp", "Emergency item below HP%", value: 30, min: 0, max: 90, step: 5);
@@ -190,6 +201,8 @@ namespace AIO3.Core.Rotations.Mage
             UsePolymorph.Category = "Rotation";
             UseRacials.Category = "Rotation";
             UseCooldowns.Category = "Rotation";
+            ArcaneBlastStacks.Category = "Rotation";        ArcaneBlastStacks.Spec = "Arcane";
+            ArcaneConserveManaPercent.Category = "Rotation"; ArcaneConserveManaPercent.Spec = "Arcane";
             EmergencyHealthPercent.Category = "Rotation";
 
             UseKiting.Category = "Survival";
@@ -220,7 +233,7 @@ namespace AIO3.Core.Rotations.Mage
                 // Buffs
                 ArmorChoice, UseArcaneIntellect, UseWaterElemental, UseConjure, ConjureCount, ManageFood,
                 // Rotation
-                CombatRange, UseAoe, AoeThreshold, InterruptCasts, UsePolymorph, UseRacials, UseCooldowns, EmergencyHealthPercent,
+                CombatRange, UseAoe, AoeThreshold, InterruptCasts, UsePolymorph, UseRacials, UseCooldowns, ArcaneBlastStacks, ArcaneConserveManaPercent, EmergencyHealthPercent,
                 // Survival
                 UseKiting, KiteYards, KiteMinTargetHealth, KiteSkipGreyLevels, UseBlink, UseIceBlock, IceBlockHealthPercent, UseIceBarrier, UseManaShield, ManaShieldHealthPercent,
                 // Mana

@@ -81,6 +81,26 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Combustion_waits_for_living_bomb_to_be_up()
+        {
+            // F3: Combustion only after Living Bomb is ticking, so its Ignite/crit value compounds an active DoT.
+            // With the DoT NOT up, Combustion holds and the rotation applies Living Bomb first.
+            FakeGameClient g = MageGame();
+            g.InCombatFlag = true;
+            g.TargetUnit.IsElite = true;
+            g.TargetUnit.Auras.Remove("Living Bomb"); // no DoT yet → too early for Combustion
+            var s = new MageSettings();
+            s.UseRacials.Value = false;
+            RotationStep fired = Fire(g, s);
+            Assert.NotEqual("Combustion", fired?.Name);
+            Assert.Equal("Living Bomb", fired?.Name); // applies the DoT first
+
+            // Once Living Bomb is ticking, Combustion fires.
+            g.TargetUnit.WithAura("Living Bomb", mine: true, timeLeftMs: 8000);
+            Assert.Equal("Combustion", Fire(g, s)?.Name);
+        }
+
+        [Fact]
         public void Flamestrike_on_a_pack()
         {
             FakeGameClient g = MageGame();

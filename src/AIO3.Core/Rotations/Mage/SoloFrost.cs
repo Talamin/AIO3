@@ -68,6 +68,12 @@ namespace AIO3.Core.Rotations.Mage
             // --- cooldowns (racials are appended by the shared Racials bundle at the 2.5 band) ---
             MageCommon.MajorCooldown(_settings, "Icy Veins", priority: 2.6f),
             MageCommon.MajorCooldown(_settings, "Mirror Image", priority: 2.65f),
+            // Cold Snap (Frost-only): instantly resets all Frost cooldowns. Spend it to bring Ice Barrier back when
+            // it has dropped in a real fight and we're getting low — not burned trivially. Old FC used it to re-cast
+            // Ice Barrier when it fell off (AIO-Public-clone .../Mage/SoloFrost.cs:13f "Cold Snap"). Conservative.
+            Skill.Spell("Cold Snap").Priority(2.7f).On(Targets.Self)
+                 .When(ctx => _settings.UseCooldowns.Value && MageCommon.IsBigFight(ctx)
+                              && !ctx.Me.HasAura("Ice Barrier") && ctx.Me.HealthPercent < ColdSnapHealthPercent),
 
             // --- AoE (held while our sheep is up so we don't break it) ---
             Skill.Spell("Blizzard").Priority(3.0f).On(Targets.CurrentEnemy)
@@ -78,8 +84,11 @@ namespace AIO3.Core.Rotations.Mage
                               && ctx.EnemiesWithin(MageCommon.MeleeRange) >= _settings.AoeThreshold.Value),
 
             // --- procs / instants (shatter combo) ---
+            // Deep Freeze is a CORE shatter nuke (guaranteed 4-5x on a frozen target), not a big-cooldown button —
+            // fire it purely on the frozen/Fingers condition, NOT gated on UseCooldowns (old FC fired it on Frozen
+            // alone: AIO-Public-clone .../Mage/SoloFrost.cs:14f "Deep Freeze").
             Skill.Spell("Deep Freeze").Priority(4.0f).On(Targets.CurrentEnemy)
-                 .When(ctx => _settings.UseCooldowns.Value && Frozen(ctx)),
+                 .When(ctx => Frozen(ctx)),
             Skill.Spell("Frostfire Bolt").Priority(4.5f).On(Targets.CurrentEnemy)
                  .When(ctx => BrainFreeze(ctx)),
             Skill.Spell("Ice Lance").Priority(5.0f).On(Targets.CurrentEnemy)
@@ -96,6 +105,10 @@ namespace AIO3.Core.Rotations.Mage
             Skill.Spell("Fireball").Priority(11f).On(Targets.CurrentEnemy)
                  .When(ctx => !ctx.Game.PlayerIsMoving && !ctx.Game.IsSpellKnown("Frostbolt")),
         }), ctx => _settings.UseRacials.Value, basePriority: 2.5f);
+
+        /// <summary>Only spend Cold Snap to refresh Ice Barrier once we've dropped below this health % — so a real
+        /// fight that chewed through the barrier gets it back, but a trivial pull never burns the cooldown.</summary>
+        private const int ColdSnapHealthPercent = 50;
 
         // Target is "frozen" (rooted by Frost Nova or we have a Fingers of Frost charge) → Ice Lance / Deep Freeze
         // shatter. HasAura (name-based HaveBuff) already detects the root cheaply; no need for the costlier HasMyAura.

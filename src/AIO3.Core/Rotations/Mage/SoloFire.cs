@@ -58,8 +58,12 @@ namespace AIO3.Core.Rotations.Mage
             MageCommon.ManaGem(_settings, priority: 2.1f),
 
             // --- cooldowns (racials are appended by the shared Racials bundle at the 2.5 band) ---
+            // Combustion only after Living Bomb is ticking, so its Ignite/crit value compounds an active DoT instead
+            // of being wasted at fight start with nothing up (old FC pressed it once Combustion's own DoT was rolling:
+            // AIO-Public-clone .../Mage/SoloFire.cs:10f, gated on t.HaveMyBuff("Combustion")).
             Skill.Spell("Combustion").Priority(2.6f).On(Targets.Self)
-                 .When(ctx => _settings.UseCooldowns.Value && MageCommon.IsBigFight(ctx) && !ctx.Me.HasAura("Combustion")),
+                 .When(ctx => _settings.UseCooldowns.Value && MageCommon.IsBigFight(ctx)
+                              && !ctx.Me.HasAura("Combustion") && ctx.Target.HasMyAura("Living Bomb")),
 
             // --- AoE (held while our sheep is up so we don't break it) ---
             Skill.Spell("Flamestrike").Priority(3.0f).On(Targets.CurrentEnemy)

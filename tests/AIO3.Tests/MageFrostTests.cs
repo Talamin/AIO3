@@ -77,9 +77,62 @@ namespace AIO3.Tests
         {
             FakeGameClient g = MageGame();
             g.TargetUnit.WithAura("Frost Nova"); // rooted → shatter
+            // Deep Freeze (prio 4.0, also a shatter) now fires on Frozen regardless of UseCooldowns (F8), so it would
+            // take this slot first — make it unavailable to isolate Ice Lance (the lower-priority shatter filler).
+            g.SpellsOnCooldown.Add("Deep Freeze");
+            Assert.Equal("Ice Lance", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Deep_Freeze_fires_on_a_frozen_target_even_with_cooldowns_off()
+        {
+            // F8: Deep Freeze is a core shatter nuke, not a big-cooldown button — it must fire on the frozen
+            // condition alone, NOT gated on UseCooldowns. With cooldowns OFF and a frozen target it still goes.
+            FakeGameClient g = MageGame();
+            g.TargetUnit.WithAura("Frost Nova"); // rooted/frozen → shatter window
             var s = new MageSettings();
-            s.UseCooldowns.Value = false; // so Deep Freeze (a cooldown) doesn't take the shatter first
-            Assert.Equal("Ice Lance", Fire(g, s)?.Name);
+            s.UseCooldowns.Value = false;        // big cooldowns off...
+            Assert.Equal("Deep Freeze", Fire(g, s)?.Name); // ...Deep Freeze still fires (it's not a "cooldown")
+        }
+
+        [Fact]
+        public void Cold_Snap_refreshes_ice_barrier_when_down_and_low_in_a_big_fight()
+        {
+            // F6: spend Cold Snap to bring Ice Barrier back when it has dropped in a real fight and we're hurt.
+            FakeGameClient g = MageGame();
+            g.InCombatFlag = true;
+            g.TargetUnit.IsElite = true;        // a big fight worth the cooldown
+            g.MeUnit.Auras.Remove("Ice Barrier"); // barrier dropped
+            g.MeUnit.HealthPercent = 45;          // below the ~50% floor
+            var s = new MageSettings();
+            s.UseRacials.Value = false;           // racials sit just above; isolate Cold Snap
+            // Ice Barrier (prio 0.8) would re-cast first, so it never reaches Cold Snap — make it unknown to isolate.
+            g.UnknownSpells.Add("Ice Barrier");
+            // Icy Veins / Mirror Image (prio 2.6/2.65) also fire on the same big fight and sit above Cold Snap (2.7);
+            // take them out so the test isolates Cold Snap itself.
+            g.UnknownSpells.Add("Icy Veins");
+            g.UnknownSpells.Add("Mirror Image");
+            Assert.Equal("Cold Snap", Fire(g, s)?.Name);
+        }
+
+        [Fact]
+        public void Cold_Snap_is_not_burned_trivially()
+        {
+            // It must NOT fire when the barrier is up, when we're healthy, or in a trivial (non-big) fight.
+            // Barrier up + healthy single target → Cold Snap stays quiet.
+            FakeGameClient g = MageGame();
+            g.InCombatFlag = true;
+            g.TargetUnit.IsElite = true;
+            // Ice Barrier still up, HP full → no reason to reset cooldowns
+            Assert.NotEqual("Cold Snap", Fire(g)?.Name);
+
+            // Barrier down + hurt but only a lone trivial mob (not a big fight) → still no Cold Snap.
+            FakeGameClient g2 = MageGame();
+            g2.InCombatFlag = true;
+            g2.MeUnit.Auras.Remove("Ice Barrier");
+            g2.MeUnit.HealthPercent = 45;
+            g2.UnknownSpells.Add("Ice Barrier"); // so the barrier re-cast doesn't mask the comparison
+            Assert.NotEqual("Cold Snap", Fire(g2)?.Name); // single non-elite mob → IsBigFight false
         }
 
         [Fact]
