@@ -51,6 +51,12 @@ namespace AIO3.Core.Rotations.Warrior
             // --- emergency defensives (lower HP = higher prio) ---
             CombatBlocks.DefensiveBelow("Last Stand", healthPercent: 15, priority: 1.5f),
             CombatBlocks.DefensiveBelow("Shield Wall", healthPercent: 35, priority: 1.6f),
+            // Enraged Regeneration: 10% HP over 10s self-heal — Prot is the spec most likely to be
+            // face-tanking, so it belongs here at the same threshold/priority Fury/Arms use. WotLK ER
+            // requires an active Enrage to cast; the in-game requirement gates the real cast, so this
+            // fires harmlessly through when not enraged (matches Fury/Arms wiring). Old FC had it on
+            // Prot (GroupProtection.cs:33).
+            CombatBlocks.DefensiveBelow("Enraged Regeneration", healthPercent: 50, priority: 1.7f),
 
             // Interrupt (Protection's interrupt is Shield Bash). Respects InterruptMode.
             CombatBlocks.Interrupt("Shield Bash", priority: 2f, mode: ctx => _settings.InterruptMode.Value),
@@ -69,6 +75,12 @@ namespace AIO3.Core.Rotations.Warrior
             WarriorCommon.DemoralizingShout(_settings, priority: 6.8f),
 
             // --- threat / damage core (fills in with level) ---
+            // Sword and Board proc makes the next Shield Slam instant + free and resets its cooldown —
+            // the single highest-priority Prot button when up. Sits ABOVE the BestDamage block so it is
+            // never passed over for Revenge; BestDamage still handles the non-proc case below. Old FC had
+            // a dedicated proc Shield Slam (GroupProtection.cs:49).
+            Skill.Spell("Shield Slam").Priority(6.9f).On(Targets.CurrentEnemy)
+                 .When(ctx => ctx.Me.HasAura("Sword and Board")),
             // Shield Slam and Revenge are both cooldown strikes. With damage learning on, cast whichever
             // hits harder on this server; otherwise the hand order (Shield Slam first) applies. Both are
             // attempted off-cooldown and fail through harmlessly when not usable (e.g. Revenge's proc).

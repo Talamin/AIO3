@@ -58,7 +58,7 @@ namespace AIO3.Core.Rotations.Warrior
             // there is rage to spend. (The old rotation gated it on HealthPercent <= 80, a carried-over
             // quirk that cost DPS at full health; removed.)
             Skill.Spell("Bloodthirst").Priority(6f).On(Targets.CurrentEnemy)
-                 .When(ctx => ctx.Me.Rage > 30),
+                 .When(ctx => ctx.Me.Rage >= 20), // its real cost; >30 withheld it (and the free Slam proc) at 21-30 rage
 
             // Instant, free Slam from the Bloodsurge proc ("Slam!") — consume it right after Bloodthirst.
             Skill.Spell("Slam").Priority(6.5f).On(Targets.CurrentEnemy)

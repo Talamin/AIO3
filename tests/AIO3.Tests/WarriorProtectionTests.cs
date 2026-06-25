@@ -81,6 +81,69 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Enraged_Regeneration_fires_below_its_threshold()
+        {
+            // P4 fix: ER (10% HP over 10s self-heal) was on Fury/Arms but missing from Protection — the
+            // spec most likely to be face-tanking. It sits below Shield Wall (35%) at the Fury/Arms
+            // threshold (50%), so at 40% HP — above Shield Wall — ER is the highest-priority survival cast.
+            FakeGameClient game = ProtGame();
+            game.MeUnit.HealthPercent = 40; // below ER's 50, above Shield Wall's 35
+
+            Assert.Equal("Enraged Regeneration", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Enraged_Regeneration_is_skipped_at_healthy_hp()
+        {
+            // Above the 50% threshold ER must not pre-empt the threat core.
+            FakeGameClient game = ProtGame();
+            game.MeUnit.HealthPercent = 80;
+
+            Assert.NotEqual("Enraged Regeneration", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Sword_and_Board_proc_wins_over_the_BestDamage_pick()
+        {
+            // P1 fix: the Sword and Board proc makes Shield Slam instant + free with a reset cooldown —
+            // the highest-priority Prot button. The dedicated proc step (6.9) sits ABOVE the BestDamage
+            // block (7) so Shield Slam is never passed over for Revenge while the proc is up.
+            FakeGameClient game = ProtGame();
+            game.MeUnit.WithAura("Sword and Board");
+            game.CastLog.Clear();
+
+            Assert.Equal("Shield Slam", Fire(game)?.Name);
+            Assert.Contains("Shield Slam", game.CastLog);
+        }
+
+        [Fact]
+        public void Sword_and_Board_proc_picks_Shield_Slam_even_when_BestDamage_prefers_Revenge()
+        {
+            // The pre-fix bug: Shield Slam was folded into BestDamage with NO proc awareness, so it could
+            // pick Revenge over a free, cooldown-reset Shield Slam. Here damage learning makes BestDamage
+            // prefer Revenge (higher learned per-hit), yet the dedicated proc step at 6.9 — above the
+            // BestDamage block at 7 — must still win Shield Slam while Sword and Board is up.
+            var fs = new WarriorSettings();
+            fs.UseDamageLearning.Value = true;
+            var damage = new DamageTracker();
+            for (int i = 0; i < 10; i++) // clear MinDamageSamples so BestDamage uses the learned averages
+            {
+                damage.Record("Revenge", 1000);   // Revenge is the higher-damage learned pick...
+                damage.Record("Shield Slam", 100);
+            }
+
+            FakeGameClient game = ProtGame();
+            game.MeUnit.WithAura("Sword and Board"); // proc up → instant/free/cooldown-reset Shield Slam
+            game.CastLog.Clear();
+
+            RotationStep fired = new RotationEngine(new SoloProtection(fs).BuildSteps())
+                .Tick(CombatContext.Capture(game, damage: damage));
+
+            Assert.Equal("Shield Slam", fired?.Name);
+            Assert.Contains("Shield Slam", game.CastLog);
+        }
+
+        [Fact]
         public void Interrupts_a_casting_enemy_with_Shield_Bash()
         {
             FakeGameClient game = ProtGame();

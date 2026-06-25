@@ -161,12 +161,25 @@ namespace AIO3.Tests
         [Fact]
         public void Bloodthirst_is_skipped_without_rage()
         {
-            // Below the rage gate (> 30) Bloodthirst is held, so Death Wish (rage > 10) wins instead.
+            // Below the rage gate (>= 20, its real cost) Bloodthirst is held, so Death Wish (rage > 10)
+            // wins instead.
             FakeGameClient game = WarriorGame();
-            game.MeUnit.Rage = 25;
+            game.MeUnit.Rage = 15;
             game.MeUnit.HealthPercent = 100;
 
             Assert.Equal("Death Wish", Fire(game)?.Name);
+        }
+
+        [Fact]
+        public void Bloodthirst_fires_at_its_real_cost_of_20_rage()
+        {
+            // F1 fix: the gate was > 30, which withheld Bloodthirst (and the free Bloodsurge Slam proc)
+            // while sitting at 21-30 rage. Its actual cost is 20, so it must fire from 20 rage upward.
+            FakeGameClient game = WarriorGame();
+            game.MeUnit.Rage = 20; // exactly its cost, formerly withheld
+            game.MeUnit.HealthPercent = 100;
+
+            Assert.Equal("Bloodthirst", Fire(game)?.Name);
         }
 
         [Fact]
@@ -332,8 +345,8 @@ namespace AIO3.Tests
         }
 
         [Theory]
-        [InlineData(10, false)] // below the reserve → keep the rage
-        [InlineData(25, true)]  // spare rage → dump it (off the GCD, even during the GCD)
+        [InlineData(40, false)] // below the default-50 reserve → keep the rage for the specials
+        [InlineData(55, true)]  // genuine surplus → dump it (off the GCD, even during the GCD)
         public void Heroic_Strike_dumps_spare_rage_off_gcd(int rage, bool shouldFire)
         {
             FakeGameClient game = WarriorGame();

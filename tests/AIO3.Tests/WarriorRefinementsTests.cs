@@ -91,7 +91,7 @@ namespace AIO3.Tests
         public void Heroic_Strike_is_not_requeued_while_already_pending()
         {
             FakeGameClient g = Game();
-            g.MeUnit.Rage = 50;
+            g.MeUnit.Rage = 60; // above the default-50 reserve
             RotationStep hs = WarriorCommon.HeroicStrike(new WarriorSettings(), 1f);
 
             Assert.Equal("Heroic Strike", Fire(g, hs)?.Name);

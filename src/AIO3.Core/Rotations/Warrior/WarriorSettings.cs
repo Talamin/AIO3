@@ -11,9 +11,12 @@ namespace AIO3.Core.Rotations.Warrior
     /// </summary>
     public sealed class WarriorSettings
     {
-        /// <summary>Rage kept in reserve before Heroic Strike dumps spare rage. Lower = HS fires sooner.</summary>
+        /// <summary>Rage kept in reserve before Heroic Strike dumps spare rage. Lower = HS fires sooner.
+        /// Default 50: HS should only soak SURPLUS rage — a low reserve queues it almost constantly and
+        /// starves the rage-costed specials (Bloodthirst / Mortal Strike / Shield Slam). Old FC used
+        /// 40-80 thresholds (GroupProtection.cs:66-67; Fury Rage>40; Arms Rage>50).</summary>
         public readonly IntSetting HeroicStrikeRageReserve =
-            new IntSetting("hsReserve", "Heroic Strike rage reserve", value: 20, min: 0, max: 100, step: 5);
+            new IntSetting("hsReserve", "Heroic Strike rage reserve", value: 50, min: 0, max: 100, step: 5);
 
         /// <summary>Minimum nearby enemies before the AoE abilities fire.</summary>
         public readonly IntSetting AoeThreshold =
