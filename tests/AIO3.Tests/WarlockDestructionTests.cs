@@ -80,6 +80,86 @@ namespace AIO3.Tests
             Assert.NotEqual("Chaos Bolt", Fire(LockGame(), NoBurst())?.Name);
         }
 
+        // --- Shadowburn (sub-20% execute; costs a shard, guarded by SoulShardKeep) ---
+
+        [Fact]
+        public void Shadowburn_executes_below_20_percent_with_shards_above_the_keep()
+        {
+            FakeGameClient g = LockGame();
+            g.InCombatFlag = true;                 // execute happens in combat (else CreateHealthstone fires OOC)
+            g.TargetUnit.HealthPercent = 15;       // execute window
+            g.ItemCounts["Soul Shard"] = 4;        // above SoulShardKeep (3) → spending one is safe
+            var s = NoBurst();
+            s.UseRacials.Value = false;            // isolate Shadowburn from the racial bundle (2.5 band)
+            // Above the fillers; fires even though the filler would otherwise be suppressed by "let DoTs finish".
+            Assert.Equal("Shadowburn", Fire(g, s)?.Name);
+            Assert.Contains("Shadowburn", g.CastLog);
+        }
+
+        [Fact]
+        public void Shadowburn_beats_the_Chaos_Bolt_filler_in_the_execute_window()
+        {
+            FakeGameClient g = LockGame();
+            g.InCombatFlag = true;
+            g.TargetUnit.HealthPercent = 15;
+            g.ItemCounts["Soul Shard"] = 4;
+            var s = new WarlockSettings();
+            s.UseConflagrate.Value = false; // Conflagrate (8f) would outrank Shadowburn (10f) while Immolate is up
+            s.UseRacials.Value = false;     // isolate from the racial bundle (2.5 band)
+            // Chaos Bolt is ON (12f) — Shadowburn (10f) still wins, and it fires even though DotsWillFinishTarget
+            // would suppress the Chaos Bolt/Incinerate fillers on this dying mob.
+            Assert.Equal("Shadowburn", Fire(g, s)?.Name);
+        }
+
+        [Fact]
+        public void No_Shadowburn_without_shards_above_the_keep()
+        {
+            FakeGameClient g = LockGame();
+            g.InCombatFlag = true;
+            g.TargetUnit.HealthPercent = 15;
+            g.ItemCounts["Soul Shard"] = 3; // only the keep amount → don't drain the pet/healthstone supply
+            RotationStep fired = Fire(g, NoBurst());
+            Assert.NotEqual("Shadowburn", fired?.Name);
+            Assert.DoesNotContain("Shadowburn", g.CastLog);
+        }
+
+        [Fact]
+        public void No_Shadowburn_above_20_percent()
+        {
+            FakeGameClient g = LockGame();
+            g.InCombatFlag = true;
+            g.TargetUnit.HealthPercent = 25; // outside the execute window
+            g.ItemCounts["Soul Shard"] = 4;
+            RotationStep fired = Fire(g, NoBurst());
+            Assert.NotEqual("Shadowburn", fired?.Name);
+            Assert.DoesNotContain("Shadowburn", g.CastLog);
+        }
+
+        [Fact]
+        public void Shadowburn_toggle_off_stops_it()
+        {
+            FakeGameClient g = LockGame();
+            g.InCombatFlag = true;
+            g.TargetUnit.HealthPercent = 15;
+            g.ItemCounts["Soul Shard"] = 4;
+            var s = NoBurst();
+            s.UseShadowburn.Value = false;
+            Assert.NotEqual("Shadowburn", Fire(g, s)?.Name);
+            Assert.DoesNotContain("Shadowburn", g.CastLog);
+        }
+
+        [Fact]
+        public void Shadowburn_skips_cleanly_when_unlearned()
+        {
+            FakeGameClient g = LockGame();
+            g.InCombatFlag = true;
+            g.TargetUnit.HealthPercent = 15;
+            g.ItemCounts["Soul Shard"] = 4;
+            g.UnknownSpells.Add("Shadowburn"); // low-level destro without it yet
+            Assert.NotEqual("Shadowburn", Fire(g, NoBurst())?.Name);
+            Assert.DoesNotContain("Shadowburn", g.CastLog);
+        }
+
         // --- filler ---
 
         [Fact]

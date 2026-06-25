@@ -43,6 +43,14 @@ namespace AIO3.Tests
         private static RotationStep Fire(FakeGameClient g, WarlockSettings s) =>
             new RotationEngine(new SoloDemonology(s).BuildSteps()).Tick(CombatContext.Capture(g));
 
+        // Racials fire in combat in their own 2.5 band; turn them off to isolate the Metamorphosis cooldown.
+        private static WarlockSettings NoRacials()
+        {
+            var s = new WarlockSettings();
+            s.UseRacials.Value = false;
+            return s;
+        }
+
         // --- filler / steady state ---
 
         [Fact]
@@ -84,6 +92,71 @@ namespace AIO3.Tests
             var s = new WarlockSettings();
             s.UseSoulFire.Value = false; // ...but the toggle is off
             Assert.NotEqual("Soul Fire", Fire(g, s)?.Name);
+        }
+
+        // --- Metamorphosis (the Demo capstone; mode setting) ---
+
+        [Fact]
+        public void Metamorphosis_fires_on_cooldown_in_combat_by_default()
+        {
+            FakeGameClient g = LockGame();
+            g.InCombatFlag = true; // Metamorphosis is combat-only
+            // Default mode "On cooldown" + known + ready + not already shifted → it pops over the filler.
+            Assert.Equal("Metamorphosis", Fire(g, NoRacials())?.Name);
+            Assert.Contains("Metamorphosis", g.CastLog);
+        }
+
+        [Fact]
+        public void Metamorphosis_does_not_fire_when_already_shifted()
+        {
+            FakeGameClient g = LockGame();
+            g.InCombatFlag = true;
+            g.MeUnit.WithAura("Metamorphosis"); // already in the form → don't re-pop it
+            Assert.NotEqual("Metamorphosis", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Metamorphosis_off_never_fires()
+        {
+            FakeGameClient g = LockGame();
+            g.InCombatFlag = true;
+            var s = new WarlockSettings();
+            s.Metamorphosis.Value = "Off";
+            Assert.NotEqual("Metamorphosis", Fire(g, s)?.Name);
+            Assert.DoesNotContain("Metamorphosis", g.CastLog);
+        }
+
+        [Fact]
+        public void Metamorphosis_on_bosses_holds_for_a_normal_mob()
+        {
+            FakeGameClient g = LockGame(); // a normal dummy (not elite/boss)
+            g.InCombatFlag = true;
+            var s = new WarlockSettings();
+            s.Metamorphosis.Value = "On bosses";
+            Assert.NotEqual("Metamorphosis", Fire(g, s)?.Name);
+            Assert.DoesNotContain("Metamorphosis", g.CastLog);
+        }
+
+        [Fact]
+        public void Metamorphosis_on_bosses_fires_on_an_elite()
+        {
+            FakeGameClient g = LockGame();
+            g.InCombatFlag = true;
+            g.TargetUnit.IsElite = true; // elite/boss → the "On bosses" mode allows it
+            var s = NoRacials();
+            s.Metamorphosis.Value = "On bosses";
+            Assert.Equal("Metamorphosis", Fire(g, s)?.Name);
+            Assert.Contains("Metamorphosis", g.CastLog);
+        }
+
+        [Fact]
+        public void Metamorphosis_skips_cleanly_when_unlearned()
+        {
+            FakeGameClient g = LockGame();
+            g.InCombatFlag = true;
+            g.UnknownSpells.Add("Metamorphosis"); // low-level demo without it yet
+            Assert.NotEqual("Metamorphosis", Fire(g)?.Name);
+            Assert.DoesNotContain("Metamorphosis", g.CastLog);
         }
 
         // --- Demonic Empowerment ---

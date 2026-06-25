@@ -20,7 +20,8 @@ namespace AIO3.Core.Rotations.Warlock
     /// in as it levels.
     ///
     /// Thin: composes the shared <see cref="WarlockCommon"/> caster baseline, <see cref="PetControl"/>, and the
-    /// Layer 3 <see cref="CombatBlocks"/>. Multi-target (Rain of Fire), Shadowfury, and Death Coil are deferred.
+    /// Layer 3 <see cref="CombatBlocks"/>. The Shadowburn execute (&lt;20% HP) and the shared Death Coil panic are
+    /// wired; multi-target (Rain of Fire) and Shadowfury are deferred.
     /// </summary>
     public sealed class SoloDestruction : IRotation
     {
@@ -30,6 +31,9 @@ namespace AIO3.Core.Rotations.Warlock
         private const int DotRefreshMs = 2000;
         // The Destruction filler nuke — referenced twice (the cast, and the Shadow-Bolt-until-learned gate).
         private const string Incinerate = "Incinerate";
+        // Shadowburn's execute window: it can only be cast on a target at or below this HP% (the spell's own
+        // mechanic), so the step never fires above it. One named source rather than a bare literal in the gate.
+        private const double ShadowburnExecutePercent = 20;
 
         private readonly WarlockSettings _settings;
         private readonly List<RotationStep> _steps;
@@ -82,7 +86,9 @@ namespace AIO3.Core.Rotations.Warlock
 
             // --- EMERGENCY break-melee (no Frost Nova; panic buttons, gated tightly on low HP) ---
             // Above Drain Life: you can't safely channel a heal while a mob beats on you — break melee first.
-            // Howl (surrounded) outranks single Fear; both skip cleanly when unknown / not low / not meleed.
+            // Death Coil wins over Howl/Fear (it ALSO heals); Howl (surrounded) outranks single Fear; all skip
+            // cleanly when unknown / not low / not meleed.
+            WarlockCommon.DeathCoil(_settings, priority: 1.8f),
             WarlockCommon.HowlOfTerror(_settings, priority: 1.85f),
             WarlockCommon.Fear(_settings, priority: 1.9f),
 
@@ -110,6 +116,16 @@ namespace AIO3.Core.Rotations.Warlock
 
             // --- Soul Shard harvest (on a dying mob when shards are low; sits above the filler nukes) ---
             WarlockCommon.DrainSoul(_settings, priority: 9.5f),
+
+            // --- execute ---
+            // Shadowburn: the instant sub-20% execute. Costs a Soul Shard, so only when we hold MORE than the keep
+            // (SoulShardKeep) — never draining the pet/healthstone supply, mirroring how the warlock guards shard
+            // spend elsewhere. Instant (no movement gate), and intentionally NOT gated on DotsWillFinishTarget: it
+            // fills the very window where the filler is suppressed on a dying mob. Auto-skips until learned.
+            Skill.Spell("Shadowburn").Priority(10f).On(Targets.CurrentEnemy)
+                 .When(ctx => _settings.UseShadowburn.Value
+                              && ctx.Target.HealthPercent < ShadowburnExecutePercent
+                              && ctx.Game.CountItems(Consumables.SoulShards) > _settings.SoulShardKeep.Value),
 
             // --- filler nukes (cast-time → stand still) ---
             // All three fillers skip once the DoTs will finish a low, normal mob on their own (saves mana /

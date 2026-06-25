@@ -18,8 +18,8 @@ namespace AIO3.Core.Rotations.Warlock
     /// unknown, so a low-level demo lock plays as a clean caster and fills in as it levels.
     ///
     /// Thin: composes the shared <see cref="WarlockCommon"/> caster baseline, <see cref="PetControl"/>, and the
-    /// Layer 3 <see cref="CombatBlocks"/>. Multi-target (Seed of Corruption / Rain of Fire), Metamorphosis, and
-    /// the pet's special abilities are deferred.
+    /// Layer 3 <see cref="CombatBlocks"/>. Metamorphosis (the capstone) is wired per the Metamorphosis mode
+    /// setting; multi-target (Seed of Corruption / Rain of Fire) is deferred.
     /// </summary>
     public sealed class SoloDemonology : IRotation
     {
@@ -27,6 +27,8 @@ namespace AIO3.Core.Rotations.Warlock
 
         // DoT refresh window: re-apply when fewer than this many ms remain (avoid clipping ticks).
         private const int DotRefreshMs = 2000;
+        // The Demonology capstone — referenced twice (the cast spell, and the "already shifted" aura check).
+        private const string Metamorphosis = "Metamorphosis";
 
         private readonly WarlockSettings _settings;
         private readonly List<RotationStep> _steps;
@@ -83,7 +85,9 @@ namespace AIO3.Core.Rotations.Warlock
 
             // --- EMERGENCY break-melee (no Frost Nova; panic buttons, gated tightly on low HP) ---
             // Above Drain Life: you can't safely channel a heal while a mob beats on you — break melee first.
-            // Howl (surrounded) outranks single Fear; both skip cleanly when unknown / not low / not meleed.
+            // Death Coil wins over Howl/Fear (it ALSO heals); Howl (surrounded) outranks single Fear; all skip
+            // cleanly when unknown / not low / not meleed.
+            WarlockCommon.DeathCoil(_settings, priority: 1.8f),
             WarlockCommon.HowlOfTerror(_settings, priority: 1.85f),
             WarlockCommon.Fear(_settings, priority: 1.9f),
 
@@ -91,6 +95,17 @@ namespace AIO3.Core.Rotations.Warlock
             WarlockCommon.DrainLife(_settings, priority: 2.0f),
 
             // (racials are appended by the shared Racials bundle at the 2.5 band)
+
+            // --- Metamorphosis: the Demonology capstone (big damage/survival form) — a cooldown, fired in combat
+            // per the mode setting: "On cooldown" whenever ready, "On bosses" only on an elite/boss. It is OFF the
+            // GCD in 3.3.5a, so it never costs the rotation a global. IsSpellReady throttles the long cooldown,
+            // IsSpellKnown auto-skips it until learned, and !HasAura stops re-popping it while already shifted.
+            Skill.Spell(Metamorphosis).Priority(3.5f).On(Targets.Self).OffGcd()
+                 .When(ctx => _settings.Metamorphosis.Value != "Off"
+                              && ctx.Game.PlayerInCombat
+                              && !ctx.Me.HasAura(Metamorphosis)
+                              && (_settings.Metamorphosis.Value == "On cooldown"
+                                  || (ctx.HasEnemyTarget && (ctx.Target.IsElite || ctx.Target.IsBoss())))),
 
             // --- DoTs (single-target upkeep, priority order) ---
             // Corruption / Immolate skip once the DoTs already on the mob will finish it (don't re-apply a long DoT

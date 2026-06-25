@@ -174,8 +174,8 @@ namespace AIO3.Core.Rotations.Warlock
             return ResolvePet(s, ctx, spec) == preferred ? preferred : null;
         }
 
-        /// <summary>The curse spell to maintain, from the chosen curse setting. Resolved at eval time so an
-        /// overlay edit swaps the curse live.</summary>
+        /// <summary>The curse spell the chosen curse setting maps to, WITHOUT the target-aware Doom fallback.
+        /// Resolved at eval time so an overlay edit swaps the curse live.</summary>
         public static string CurseSpell(WarlockSettings s)
         {
             switch (s.Curse.Value)
@@ -188,10 +188,30 @@ namespace AIO3.Core.Rotations.Warlock
             }
         }
 
+        /// <summary>The single-nuke Curse of Doom only deals its damage after a 60s delay — it does NOTHING if the
+        /// target dies first. On a normal leveling mob (and on anything already low) it never ticks, so it's a
+        /// wasted GCD and an empty curse slot. Below this HP% we won't apply Doom even on an elite/boss.</summary>
+        private const double CurseOfDoomMinHealthPercent = 50;
+
+        /// <summary>The curse to actually maintain on <paramref name="target"/>, applying the Curse-of-Doom guard:
+        /// Doom is a 60s-delayed single nuke that does nothing if the mob dies first, so it's only worth it on a
+        /// healthy elite/boss. On a normal mob (or anything below <see cref="CurseOfDoomMinHealthPercent"/>) we
+        /// FALL BACK to Curse of Agony — the ramping ticking DoT — so the curse slot is never left empty. Every
+        /// other curse choice resolves straight through <see cref="CurseSpell"/>.</summary>
+        public static string ResolveCurse(WarlockSettings s, IWowUnit target)
+        {
+            string curse = CurseSpell(s);
+            if (curse == "Curse of Doom" && target != null
+                && (!(target.IsElite || target.IsBoss()) || target.HealthPercent < CurseOfDoomMinHealthPercent))
+                return "Curse of Agony";
+            return curse;
+        }
+
         /// <summary>Maintain the chosen curse on the current target — cast when missing. The curse name is
-        /// resolved each tick (<see cref="CurseSpell"/>), so swapping the curse setting takes effect live; the
-        /// known/ready gate then auto-skips a curse the warlock has not learned yet. (Only one curse can be up
-        /// at a time, so we just check it is missing rather than a refresh window.)</summary>
+        /// resolved each tick against the target (<see cref="ResolveCurse"/>), so swapping the curse setting takes
+        /// effect live AND the Curse-of-Doom→Agony fallback adapts as the target changes; the known/ready gate
+        /// then auto-skips a curse the warlock has not learned yet. (Only one curse can be up at a time, so we
+        /// just check it is missing rather than a refresh window.)</summary>
         public static RotationStep MaintainCurse(WarlockSettings s, float priority) =>
             new RotationStep(
                 name: "Curse",
@@ -199,13 +219,13 @@ namespace AIO3.Core.Rotations.Warlock
                 targets: Targets.CurrentEnemy,
                 condition: (ctx, t) =>
                 {
-                    string curse = CurseSpell(s);
+                    string curse = ResolveCurse(s, t);
                     if (!ctx.Game.IsSpellKnown(curse) || !ctx.Game.IsSpellReady(curse)) return false;
                     float range = ctx.Game.SpellRange(curse);
                     if (range > 0f && t.Distance > range) return false;
                     return !t.HasMyAura(curse);
                 },
-                action: (ctx, t) => ctx.Game.Cast(CurseSpell(s), t));
+                action: (ctx, t) => ctx.Game.Cast(ResolveCurse(s, t), t));
 
         /// <summary>Below this range an enemy that is on us counts as "in melee" — the trigger for the Fear /
         /// Howl panic buttons (a cloth caster with no Frost Nova has to break melee to survive). One named
@@ -351,6 +371,36 @@ namespace AIO3.Core.Rotations.Warlock
         }
 
         // --- emergency Fear / Howl (panic buttons; a warlock has no Frost Nova) ---
+
+        /// <summary>
+        /// EMERGENCY Death Coil: when health is below <c>FearHealthPercent</c> AND a mob is meleeing us, Death
+        /// Coil the attacker on us. Death Coil is an INSTANT horror (1.5s flee) that ALSO heals the warlock for the
+        /// damage it deals — strictly better than the plain Fear panic button (Fear only scatters; Death Coil
+        /// scatters AND heals), so it sits ABOVE Fear/Howl and wins when both are eligible. Same tight gate as
+        /// <see cref="Fear"/> (low HP + actually meleed), same target picker (<see cref="FearTarget"/> — prefer the
+        /// current target when it is the one on us). Instant, so no movement gate. Known/ready gating is automatic,
+        /// so a low-level lock without Death Coil skips cleanly and the Fear/Howl panic below takes over.
+        /// </summary>
+        public static RotationStep DeathCoil(WarlockSettings s, float priority)
+        {
+            const string deathCoil = "Death Coil";
+            return new RotationStep(
+                name: deathCoil,
+                priority: priority,
+                targets: ctx => FearTarget(ctx) is IWowUnit u ? new[] { u } : Array.Empty<IWowUnit>(),
+                condition: (ctx, t) =>
+                {
+                    if (!s.UseDeathCoil.Value || s.FearHealthPercent.Value <= 0) return false;
+                    if (ctx.Me.HealthPercent >= s.FearHealthPercent.Value) return false;
+                    if (!ctx.Game.IsSpellKnown(deathCoil) || !ctx.Game.IsSpellReady(deathCoil)) return false;
+                    float range = ctx.Game.SpellRange(deathCoil);
+                    if (range > 0f && t.Distance > range) return false;
+                    // Only while actually meleed: t is already a meleeing-on-us enemy (see FearTarget).
+                    return true;
+                },
+                action: (ctx, t) => ctx.Game.Cast(deathCoil, t),
+                recastDelayMs: FearRecastMs);
+        }
 
         /// <summary>
         /// EMERGENCY single-target Fear: when health is below <c>FearHealthPercent</c> AND a mob is meleeing us,

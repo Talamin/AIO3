@@ -91,10 +91,52 @@ namespace AIO3.Tests
         {
             FakeGameClient g = LockGame();
             g.TargetUnit.Auras.Remove("Curse of Agony");
+            g.TargetUnit.IsElite = true; // a healthy elite → Curse of Doom is worth it (it'll tick before death)
             var s = new WarlockSettings();
             s.Curse.Value = "Doom";
             Assert.Equal("Curse", Fire(g, s)?.Name);
             Assert.Contains("Curse of Doom", g.CastLog);
+        }
+
+        // --- Curse of Doom → Agony fallback (a 60s-delayed nuke is wasted on a normal/low mob) ---
+
+        [Fact]
+        public void Curse_of_Doom_falls_back_to_Agony_on_a_normal_mob()
+        {
+            FakeGameClient g = LockGame();
+            g.TargetUnit.Auras.Remove("Curse of Agony"); // curse slot empty
+            var s = new WarlockSettings();
+            s.Curse.Value = "Doom"; // player picked Doom...
+            // ...but the target is a normal mob → Doom would never tick before it dies, so fall back to Agony.
+            Assert.Equal("Curse", Fire(g, s)?.Name);
+            Assert.Contains("Curse of Agony", g.CastLog);
+            Assert.DoesNotContain("Curse of Doom", g.CastLog);
+        }
+
+        [Fact]
+        public void Curse_of_Doom_applies_on_a_healthy_elite()
+        {
+            FakeGameClient g = LockGame();
+            g.TargetUnit.Auras.Remove("Curse of Agony");
+            g.TargetUnit.IsElite = true; // elite/boss with a huge HP pool → Doom ticks before death
+            var s = new WarlockSettings();
+            s.Curse.Value = "Doom";
+            Assert.Equal("Curse", Fire(g, s)?.Name);
+            Assert.Contains("Curse of Doom", g.CastLog);
+        }
+
+        [Fact]
+        public void Curse_of_Doom_falls_back_to_Agony_on_a_low_elite()
+        {
+            FakeGameClient g = LockGame();
+            g.TargetUnit.Auras.Remove("Curse of Agony");
+            g.TargetUnit.IsElite = true;
+            g.TargetUnit.HealthPercent = 40; // below the 50% Doom floor → it won't tick before death; use Agony
+            var s = new WarlockSettings();
+            s.Curse.Value = "Doom";
+            Assert.Equal("Curse", Fire(g, s)?.Name);
+            Assert.Contains("Curse of Agony", g.CastLog);
+            Assert.DoesNotContain("Curse of Doom", g.CastLog);
         }
 
         [Fact]

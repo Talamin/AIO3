@@ -105,6 +105,13 @@ namespace AIO3.Core.Rotations.Warlock
 
         // --- Rotation: Demonology-only (shown only while Demonology is the active spec) ---
 
+        /// <summary>When to pop Metamorphosis (the Demonology capstone — a big damage/survival form): "On cooldown"
+        /// uses it whenever it's ready, "On bosses" saves it for elites/bosses, "Off" never casts it. Auto-skips
+        /// until learned. Mirrors the old FC's SoloDemonologyMetamorphosis (OnCooldown / OnBosses / None).</summary>
+        public readonly ChoiceSetting Metamorphosis =
+            new ChoiceSetting("metamorphosis", "Metamorphosis", "On cooldown",
+                new[] { "On cooldown", "On bosses", "Off" });
+
         /// <summary>Keep Demonic Empowerment up on the demon (spec buff; auto-skips if unknown / petless).</summary>
         public readonly ToggleSetting DemonicEmpowerment =
             new ToggleSetting("demonicEmpowerment", "Demonic Empowerment on pet", value: true);
@@ -125,6 +132,12 @@ namespace AIO3.Core.Rotations.Warlock
         public readonly ToggleSetting UseChaosBolt =
             new ToggleSetting("chaosBolt", "Use Chaos Bolt", value: true);
 
+        /// <summary>Use Shadowburn (the instant sub-20% execute) to finish a low target — costs a Soul Shard, so it
+        /// only fires when we hold MORE than <see cref="SoulShardKeep"/> shards (never draining the pet/healthstone
+        /// supply). Fills the window where the normal filler is suppressed by "let DoTs finish".</summary>
+        public readonly ToggleSetting UseShadowburn =
+            new ToggleSetting("shadowburn", "Shadowburn execute below 20% HP", value: true);
+
         /// <summary>Use an emergency healthstone/potion below this health %. 0 disables it.</summary>
         public readonly IntSetting EmergencyHealthPercent =
             new IntSetting("emergencyHp", "Emergency item below HP%", value: 30, min: 0, max: 90, step: 5);
@@ -134,6 +147,12 @@ namespace AIO3.Core.Rotations.Warlock
         /// <summary>Channel Drain Life to self-heal when low and solo (no healer to rely on). 0 disables it.</summary>
         public readonly IntSetting DrainLifeHealthPercent =
             new IntSetting("drainLifeHp", "Drain Life below HP%", value: 40, min: 0, max: 90, step: 5);
+
+        /// <summary>EMERGENCY Death Coil: when low AND meleed, Death Coil the attacker — an instant horror (1.5s
+        /// flee) that ALSO heals us for the damage dealt. Strictly better than the Fear panic (Fear only scatters;
+        /// Death Coil scatters AND heals), so it wins over Fear/Howl. Shares the Fear/Howl low-HP threshold.</summary>
+        public readonly ToggleSetting UseDeathCoil =
+            new ToggleSetting("useDeathCoil", "Emergency Death Coil when meleed + low HP", value: true);
 
         /// <summary>EMERGENCY Fear: with no Frost Nova, Fear the mob meleeing you to break melee for a brief heal
         /// window when low. A panic button, not a kite (DoTs break Fear).</summary>
@@ -218,13 +237,16 @@ namespace AIO3.Core.Rotations.Warlock
 
             // Spec-only knobs live in the Rotation tab but tag their spec, so the overlay shows them ONLY while
             // that spec is active (Spec strings match WarlockSpec.ToString()). No more standalone spec tabs.
+            Metamorphosis.Category = "Rotation";      Metamorphosis.Spec = "Demonology";
             DemonicEmpowerment.Category = "Rotation"; DemonicEmpowerment.Spec = "Demonology";
             UseSoulFire.Category = "Rotation";        UseSoulFire.Spec = "Demonology";
 
             UseConflagrate.Category = "Rotation"; UseConflagrate.Spec = "Destruction";
             UseChaosBolt.Category = "Rotation";   UseChaosBolt.Spec = "Destruction";
+            UseShadowburn.Category = "Rotation";  UseShadowburn.Spec = "Destruction";
 
             DrainLifeHealthPercent.Category = "Survival";
+            UseDeathCoil.Category = "Survival";
             UseFear.Category = "Survival";
             FearHealthPercent.Category = "Survival";
             UseHowl.Category = "Survival";
@@ -250,10 +272,10 @@ namespace AIO3.Core.Rotations.Warlock
                 // Rotation (general, then the spec-only knobs that show only in their spec)
                 CombatRange, Curse, UseRacials, InterruptCasts, LetDotsFinishHealthPercent,
                 UseDrainSoul, DrainSoulHealthPercent, SoulShardKeep, EmergencyHealthPercent,
-                DemonicEmpowerment, UseSoulFire,   // Demonology-only
-                UseConflagrate, UseChaosBolt,      // Destruction-only
+                Metamorphosis, DemonicEmpowerment, UseSoulFire,   // Demonology-only
+                UseConflagrate, UseChaosBolt, UseShadowburn,      // Destruction-only
                 // Survival
-                DrainLifeHealthPercent, UseFear, FearHealthPercent, UseHowl,
+                DrainLifeHealthPercent, UseDeathCoil, UseFear, FearHealthPercent, UseHowl,
                 // Mana
                 LifeTapManaPercent, LifeTapHealthFloor, GlyphLifeTap, UseWand, WandManaPercent,
                 // Spec

@@ -87,7 +87,9 @@ namespace AIO3.Core.Rotations.Warlock
 
             // --- EMERGENCY break-melee (no Frost Nova; panic buttons, gated tightly on low HP) ---
             // Above Drain Life: you can't safely channel a heal while a mob beats on you — break melee first.
-            // Howl (surrounded) outranks single Fear; both skip cleanly when unknown / not low / not meleed.
+            // Death Coil wins over Howl/Fear (it ALSO heals); Howl (surrounded) outranks single Fear; all skip
+            // cleanly when unknown / not low / not meleed.
+            WarlockCommon.DeathCoil(_settings, priority: 1.8f),
             WarlockCommon.HowlOfTerror(_settings, priority: 1.85f),
             WarlockCommon.Fear(_settings, priority: 1.9f),
 

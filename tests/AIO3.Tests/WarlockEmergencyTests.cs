@@ -63,6 +63,97 @@ namespace AIO3.Tests
         private static RotationStep Fire(FakeGameClient g, WarlockSettings s) =>
             new RotationEngine(new SoloAffliction(s).BuildSteps()).Tick(CombatContext.Capture(g));
 
+        // Death Coil now outranks Fear/Howl by default (it also heals), so the Fear/Howl tests below disable it to
+        // isolate the spell they exercise.
+        private static WarlockSettings NoDeathCoil()
+        {
+            var s = new WarlockSettings();
+            s.UseDeathCoil.Value = false;
+            return s;
+        }
+
+        // --- Death Coil (panic heal; wins over Fear/Howl) ---
+
+        [Fact]
+        public void Death_Coils_the_meleeing_mob_when_low()
+        {
+            FakeGameClient g = LockGame();
+            g.MeUnit.HealthPercent = 20; // below FearHealthPercent (25)
+            g.TargetUnit.Distance = 4;
+            g.TargetUnit.IsTargetingMe = true;
+            Assert.Equal("Death Coil", Fire(g)?.Name);
+            Assert.Contains("Death Coil", g.CastLog);
+        }
+
+        [Fact]
+        public void Death_Coil_beats_single_Fear_when_both_are_eligible()
+        {
+            FakeGameClient g = LockGame();
+            g.MeUnit.HealthPercent = 20;
+            g.TargetUnit.Distance = 4;
+            g.TargetUnit.IsTargetingMe = true;
+            // Both Fear and Death Coil are eligible (low + meleed) — Death Coil wins (it also heals).
+            Assert.Equal("Death Coil", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Death_Coil_beats_Howl_when_surrounded()
+        {
+            FakeGameClient g = LockGame();
+            g.MeUnit.HealthPercent = 20;
+            AddMeleeAttacker(g, 2);
+            AddMeleeAttacker(g, 3); // surrounded → Howl is eligible, but Death Coil still wins
+            Assert.Equal("Death Coil", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Does_not_Death_Coil_at_full_health_even_when_meleed()
+        {
+            FakeGameClient g = LockGame();
+            g.TargetUnit.Distance = 4;
+            g.TargetUnit.IsTargetingMe = true;
+            RotationStep fired = Fire(g);
+            Assert.NotEqual("Death Coil", fired?.Name);
+            Assert.DoesNotContain("Death Coil", g.CastLog);
+        }
+
+        [Fact]
+        public void Does_not_Death_Coil_when_low_but_nothing_is_meleeing_us()
+        {
+            FakeGameClient g = LockGame();
+            g.MeUnit.HealthPercent = 20; // low, but the target is at 30yd and not on us
+            RotationStep fired = Fire(g);
+            Assert.NotEqual("Death Coil", fired?.Name);
+            Assert.DoesNotContain("Death Coil", g.CastLog);
+        }
+
+        [Fact]
+        public void UseDeathCoil_toggle_off_falls_back_to_Fear()
+        {
+            FakeGameClient g = LockGame();
+            g.MeUnit.HealthPercent = 20;
+            g.TargetUnit.Distance = 4;
+            g.TargetUnit.IsTargetingMe = true;
+            var s = new WarlockSettings();
+            s.UseDeathCoil.Value = false; // off → the Fear panic still breaks melee
+            RotationStep fired = Fire(g, s);
+            Assert.NotEqual("Death Coil", fired?.Name);
+            Assert.Equal("Fear", fired?.Name);
+        }
+
+        [Fact]
+        public void Low_level_lock_without_Death_Coil_falls_back_to_Fear()
+        {
+            FakeGameClient g = LockGame();
+            g.MeUnit.HealthPercent = 20;
+            g.TargetUnit.Distance = 4;
+            g.TargetUnit.IsTargetingMe = true;
+            g.UnknownSpells.Add("Death Coil"); // not learned yet → skips cleanly, Fear takes over
+            RotationStep fired = Fire(g);
+            Assert.NotEqual("Death Coil", fired?.Name);
+            Assert.Equal("Fear", fired?.Name);
+        }
+
         // --- Fear (single) ---
 
         [Fact]
@@ -73,7 +164,7 @@ namespace AIO3.Tests
             // The current target is the one in melee on us → Fear it.
             g.TargetUnit.Distance = 4;
             g.TargetUnit.IsTargetingMe = true;
-            Assert.Equal("Fear", Fire(g)?.Name);
+            Assert.Equal("Fear", Fire(g, NoDeathCoil())?.Name);
             Assert.Contains("Fear", g.CastLog);
         }
 
@@ -85,7 +176,7 @@ namespace AIO3.Tests
             // The kill target is at range and not on us; a separate add is meleeing us → Fear fires for the add
             // (the FearTarget picker selects the meleeing-on-us enemy, since the ranged target isn't on us).
             AddMeleeAttacker(g, 2);
-            Assert.Equal("Fear", Fire(g)?.Name);
+            Assert.Equal("Fear", Fire(g, NoDeathCoil())?.Name);
             Assert.Contains("Fear", g.CastLog);
         }
 
@@ -161,7 +252,7 @@ namespace AIO3.Tests
             // Two adds meleeing us = surrounded → Howl beats single Fear.
             AddMeleeAttacker(g, 2);
             AddMeleeAttacker(g, 3);
-            Assert.Equal("Howl of Terror", Fire(g)?.Name);
+            Assert.Equal("Howl of Terror", Fire(g, NoDeathCoil())?.Name);
             Assert.Contains("Howl of Terror", g.CastLog);
         }
 
@@ -171,7 +262,7 @@ namespace AIO3.Tests
             FakeGameClient g = LockGame();
             g.MeUnit.HealthPercent = 20;
             AddMeleeAttacker(g, 2); // only one mob on us → single Fear handles it, not Howl
-            RotationStep fired = Fire(g);
+            RotationStep fired = Fire(g, NoDeathCoil());
             Assert.NotEqual("Howl of Terror", fired?.Name);
             Assert.DoesNotContain("Howl of Terror", g.CastLog);
             Assert.Equal("Fear", fired?.Name); // the single-target panic instead
@@ -196,7 +287,7 @@ namespace AIO3.Tests
             g.MeUnit.HealthPercent = 20;
             AddMeleeAttacker(g, 2);
             AddMeleeAttacker(g, 3);
-            var s = new WarlockSettings();
+            var s = NoDeathCoil(); // isolate Fear/Howl from Death Coil
             s.UseHowl.Value = false; // no AoE fear, but the single Fear still breaks one mob
             RotationStep fired = Fire(g, s);
             Assert.NotEqual("Howl of Terror", fired?.Name);
