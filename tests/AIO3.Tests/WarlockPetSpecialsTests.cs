@@ -32,6 +32,7 @@ namespace AIO3.Tests
             g.MeUnit.PowerPercent = 100;
             g.MeUnit.HealthPercent = 100;
             g.MeUnit.WithAura("Fel Armor");
+            g.MeUnit.WithAura("Unending Breath"); // underwater-breathing buff up, so the OOC self-cast stays quiet
             g.TargetUnit.WithAura("Haunt", mine: true, timeLeftMs: Fresh);
             g.TargetUnit.WithAura("Curse of Agony", mine: true, timeLeftMs: Fresh);
             g.TargetUnit.WithAura("Corruption", mine: true, timeLeftMs: Fresh);

@@ -40,6 +40,15 @@ namespace AIO3.Core.Rotations.Warlock
                     return armor != null ? ctx.Game.Cast(armor, ctx.Me) : CastResult.Failed;
                 });
 
+        /// <summary>Keep Unending Breath up — the warlock's underwater-breathing buff — by self-casting it when
+        /// missing, so you can breathe the moment you hit water. Out of combat only (not worth a GCD mid-fight; the
+        /// 10-min buff is re-applied between pulls) and not while mounted (the cast would dismount you). Auto-skips
+        /// until it's learned (IsSpellKnown). Instant.</summary>
+        public static RotationStep UnendingBreath(float priority) =>
+            Skill.Spell("Unending Breath").Priority(priority).On(Targets.Self)
+                 .When(ctx => !ctx.Game.PlayerInCombat && !ctx.Game.PlayerIsMounted
+                              && !ctx.Me.HasAura("Unending Breath"));
+
         /// <summary>Life Tap — trade health for mana when mana is low, but only while health is above the floor
         /// (so we never tap ourselves into danger). Instant, so it does not gate on movement.</summary>
         public static RotationStep LifeTap(WarlockSettings s, float priority) =>

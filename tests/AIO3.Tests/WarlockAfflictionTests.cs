@@ -26,6 +26,7 @@ namespace AIO3.Tests
             g.MeUnit.PowerPercent = 100;
             g.MeUnit.HealthPercent = 100;
             g.MeUnit.WithAura("Fel Armor"); // armor up
+            g.MeUnit.WithAura("Unending Breath"); // underwater-breathing buff up, so the OOC self-cast stays quiet
             // DoTs already up with plenty of time left → maintenance quiet, rotation falls to the filler.
             g.TargetUnit.WithAura("Haunt", mine: true, timeLeftMs: Fresh);
             g.TargetUnit.WithAura("Curse of Agony", mine: true, timeLeftMs: Fresh);
@@ -228,6 +229,23 @@ namespace AIO3.Tests
             g.UnknownSpells.Add("Fel Armor");
             Assert.Equal("Armor", Fire(g)?.Name);
             Assert.Contains("Demon Armor", g.CastLog);
+        }
+
+        [Fact]
+        public void Casts_Unending_Breath_out_of_combat_when_missing()
+        {
+            FakeGameClient g = LockGame();
+            g.MeUnit.Auras.Remove("Unending Breath"); // buff dropped; OOC + not mounted → re-apply it
+            Assert.Equal("Unending Breath", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Does_not_cast_Unending_Breath_in_combat()
+        {
+            FakeGameClient g = LockGame();
+            g.MeUnit.Auras.Remove("Unending Breath");
+            g.InCombatFlag = true; // mid-fight → don't waste a GCD on the breathing buff
+            Assert.NotEqual("Unending Breath", Fire(g)?.Name);
         }
 
         // --- pet ---

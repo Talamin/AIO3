@@ -54,6 +54,8 @@ namespace AIO3.Core.Rotations.Warlock
 
             // --- buffs ---
             WarlockCommon.Armor(_settings, priority: 0.5f),
+            // Keep Unending Breath (underwater breathing) up out of combat, once learned.
+            WarlockCommon.UnendingBreath(priority: 0.55f),
             // Keep a Healthstone stocked (OOC). Priority sits BELOW the pet summon (0.6) so summoning the demon
             // gets first claim on a Soul Shard — a Healthstone is only made from a surplus shard, never the pet's.
             WarlockCommon.CreateHealthstone(_settings, priority: 0.85f),
