@@ -67,6 +67,17 @@ namespace AIO3.Core.Rotations.Rogue
         public readonly ToggleSetting UseCooldowns =
             new ToggleSetting("cooldowns", "Use cooldowns (Adrenaline Rush / Killing Spree)", value: true);
 
+        /// <summary>Keep weapon poisons applied out of combat: Instant Poison on the main hand, Deadly Poison (else
+        /// Instant) on the off hand, using the best rank carried for the rogue's level. On by default. The apply
+        /// briefly stops the character, so it only fires out of combat (never mid-fight).</summary>
+        public readonly ToggleSetting UsePoisons =
+            new ToggleSetting("poisons", "Apply weapon poisons", value: true);
+
+        /// <summary>Reapply a weapon's poison once it drops under this many minutes remaining. Weapon poisons last
+        /// ~60 min in 3.3.5a, so 5 tops them up roughly hourly; a fresh/expired weapon (0 min) reapplies at once.</summary>
+        public readonly IntSetting PoisonRefreshMinutes =
+            new IntSetting("poisonRefreshMin", "Reapply poison under (min)", value: 5, min: 1, max: 30, step: 1);
+
         // --- Rotation: Combat-only (shown only while Combat is the active spec) ---
 
         /// <summary>Use Blade Flurry when at least this many enemies are within melee (its cleave is wasted on a
@@ -106,13 +117,13 @@ namespace AIO3.Core.Rotations.Rogue
         public readonly ToggleSetting UseColdBlood =
             new ToggleSetting("coldBlood", "Use Cold Blood with finishers", value: true);
 
-        /// <summary>Which finisher Assassination spends combo points on. Defaults to Eviscerate because poisons are
-        /// deferred to the player/product — Envenom with 0 Deadly Poison stacks hits weaker than Eviscerate, so until
-        /// you poison your weapons Eviscerate is the better dump. Switch to Envenom (the signature finisher, which
-        /// scales with Deadly Poison stacks) or Auto (Envenom when it's known, else Eviscerate) once you apply
-        /// poisons. Assassination-only.</summary>
+        /// <summary>Which finisher Assassination spends combo points on. Defaults to Auto now that the rogue applies
+        /// its own poisons (<see cref="UsePoisons"/>): Auto picks Envenom — the signature finisher that scales with
+        /// the Deadly Poison stacks the off-hand builds — when it's learned, else Eviscerate (so a low-level rogue
+        /// still has a working dump). Force "Envenom" or "Eviscerate" to override (e.g. set Eviscerate if you turn
+        /// poisons off). Assassination-only.</summary>
         public readonly ChoiceSetting AssassinationFinisher =
-            new ChoiceSetting("assassFinisher", "Finisher", "Eviscerate", new[] { "Auto", "Envenom", "Eviscerate" });
+            new ChoiceSetting("assassFinisher", "Finisher", "Auto", new[] { "Auto", "Envenom", "Eviscerate" });
 
         /// <summary>True when the rotation should use Envenom as the finisher: explicitly chosen, or "Auto" — the
         /// Envenom step still auto-skips via IsSpellKnown when it isn't learned, so Auto falls back to Eviscerate
@@ -175,6 +186,8 @@ namespace AIO3.Core.Rotations.Rogue
             UseSprint.Category = "Rotation";
             UseRacials.Category = "Rotation";
             UseCooldowns.Category = "Rotation";
+            UsePoisons.Category = "Rotation";
+            PoisonRefreshMinutes.Category = "Rotation";
 
             // Combat-only knobs live in the Rotation tab but tag their spec, so the overlay shows them ONLY while
             // Combat is active (Spec strings match RogueSpec.ToString()).
@@ -204,7 +217,7 @@ namespace AIO3.Core.Rotations.Rogue
             {
                 // Rotation (general, then the Combat-only knobs that show only in Combat)
                 CombatRange, InterruptMode, FinisherComboPoints, UseRupture, UseStealth, StealthOpener, UseSprint,
-                UseRacials, UseCooldowns,
+                UseRacials, UseCooldowns, UsePoisons, PoisonRefreshMinutes,
                 BladeFlurryEnemies, AdrenalineRushEnemies, KillingSpreeEnemies, // Combat-only
                 AssassinationUseRupture, UseHungerForBlood, UseColdBlood, AssassinationFinisher,
                 FanOfKnivesEnemies, // Assassination-only

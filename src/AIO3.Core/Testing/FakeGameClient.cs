@@ -232,6 +232,20 @@ namespace AIO3.Core.Testing
             return total;
         }
 
+        /// <summary>Weapon-enchant state returned by <see cref="GetWeaponEnchant"/>. Default = nothing equipped /
+        /// 0 ms; a poison test opts in by setting the equipped hands + remaining time.</summary>
+        public WeaponEnchant WeaponEnchantState;
+        public WeaponEnchant GetWeaponEnchant() => WeaponEnchantState;
+
+        /// <summary>Item ids considered present in the bags, for <see cref="HasItemById"/> (e.g. poison ranks).</summary>
+        public readonly HashSet<uint> ItemIdsInBags = new HashSet<uint>();
+        public bool HasItemById(uint itemId) => ItemIdsInBags.Contains(itemId);
+
+        /// <summary>Poisons applied via <see cref="ApplyPoisonToWeapon"/>, in order (id + which hand).</summary>
+        public readonly List<PoisonApplication> AppliedPoisons = new List<PoisonApplication>();
+        public void ApplyPoisonToWeapon(uint poisonItemId, bool mainHand)
+            => AppliedPoisons.Add(new PoisonApplication(poisonItemId, mainHand));
+
         /// <summary>GUIDs Polymorph was cast on, in order; PolymorphResult controls whether it "succeeds"
         /// (false simulates the add not being a sheepable type / unknown).</summary>
         public readonly List<ulong> PolymorphLog = new List<ulong>();
@@ -244,5 +258,13 @@ namespace AIO3.Core.Testing
         }
 
         public void RunLocked(Action action) => action();
+    }
+
+    /// <summary>A recorded poison application (which item id went on which hand) for asserting in tests.</summary>
+    public readonly struct PoisonApplication
+    {
+        public readonly uint PoisonId;
+        public readonly bool MainHand;
+        public PoisonApplication(uint poisonId, bool mainHand) { PoisonId = poisonId; MainHand = mainHand; }
     }
 }

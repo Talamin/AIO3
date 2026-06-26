@@ -11,6 +11,7 @@ using wManager.Wow.Helpers;
 using wManager.Wow.ObjectManager;
 using WReaction = wManager.Wow.Enums.Reaction;
 using HitFlags = wManager.Wow.Enums.CGWorldFrameHitFlags;
+using InventorySlot = wManager.Wow.Enums.InventorySlot;
 
 namespace AIO3.Adapter
 {
@@ -782,6 +783,68 @@ namespace AIO3.Adapter
             int total = Lua.LuaDoString<int>("return " + sum);
             _itemCountCache[key] = (total, Now);
             return total;
+        }
+
+        // Weapon temp-enchant (poison) state, cached ~1s so the rogue's OOC poison upkeep can read it every tick
+        // without a Lua round-trip each time. Reapplication is ~hourly, so a 1s cache is plenty fresh; applying a
+        // poison invalidates it (_weaponEnchantFresh=false) so the next read reflects the new enchant immediately.
+        private const int WeaponEnchantTtlMs = 1000;
+        private WeaponEnchant _weaponEnchant;
+        private int _weaponEnchantAt;
+        private bool _weaponEnchantFresh;
+
+        public WeaponEnchant GetWeaponEnchant()
+        {
+            if (_weaponEnchantFresh && unchecked(Now - _weaponEnchantAt) < WeaponEnchantTtlMs) return _weaponEnchant;
+
+            bool mainEquipped = ObjectManager.Me.GetEquipedItemBySlot(InventorySlot.INVSLOT_MAINHAND) != 0;
+            bool offEquipped = ObjectManager.Me.GetEquipedItemBySlot(InventorySlot.INVSLOT_OFFHAND) != 0;
+
+            // GetWeaponEnchantInfo() -> hasMain, mainExpirationMs, mainCharges, hasOff, offExpirationMs, offCharges.
+            // Expiration is MILLISECONDS remaining; a hand with no enchant returns 0 (so the upkeep treats it as
+            // needing poison). We only read the has-flag + expiration for each hand.
+            string[] r = Lua.LuaDoString<string[]>(
+                "local hm, me, _, ho, oe = GetWeaponEnchantInfo(); " +
+                "return tostring(hm), tostring(me or 0), tostring(ho), tostring(oe or 0);");
+            int mainMs = (r != null && r.Length > 1 && r[0] == "true") ? ParseIntSafe(r[1]) : 0;
+            int offMs = (r != null && r.Length > 3 && r[2] == "true") ? ParseIntSafe(r[3]) : 0;
+
+            _weaponEnchant = new WeaponEnchant(mainEquipped, mainMs, offEquipped, offMs);
+            _weaponEnchantAt = Now;
+            _weaponEnchantFresh = true;
+            return _weaponEnchant;
+        }
+
+        private static int ParseIntSafe(string s) => int.TryParse(s, out int v) ? v : 0;
+
+        public bool HasItemById(uint itemId) => ItemsManager.HasItemById(itemId);
+
+        // Apply a poison item to a weapon: plant the character so the apply lands, USE the poison (which enters the
+        // apply-to-weapon CURSOR mode), then PickupInventoryItem on the chosen slot applies it and clicking the static
+        // popup confirms replacing any existing enchant. Off-hand's Lua slot token is "SecondaryHandSlot".
+        //
+        // CRITICAL: use the poison BY NAME (resolved from the id), NOT ItemsManager.UseItem(uint). The by-id overload
+        // does a plain "use", which for a poison lands on the MAIN hand regardless of the slot we then pick — so every
+        // poison overwrote the main weapon and the off hand never got one (Daniel's bug). UseItem(name) is the proven
+        // mechanic from the old AIO ApplyPoison: it puts the poison on the cursor so PickupInventoryItem(slot) targets
+        // the hand we chose. GetItemInfo returns the client-localized name, which UseItem(name) matches — so this is
+        // still locale-safe. The Core step's RecastDelay throttles re-issue.
+        public void ApplyPoisonToWeapon(uint poisonItemId, bool mainHand)
+        {
+            if (!ItemsManager.HasItemById(poisonItemId)) return; // not carried — nothing to apply
+
+            string poisonName = Lua.LuaDoString<string>("local n = GetItemInfo(" + poisonItemId + "); return n or '';");
+            if (string.IsNullOrEmpty(poisonName)) return; // name not in the client cache yet → skip, retry next tick
+
+            string slot = mainHand ? "MainHandSlot" : "SecondaryHandSlot";
+
+            MovementManager.StopMove();
+            MovementManager.StopMoveTo(false, 1000);
+            ItemsManager.UseItem(poisonName);
+            Lua.LuaDoString("PickupInventoryItem(GetInventorySlotInfo(\"" + slot + "\")); StaticPopup1Button1:Click();");
+
+            _weaponEnchantFresh = false; // force a fresh read next tick (the enchant just changed)
+            DebugLog.Write($"Applied poison {poisonName} ({poisonItemId}) on {slot}");
         }
 
         // Whether a creature entry is a sheepable type (Beast/Humanoid/Critter). Cached so we only pay one Lua

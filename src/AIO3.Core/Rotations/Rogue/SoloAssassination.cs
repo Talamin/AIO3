@@ -11,8 +11,9 @@ namespace AIO3.Core.Rotations.Rogue
     /// baseline as Combat: keep Slice and Dice up, maintain the bleed + Hunger for Blood, and spend combo points on
     /// Envenom (the signature finisher) — built with Mutilate (daggers) and Sinister Strike as the dagger-less /
     /// pre-Mutilate fallback. Positional-FREE: it opens from the FRONT with Cheap Shot (Garrote, which needs to be
-    /// behind, stays the opt-in opener). Poisons are deferred to the player/product, so this functions with no
-    /// poison managed (Envenom is still chosen, but auto-falls back to Eviscerate when unknown / unwanted).
+    /// behind, stays the opt-in opener). The rogue keeps its own weapon poisons applied out of combat (Deadly Poison
+    /// on the off hand feeds Envenom's stacks), so Envenom is the default finisher; it still auto-falls back to
+    /// Eviscerate when unknown / when poisons are turned off.
     ///
     /// Thin: composes the shared <see cref="RogueCommon"/> melee baseline and the Layer 3 <see cref="CombatBlocks"/>
     /// / racials, and adds only the Assassination-specific filler in priority order. It deliberately omits the
@@ -54,6 +55,11 @@ namespace AIO3.Core.Rotations.Rogue
             // --- defensives (off the GCD) — shared with Combat ---
             RogueCommon.Evasion(_settings, priority: 0.2f),
             RogueCommon.CloakOfShadows(_settings, priority: 0.3f),
+
+            // --- out-of-combat prep ---
+            // Keep weapon poisons applied (Instant main / Deadly off — Deadly feeds Envenom). OOC-gated and above the
+            // stealth opener so a hand is topped up before the pull; reapplies ~hourly, so it barely stops the bot.
+            RogueCommon.MaintainPoisons(_settings, priority: 0.35f),
 
             // --- opener (positional-free by default) ---
             // Stealth out of combat (opt-in) so the fight can start from stealth; never fights the product's pull.

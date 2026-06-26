@@ -1,5 +1,6 @@
 using System.Linq;
 using AIO3.Core.Combat;
+using AIO3.Core.Data;
 using AIO3.Core.Dsl;
 using AIO3.Core.Engine;
 using AIO3.Core.Game;
@@ -287,6 +288,70 @@ namespace AIO3.Core.Rotations.Rogue
             string mode = s.StealthOpener.Value;
             if (mode != "Auto") return mode == spell;
             return ctx.Game.PlayerIsBehindTarget() ? spell == "Garrote" : spell == "Cheap Shot";
+        }
+
+        // --- Weapon poisons (out-of-combat upkeep) ---
+
+        /// <summary>Don't re-issue the poison apply for this long after one fires — the apply is near-instant, but
+        /// this covers the use→enchant-registers gap so the step doesn't spam it (mirrors the old AIO ApplyPoison's
+        /// 5000ms step timer).</summary>
+        public const int PoisonApplyThrottleMs = 5000;
+
+        /// <summary>Out-of-combat weapon-poison upkeep: keep Instant Poison on the MAIN hand and Deadly Poison (else
+        /// Instant) on the OFF hand, reapplying when a hand's poison drops under the configured minutes — or is
+        /// missing (a fresh/expired hand reads 0 ms and reapplies). Picks the highest poison rank the rogue's level
+        /// allows AND carries; if none is carried the step falls through (no spin). OOC only — applying briefly stops
+        /// the character, so it never interrupts a live fight — and not mounted. Opt-out via UsePoisons. Mirrors the
+        /// old AIO ApplyPoison addon (minus its mis-ordered Deadly table; see <see cref="RoguePoisons"/>).</summary>
+        public static RotationStep MaintainPoisons(RogueSettings s, float priority) =>
+            new RotationStep(
+                name: "Apply poisons",
+                priority: priority,
+                targets: Targets.Self,
+                condition: (ctx, t) => s.UsePoisons.Value
+                                       && !ctx.Game.PlayerInCombat
+                                       && !ctx.Game.PlayerIsMounted
+                                       && ChoosePoison(ctx, s).HasValue,
+                action: (ctx, t) =>
+                {
+                    PoisonChoice? choice = ChoosePoison(ctx, s);
+                    if (choice == null) return CastResult.Failed;
+                    ctx.Game.ApplyPoisonToWeapon(choice.Value.PoisonId, choice.Value.MainHand);
+                    return CastResult.Success;
+                },
+                ignoreGcd: true,
+                recastDelayMs: PoisonApplyThrottleMs);
+
+        /// <summary>A pending poison application: which poison id goes on which hand.</summary>
+        private readonly struct PoisonChoice
+        {
+            public readonly uint PoisonId;
+            public readonly bool MainHand;
+            public PoisonChoice(uint poisonId, bool mainHand) { PoisonId = poisonId; MainHand = mainHand; }
+        }
+
+        /// <summary>Which poison to apply to which hand right now, or null if nothing needs it. Reads the weapon
+        /// enchant state once plus the highest usable Instant/Deadly ranks (by level + carried), then applies the
+        /// strategy: Instant on the main hand; Deadly (else Instant) on the off hand — each only when that hand is
+        /// equipped and its poison is under the refresh window. Main hand is checked first, so a fight-approach tick
+        /// tops up at most one hand per <see cref="PoisonApplyThrottleMs"/>; the next eligible tick does the other.</summary>
+        private static PoisonChoice? ChoosePoison(CombatContext ctx, RogueSettings s)
+        {
+            WeaponEnchant we = ctx.Game.GetWeaponEnchant();
+            int thresholdMs = s.PoisonRefreshMinutes.Value * 60000;
+            int level = ctx.Me.Level;
+
+            uint instant = RoguePoisons.BestUsableInstant(level, ctx.Game.HasItemById);
+            if (we.MainHandEquipped && we.MainHandRemainingMs < thresholdMs && instant != 0)
+                return new PoisonChoice(instant, mainHand: true);
+
+            if (we.OffHandEquipped && we.OffHandRemainingMs < thresholdMs)
+            {
+                uint deadly = RoguePoisons.BestUsableDeadly(level, ctx.Game.HasItemById);
+                if (deadly != 0) return new PoisonChoice(deadly, mainHand: false);
+                if (instant != 0) return new PoisonChoice(instant, mainHand: false);
+            }
+            return null;
         }
     }
 }

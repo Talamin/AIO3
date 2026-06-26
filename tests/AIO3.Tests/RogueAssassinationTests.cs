@@ -104,16 +104,17 @@ namespace AIO3.Tests
             Assert.Equal("Mutilate", Fire(g)?.Name);
         }
 
-        // --- Eviscerate is the DEFAULT finisher now (poisons are deferred, so Envenom at 0 Deadly Poison stacks is
-        //     weaker than Eviscerate); Envenom is chosen only when the player switches the finisher to Envenom/Auto ---
+        // --- Envenom is the DEFAULT finisher now: the rogue applies its own poisons (Deadly on the off hand feeds
+        //     Envenom's stacks), so the finisher defaults to "Auto" = Envenom-when-known; it falls back to Eviscerate
+        //     only when Envenom isn't learned or is forced off ---
 
         [Fact]
-        public void Eviscerate_is_the_default_finisher_at_the_threshold()
+        public void Envenom_is_the_default_finisher_at_the_threshold()
         {
             var g = RogueGame();
             g.MeUnit.WithAura("Slice and Dice"); // keep SnD upkeep out of the way
             g.ComboPointCount = 3;               // default finisher threshold
-            Assert.Equal("Eviscerate", Fire(g)?.Name); // default finisher is Eviscerate (poisons deferred)
+            Assert.Equal("Envenom", Fire(g)?.Name); // default finisher is Envenom (Auto, poisons auto-applied)
         }
 
         [Fact]
@@ -190,7 +191,7 @@ namespace AIO3.Tests
         public void Rupture_can_be_disabled_for_Assassination()
         {
             var s = new RogueSettings();
-            s.AssassinationUseRupture.Value = false; // off → straight to the damage finisher (default Eviscerate)
+            s.AssassinationUseRupture.Value = false; // off → straight to the damage finisher (default Envenom)
             var g = RogueGame();
             g.SpellsOnCooldown.Add("Evasion");      // isolate from Evasion's lone-elite trigger
             g.SpellsOnCooldown.Add("Cold Blood");   // ...and Cold Blood's
@@ -199,7 +200,7 @@ namespace AIO3.Tests
             g.TargetUnit.IsElite = true;
             g.TargetUnit.WithAura("Rupture", mine: true, timeLeftMs: 10000); // a bleed is up (enables HfB precondition)
             g.ComboPointCount = 5;
-            Assert.Equal("Eviscerate", Fire(g, new SoloAssassination(s))?.Name); // default finisher (poisons deferred)
+            Assert.Equal("Envenom", Fire(g, new SoloAssassination(s))?.Name); // default finisher (Auto → Envenom)
         }
 
         [Fact]
@@ -213,7 +214,7 @@ namespace AIO3.Tests
             g.TargetUnit.IsElite = true;
             g.TargetUnit.WithAura("Rupture", mine: true, timeLeftMs: 10000); // bleed already up, plenty left
             g.ComboPointCount = 5;
-            Assert.Equal("Eviscerate", Fire(g)?.Name); // Rupture skipped → the default damage finisher
+            Assert.Equal("Envenom", Fire(g)?.Name); // Rupture skipped → the default damage finisher (Auto → Envenom)
         }
 
         // --- Hunger for Blood upkeep (needs a bleed up) ---
@@ -297,8 +298,8 @@ namespace AIO3.Tests
             g.TargetUnit.IsElite = true;
             g.TargetUnit.WithAura("Rupture", mine: true, timeLeftMs: 10000);
             g.ComboPointCount = 5;
-            // No Cold Blood; with the bleed up and 5 CP, the default finisher (Eviscerate) fires.
-            Assert.Equal("Eviscerate", Fire(g, new SoloAssassination(s))?.Name);
+            // No Cold Blood; with the bleed up and 5 CP, the default finisher (Envenom) fires.
+            Assert.Equal("Envenom", Fire(g, new SoloAssassination(s))?.Name);
         }
 
         [Fact]
@@ -313,7 +314,7 @@ namespace AIO3.Tests
             g.TargetUnit.IsElite = true;
             g.TargetUnit.WithAura("Rupture", mine: true, timeLeftMs: 10000);
             g.ComboPointCount = 5;
-            Assert.Equal("Eviscerate", Fire(g, new SoloAssassination(s))?.Name);
+            Assert.Equal("Envenom", Fire(g, new SoloAssassination(s))?.Name);
         }
 
         [Fact]
@@ -323,8 +324,8 @@ namespace AIO3.Tests
             g.MeUnit.WithAura("Slice and Dice");
             g.MeUnit.WithAura("Hunger For Blood"); // up so HfB upkeep doesn't preempt the finisher
             g.TargetUnit.WithAura("Rupture", mine: true, timeLeftMs: 10000);
-            g.ComboPointCount = 5; // single non-elite → no Cold Blood, just finish (default Eviscerate)
-            Assert.Equal("Eviscerate", Fire(g)?.Name);
+            g.ComboPointCount = 5; // single non-elite → no Cold Blood, just finish (default Envenom)
+            Assert.Equal("Envenom", Fire(g)?.Name);
         }
 
         // --- stealth opener: positional-free Cheap Shot is the default ---

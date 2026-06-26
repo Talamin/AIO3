@@ -97,13 +97,15 @@ below (interrupts, racials, target switching, performance).
 - **Survival:** emergency **Fear / Howl of Terror** to break melee when low and surrounded.
 - **Soul Shard economy:** **Drain Soul** harvests a shard off a dying mob (a 4× execute under 25 % HP — costs no DPS) · **Create Healthstone** restocks the emergency-heal item out of combat, so the supply never runs dry.
 
-### Rogue — Combat *(Phase 1: built + unit-tested, in-game verification pending)*
+### Rogue — Combat / Assassination
 
-*First melee combo-point class. Foundation built so Assassination slots in next.*
+*First melee combo-point class.*
 
-- **Rotation:** Slice and Dice uptime · Sinister Strike builder · Eviscerate finisher · Rupture (opt-in) · **Blade Flurry** on packs.
-- **Cooldowns:** Adrenaline Rush · Killing Spree (boss / elite / pack).
-- **Utility / survival:** Kick interrupt · Evasion · Cloak of Shadows (vs. magic) · Sprint · emergency item.
+- **Combat:** Slice and Dice uptime · Sinister Strike builder · Eviscerate finisher · Rupture (opt-in) · **Blade Flurry** on packs · Adrenaline Rush / Killing Spree cooldowns.
+- **Assassination:** Mutilate builder · **Envenom** finisher (consumes Deadly Poison stacks) · Rupture + Hunger for Blood upkeep · Cold Blood · Fan of Knives on packs.
+- **Weapon poisons:** keeps **Instant Poison** on the main hand and **Deadly Poison** on the off hand out of combat, picking the best rank for your level (so Envenom is the default Assassination finisher).
+- **Stealth opener (opt-in):** picks by position — **Garrote** from behind (the shared behind-detection), else **Cheap Shot** from the front.
+- **Utility / survival:** Kick interrupt · Evasion (panics at critical HP) · Cloak of Shadows (vs. magic) · Sprint · emergency item.
 
 ### Druid — Feral / Balance
 

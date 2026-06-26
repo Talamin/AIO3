@@ -25,7 +25,10 @@ casters → DoT-spreading — and then fills in the remaining classes.
       Spell Lock interrupt, Firebolt), and emergency Fear / Howl of Terror. Not yet in-game-verified. Still to do:
       multi-target SpreadDot (needs a focus-DoT adapter seam; deferred — not needed for solo), Metamorphosis,
       Soulstone / Death Coil, the remaining pet abilities (Devour Magic / Sacrifice / Seduction / Felguard Cleave).)*
-- [ ] **Rogue** — melee, energy / combo points.
+- [~] **Rogue** — melee, energy / combo points. *(Combat / Assassination solo specs built and unit-tested
+      — Slice and Dice, finishers, the burst cooldowns, Fan of Knives, out-of-combat weapon-poison upkeep
+      (Instant main / Deadly off), and a positional stealth opener; not yet fully in-game-verified.
+      Subtlety + group modes deferred.)*
 - [ ] **Priest** (Shadow) — caster DoTs (+ healing later).
 - [ ] **Death Knight** — melee, runes / runic power + temporary pet.
 - [ ] **Shaman** — hybrid (Enhancement / Elemental / Restoration) + totems.

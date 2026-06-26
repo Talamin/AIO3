@@ -195,6 +195,20 @@ namespace AIO3.Core.Game
         /// ranks of conjured food). Used by the mage's auto-conjure to decide when to make more.</summary>
         int CountItems(IReadOnlyList<string> names);
 
+        /// <summary>Temporary weapon-enchant (poison) state for both weapon slots — equipped flag + remaining ms per
+        /// hand (0 = none / expired). Read in one shot from GetWeaponEnchantInfo(). Drives the rogue's poison upkeep
+        /// (which hand's poison is about to fall off).</summary>
+        WeaponEnchant GetWeaponEnchant();
+
+        /// <summary>True if the player's bags hold at least one of the given item id. By ID (not name) so it's
+        /// locale-independent — poison item names differ per client language, the ids don't.</summary>
+        bool HasItemById(uint itemId);
+
+        /// <summary>Apply the poison item (by id) to the main- or off-hand weapon: use the item, then place it on the
+        /// weapon in that slot and confirm the replace-popup. Briefly stops movement so the apply lands. No-op if the
+        /// item isn't carried. The caller (rogue poison upkeep) throttles re-issue via the step's RecastDelay.</summary>
+        void ApplyPoisonToWeapon(uint poisonItemId, bool mainHand);
+
         /// <summary>Polymorph (sheep) the given add — which is NOT the current target. The adapter parks it on
         /// focus to read its creature type (only sheepable types: Beast / Humanoid / Critter), turns to face it
         /// so the cast lands, and casts on focus. Returns false (no-op) if it's unknown/on cooldown or the add

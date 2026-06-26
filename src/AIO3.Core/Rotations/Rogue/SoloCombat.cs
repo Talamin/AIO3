@@ -50,6 +50,11 @@ namespace AIO3.Core.Rotations.Rogue
             RogueCommon.Evasion(_settings, priority: 0.2f),
             RogueCommon.CloakOfShadows(_settings, priority: 0.3f),
 
+            // --- out-of-combat prep ---
+            // Keep weapon poisons applied (Instant main / Deadly off). OOC-gated and above the stealth opener so a
+            // hand is topped up before the pull; reapplies ~hourly, so it only briefly stops the bot between fights.
+            RogueCommon.MaintainPoisons(_settings, priority: 0.35f),
+
             // --- opener ---
             // Stealth out of combat (opt-in) so the fight can start from stealth; never fights the product's pull.
             RogueCommon.Stealth(_settings, priority: 0.4f),
