@@ -304,60 +304,6 @@ namespace AIO3.Tests
             Assert.Equal("Evasion", Fire(g, RogueCommon.Evasion(s, 1f))?.Name);
         }
 
-        // --- Recuperate: low-HP self-heal finisher ---
-
-        [Fact]
-        public void Recuperate_fires_low_with_a_finisher_worthy_bar()
-        {
-            var s = new RogueSettings();
-            var g = Game();
-            g.MeUnit.HealthPercent = s.RecuperateHealthPercent.Value - 1; // below the heal threshold
-            g.ComboPointCount = s.FinisherComboPoints.Value;              // finisher-worthy bar
-            Assert.Equal("Recuperate", Fire(g, RogueCommon.Recuperate(s, 1f))?.Name);
-        }
-
-        [Fact]
-        public void Recuperate_held_when_healthy()
-        {
-            var s = new RogueSettings();
-            var g = Game();
-            g.MeUnit.HealthPercent = s.RecuperateHealthPercent.Value + 1; // above the threshold → no heal
-            g.ComboPointCount = s.FinisherComboPoints.Value;
-            Assert.Null(Fire(g, RogueCommon.Recuperate(s, 1f)));
-        }
-
-        [Fact]
-        public void Recuperate_held_without_a_finisher_worthy_bar()
-        {
-            var s = new RogueSettings();
-            var g = Game();
-            g.MeUnit.HealthPercent = s.RecuperateHealthPercent.Value - 1;
-            g.ComboPointCount = s.FinisherComboPoints.Value - 1; // not enough CP → don't spend a partial bar
-            Assert.Null(Fire(g, RogueCommon.Recuperate(s, 1f)));
-        }
-
-        [Fact]
-        public void Recuperate_not_recast_while_the_HoT_is_up()
-        {
-            var s = new RogueSettings();
-            var g = Game();
-            g.MeUnit.HealthPercent = s.RecuperateHealthPercent.Value - 1;
-            g.ComboPointCount = s.FinisherComboPoints.Value;
-            g.MeUnit.WithAura("Recuperate"); // HoT already up → don't re-cast
-            Assert.Null(Fire(g, RogueCommon.Recuperate(s, 1f)));
-        }
-
-        [Fact]
-        public void Recuperate_respects_its_toggle()
-        {
-            var s = new RogueSettings();
-            s.UseRecuperate.Value = false;
-            var g = Game();
-            g.MeUnit.HealthPercent = s.RecuperateHealthPercent.Value - 1;
-            g.ComboPointCount = s.FinisherComboPoints.Value;
-            Assert.Null(Fire(g, RogueCommon.Recuperate(s, 1f)));
-        }
-
         // --- Fan of Knives: Assassination pack AoE ---
 
         [Fact]

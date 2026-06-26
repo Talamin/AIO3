@@ -137,17 +137,6 @@ namespace AIO3.Core.Rotations.Rogue
         public readonly ToggleSetting UseCloakOfShadows =
             new ToggleSetting("cloak", "Cloak of Shadows on magic debuff", value: true);
 
-        /// <summary>Use Recuperate (a combo-point finisher that heals over time) as a low-HP self-heal. A survival
-        /// spend: when low it takes priority over the offensive finishers, so a finisher-worthy bar goes into the
-        /// HoT instead of damage. Auto-skips until the talent is learned.</summary>
-        public readonly ToggleSetting UseRecuperate =
-            new ToggleSetting("recuperate", "Use Recuperate (self-heal finisher)", value: true);
-
-        /// <summary>Spend a finisher on Recuperate (the healing-over-time HoT) below this health %. Reads at eval
-        /// time so an overlay edit applies live.</summary>
-        public readonly IntSetting RecuperateHealthPercent =
-            new IntSetting("recuperateHp", "Recuperate below HP%", value: 50, min: 0, max: 90, step: 5);
-
         /// <summary>Use an emergency healthstone/potion below this health %. 0 disables it.</summary>
         public readonly IntSetting EmergencyHealthPercent =
             new IntSetting("emergencyHp", "Emergency item below HP%", value: 30, min: 0, max: 90, step: 5);
@@ -203,8 +192,6 @@ namespace AIO3.Core.Rotations.Rogue
             EvasionHealthPercent.Category = "Survival";
             EvasionEnemies.Category = "Survival";
             UseCloakOfShadows.Category = "Survival";
-            UseRecuperate.Category = "Survival";
-            RecuperateHealthPercent.Category = "Survival";
             EmergencyHealthPercent.Category = "Survival";
 
             ContentMode.Category = "Spec";
@@ -222,8 +209,7 @@ namespace AIO3.Core.Rotations.Rogue
                 AssassinationUseRupture, UseHungerForBlood, UseColdBlood, AssassinationFinisher,
                 FanOfKnivesEnemies, // Assassination-only
                 // Survival
-                EvasionHealthPercent, EvasionEnemies, UseCloakOfShadows,
-                UseRecuperate, RecuperateHealthPercent, EmergencyHealthPercent,
+                EvasionHealthPercent, EvasionEnemies, UseCloakOfShadows, EmergencyHealthPercent,
                 // Spec
                 ContentMode, AutoAssignTalents,
                 // General

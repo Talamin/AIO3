@@ -164,17 +164,6 @@ namespace AIO3.Core.Rotations.Rogue
                  .When(ctx => s.UseCloakOfShadows.Value && ctx.Game.PlayerHasDebuffType("Magic"))
                  .OffGcd();
 
-        /// <summary>Recuperate — a combo-point finisher that heals over time. A survival spend: when below
-        /// <c>RecuperateHealthPercent</c> and a finisher-worthy bar is up, dump the points into the HoT instead of
-        /// damage. The spec lists it ABOVE every offensive CP-spender (and Cold Blood) so survival wins the bar when
-        /// low. Don't re-cast while the HoT is already up. Auto-skips until the talent is learned (IsSpellKnown).</summary>
-        public static RotationStep Recuperate(RogueSettings s, float priority) =>
-            Skill.Spell("Recuperate").Priority(priority).On(Targets.Self)
-                 .When(ctx => s.UseRecuperate.Value
-                              && ctx.Me.HealthPercent < s.RecuperateHealthPercent.Value
-                              && ctx.ComboPoints >= s.FinisherComboPoints.Value
-                              && !ctx.Me.HasAura("Recuperate"));
-
         /// <summary>Sprint — close the gap to a target out of melee range during a committed fight (the host only
         /// runs the rotation while the product is fighting, so this never fires during navigation). Off the GCD;
         /// throttled so it isn't re-issued every tick while the speed buff carries us in.</summary>

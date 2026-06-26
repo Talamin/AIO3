@@ -71,12 +71,6 @@ namespace AIO3.Core.Rotations.Rogue
 
             // (racials are appended by the shared Racials bundle at the 2.5 band)
 
-            // --- survival finisher (shared block) ---
-            // Recuperate: when low on HP, spend a finisher-worthy combo bar on the self-heal HoT instead of damage.
-            // At 2.9f it sits above Cold Blood (3f) and every offensive CP-spender (SnD 5 / Rupture 6 / Envenom 7 /
-            // Eviscerate 7.5) — so when low, survival wins the bar instead of crit-buffing a damage finisher.
-            RogueCommon.Recuperate(_settings, priority: 2.9f),
-
             // --- cooldown: Cold Blood pairs with the next finisher (guaranteed crit). Sits just above the finishers
             // so the crit lands on the Envenom/Eviscerate that follows. Off the GCD; gated on cooldowns + a pack /
             // lone elite, like Combat's Adrenaline Rush (Adrenaline Rush / Killing Spree / Blade Flurry are COMBAT

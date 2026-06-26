@@ -365,28 +365,5 @@ namespace AIO3.Tests
             g.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 6, IsAttackable = true });
             Assert.Equal("Sinister Strike", Fire(g)?.Name); // builds instead of Blade Flurry
         }
-
-        // --- Recuperate: the low-HP self-heal finisher wins the combo bar over the damage finishers ---
-
-        [Fact]
-        public void Recuperate_wins_the_bar_over_Eviscerate_when_low()
-        {
-            var g = RogueGame();
-            g.MeUnit.WithAura("Slice and Dice"); // SnD up so upkeep doesn't compete
-            g.MeUnit.HealthPercent = 40;         // below the default 50 heal threshold
-            g.ComboPointCount = 3;               // finisher-worthy bar — survival takes it
-            Assert.Equal("Recuperate", Fire(g)?.Name);
-        }
-
-        [Fact]
-        public void Recuperate_skipped_when_the_HoT_is_already_up()
-        {
-            var g = RogueGame();
-            g.MeUnit.WithAura("Slice and Dice");
-            g.MeUnit.WithAura("Recuperate"); // HoT already ticking → spend the bar on damage instead
-            g.MeUnit.HealthPercent = 40;
-            g.ComboPointCount = 3;
-            Assert.Equal("Eviscerate", Fire(g)?.Name);
-        }
     }
 }

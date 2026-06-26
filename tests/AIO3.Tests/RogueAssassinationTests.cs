@@ -437,36 +437,5 @@ namespace AIO3.Tests
             g.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 6, IsAttackable = true });
             Assert.Equal("Mutilate", Fire(g)?.Name);
         }
-
-        // --- Recuperate: the low-HP self-heal finisher wins the bar over the offensive finishers and Cold Blood ---
-
-        [Fact]
-        public void Recuperate_wins_the_bar_over_the_damage_finishers_when_low()
-        {
-            var g = RogueGame();
-            g.SpellsOnCooldown.Add("Evasion"); // Evasion's lone-elite trigger sits above Recuperate — isolate
-            g.MeUnit.WithAura("Slice and Dice");
-            g.MeUnit.HealthPercent = 40;       // below the default 50 heal threshold
-            g.TargetUnit.IsElite = true;       // would otherwise pull Cold Blood at 3f — survival (2.9f) wins
-            g.TargetUnit.WithAura("Rupture", mine: true, timeLeftMs: 10000); // bleed up so Rupture doesn't compete
-            g.MeUnit.WithAura("Hunger For Blood");
-            g.ComboPointCount = 5;             // finisher-worthy bar — survival takes it
-            Assert.Equal("Recuperate", Fire(g)?.Name);
-        }
-
-        [Fact]
-        public void Recuperate_skipped_when_the_HoT_is_already_up()
-        {
-            var g = RogueGame();
-            g.SpellsOnCooldown.Add("Evasion");
-            g.SpellsOnCooldown.Add("Cold Blood");
-            g.MeUnit.WithAura("Slice and Dice");
-            g.MeUnit.WithAura("Recuperate"); // HoT already ticking → spend the bar on damage instead
-            g.MeUnit.WithAura("Hunger For Blood");
-            g.MeUnit.HealthPercent = 40;
-            g.TargetUnit.WithAura("Rupture", mine: true, timeLeftMs: 10000);
-            g.ComboPointCount = 5;
-            Assert.Equal("Eviscerate", Fire(g)?.Name); // default finisher (poisons deferred)
-        }
     }
 }

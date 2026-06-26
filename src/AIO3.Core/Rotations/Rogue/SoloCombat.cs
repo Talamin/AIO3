@@ -66,12 +66,6 @@ namespace AIO3.Core.Rotations.Rogue
 
             // (racials are appended by the shared Racials bundle at the 2.5 band)
 
-            // --- survival finisher (shared block) ---
-            // Recuperate: when low on HP, spend a finisher-worthy combo bar on the self-heal HoT instead of damage.
-            // Sits at 2.9f — above EVERY offensive CP-spender (SnD 5 / Rupture 6 / Eviscerate 7) and above the
-            // cooldown→finisher band (Adrenaline Rush 3 / Cold Blood 3 in Assassination) — so survival wins the bar.
-            RogueCommon.Recuperate(_settings, priority: 2.9f),
-
             // --- burst cooldowns (shared RogueCommon blocks; gated on UseCooldowns, on a pack or a lone
             // elite/boss, mirroring WarriorCommon.Recklessness — so a future Group Combat rotation reuses them) ---
             RogueCommon.AdrenalineRush(_settings, priority: 3f),
