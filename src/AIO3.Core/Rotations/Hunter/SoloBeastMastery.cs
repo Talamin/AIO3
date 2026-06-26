@@ -86,11 +86,8 @@ namespace AIO3.Core.Rotations.Hunter
             HunterCommon.Volley(_settings, priority: 6.5f),
             HunterCommon.KillShot(priority: 7f),
             HunterCommon.KillCommand(priority: 8f),
-            // Multi-Shot: target-relative pack gate (EnemiesNearTarget) — the AoE hits the cluster around the
-            // target, not the player, who stands ~28yd back.
-            Skill.Spell("Multi-Shot").Priority(9f).On(Targets.CurrentEnemy)
-                 .When(ctx => ctx.Target.Distance >= HunterCommon.RangedMin
-                              && _settings.UseAoe.Value && ctx.EnemiesNearTarget(HunterCommon.AoeRadius) >= _settings.AoeThreshold.Value),
+            // Multi-Shot: shared AoE shot (target-relative pack gate, throttled so its short cast can complete).
+            HunterCommon.MultiShot(_settings, priority: 9f),
             Skill.Spell("Arcane Shot").Priority(10f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.Distance >= HunterCommon.RangedMin),
             // Steady Shot is the filler — a cast-time shot, so only while standing still.

@@ -76,6 +76,26 @@ namespace AIO3.Core.Rotations.Hunter
                               && ctx.EnemiesNearTarget(AoeRadius) >= s.AoeThreshold.Value
                               && !ctx.Game.PlayerIsMoving);
 
+        /// <summary>Don't re-issue Multi-Shot during its own cast. Multi-Shot's ~0.5s cast time (less with haste)
+        /// falls within the ~400ms spell-queue window, so without a throttle the engine re-casts it every tick and
+        /// RESTARTS the shot before it completes — it just toggles the spell on/off and never fires (the bug Daniel
+        /// saw). One RecastDelay lets the cast finish; the shot's own ~10s cooldown then gates further casts, so this
+        /// throttle never limits real usage. Longer than the cast + the cooldown-register latency.</summary>
+        public const int MultiShotRecastMs = 1500;
+
+        /// <summary>Multi-Shot: the AoE shot that hits the target plus the cluster around it. Shared by every spec
+        /// (BM/MM/SV all list it). TARGET-relative pack gate (EnemiesNearTarget): the AoE lands on the cluster around
+        /// the target, not the player, who stands ~28yd back, so a player-relative count would almost never trip. A
+        /// cast-time shot, so only while standing still (like Steady Shot / Volley), and throttled (RecastDelay) so
+        /// its short cast isn't re-issued mid-flight. IsSpellKnown auto-skips until learned.</summary>
+        public static RotationStep MultiShot(HunterSettings s, float priority) =>
+            Skill.Spell("Multi-Shot").Priority(priority).On(Targets.CurrentEnemy)
+                 .When(ctx => ctx.Target.Distance >= RangedMin
+                              && s.UseAoe.Value
+                              && ctx.EnemiesNearTarget(AoeRadius) >= s.AoeThreshold.Value
+                              && !ctx.Game.PlayerIsMoving)
+                 .RecastDelay(MultiShotRecastMs);
+
         /// <summary>Viper Sting: MM's mana-sustain vs caster mobs — drains the target's mana into yours. Old MM
         /// fired it when the target is a caster and our mana is low (SoloMarksmanship.cs:28: Target.IsCaster &amp;&amp;
         /// Me.ManaPercentage &lt;= 45). MM-only (wired into SoloMarksmanship). Mutually exclusive with Serpent Sting
