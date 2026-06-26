@@ -1,0 +1,391 @@
+using AIO3.Core.Combat;
+using AIO3.Core.Engine;
+using AIO3.Core.Game;
+using AIO3.Core.Rotations.Druid;
+using AIO3.Core.Testing;
+using Xunit;
+
+namespace AIO3.Tests
+{
+    // End-to-end priority tests for the Solo Feral druid, plus the shared DruidCommon cat/bear ladders and the
+    // form-switch glue. The base game is a feral druid in CAT FORM, in melee on one full-health, non-elite enemy,
+    // auto-attacking, with the burst cooldowns + Bash on cooldown so the tests isolate the ladder rules unless
+    // they opt in. PlayerInCombat is left false so the in-combat offensive racials don't preempt the rule under
+    // test (same convention as the Rogue/Warrior spec tests); nothing in the feral cat ladder gates on
+    // PlayerInCombat.
+    public class DruidFeralTests
+    {
+        private static FakeGameClient CatGame()
+        {
+            var g = new FakeGameClient
+            {
+                Class = WowClass.Druid,
+                AutoAttacking = true
+            };
+            g.MeUnit.WithAura("Cat Form"); // in cat form by default
+            g.MeUnit.WithAura("Mark of the Wild"); // pre-buffed (OOC buffs are up before the pull) so they don't preempt
+            g.MeUnit.WithAura("Thorns");
+            g.MeUnit.Energy = 100;
+            g.TargetUnit = new FakeUnit
+            {
+                Guid = 1,
+                Name = "Dummy",
+                Reaction = Reaction.Hostile,
+                Distance = 5,
+                HealthPercent = 100,
+                IsAttackable = true
+            };
+            g.TargetUnit.WithAura("Faerie Fire (Feral)", mine: true); // armor debuff already applied (it leads the fight)
+            g.EnemyList.Add(g.TargetUnit);
+            // Neutralise the burst cooldown + interrupt + Tiger's Fury so they don't preempt the rules under test.
+            g.SpellsOnCooldown.Add("Berserk");
+            g.SpellsOnCooldown.Add("Bash");
+            g.SpellsOnCooldown.Add("Tiger's Fury");
+            return g;
+        }
+
+        private static RotationStep Fire(FakeGameClient g) =>
+            new RotationEngine(new SoloFeral().BuildSteps()).Tick(CombatContext.Capture(g));
+
+        private static RotationStep Fire(FakeGameClient g, SoloFeral rotation) =>
+            new RotationEngine(rotation.BuildSteps()).Tick(CombatContext.Capture(g));
+
+        // --- seams read through in cat form (the in-game verification proxy) ---
+
+        [Fact]
+        public void Energy_and_combo_points_read_through_in_cat_form()
+        {
+            var g = CatGame();
+            g.MeUnit.Energy = 80;
+            g.ComboPointCount = 3;
+            CombatContext ctx = CombatContext.Capture(g);
+            Assert.Equal(80, ctx.Me.Energy);
+            Assert.Equal(3, ctx.ComboPoints);
+        }
+
+        // --- cat builder ladder ---
+
+        [Fact]
+        public void Mangle_Cat_is_the_primary_builder_below_the_finisher_threshold()
+        {
+            var g = CatGame();
+            g.ComboPointCount = 0;
+            g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000); // Rake already up → builder is next
+            Assert.Equal("Mangle (Cat)", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Claw_is_the_builder_fallback_when_Mangle_is_unavailable()
+        {
+            var g = CatGame();
+            g.ComboPointCount = 0;
+            g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
+            g.SpellsOnCooldown.Add("Mangle (Cat)"); // Mangle down → Claw fills in
+            Assert.Equal("Claw", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Builder_stops_at_the_finisher_threshold()
+        {
+            var s = new DruidSettings(); // FinisherComboPoints default 5
+            var g = CatGame();
+            g.ComboPointCount = 5;                                   // at the threshold → a finisher fires, not a builder
+            g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
+            g.TargetUnit.WithAura("Rip", mine: true, timeLeftMs: 12000); // Rip up → Ferocious Bite dumps
+            Assert.Equal("Ferocious Bite", Fire(g, new SoloFeral(s))?.Name);
+        }
+
+        // --- Rake (bleed, apply when missing on a healthy target, HP-floored) ---
+
+        [Fact]
+        public void Rake_applied_when_missing_on_a_healthy_target()
+        {
+            var g = CatGame();
+            g.ComboPointCount = 0; // missing Rake outranks the builder
+            Assert.Equal("Rake", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Rake_skipped_on_a_dying_target()
+        {
+            var g = CatGame();
+            g.ComboPointCount = 0;
+            g.TargetUnit.HealthPercent = 20; // below the Rip-health floor (30) → don't waste a bleed; build instead
+            Assert.Equal("Mangle (Cat)", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Rake_skipped_on_a_bleed_immune_creature()
+        {
+            var g = CatGame();
+            g.ComboPointCount = 0;
+            g.TargetUnit.CreatureType = "Elemental"; // bleed-immune → no Rake; build instead
+            Assert.Equal("Mangle (Cat)", Fire(g)?.Name);
+        }
+
+        // --- finishers at the CP threshold ---
+
+        [Fact]
+        public void Rip_is_the_bleed_finisher_on_a_durable_target()
+        {
+            var g = CatGame();
+            g.ComboPointCount = 5;                                   // at the finisher threshold
+            g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000); // Rake up so it doesn't preempt
+            // Rip missing on a healthy durable target → it wins over Ferocious Bite.
+            Assert.Equal("Rip", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Ferocious_Bite_dumps_when_Rip_is_already_up()
+        {
+            var g = CatGame();
+            g.ComboPointCount = 5;
+            g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
+            g.TargetUnit.WithAura("Rip", mine: true, timeLeftMs: 12000); // Rip up → Ferocious Bite gets the points
+            Assert.Equal("Ferocious Bite", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Rip_skipped_on_a_dying_target_so_Ferocious_Bite_dumps()
+        {
+            var g = CatGame();
+            g.ComboPointCount = 5;
+            g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
+            g.TargetUnit.HealthPercent = 20; // below the Rip-health floor → no fresh bleed; dump with Ferocious Bite
+            Assert.Equal("Ferocious Bite", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Finisher_threshold_setting_is_respected()
+        {
+            var s = new DruidSettings();
+            s.FinisherComboPoints.Value = 5;
+            var g = CatGame();
+            g.ComboPointCount = 4; // below the raised threshold → build, no finisher
+            g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
+            Assert.Equal("Mangle (Cat)", Fire(g, new SoloFeral(s))?.Name);
+        }
+
+        // --- Tiger's Fury (off-GCD energy/damage CD) ---
+
+        [Fact]
+        public void Tigers_Fury_pops_on_cooldown_in_cat_form()
+        {
+            var g = CatGame();
+            g.SpellsOnCooldown.Remove("Tiger's Fury");
+            g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000); // keep the ladder out of the way
+            Assert.Equal("Tiger's Fury", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Tigers_Fury_respects_its_toggle()
+        {
+            var s = new DruidSettings();
+            s.UseTigersFury.Value = false;
+            var g = CatGame();
+            g.SpellsOnCooldown.Remove("Tiger's Fury");
+            g.ComboPointCount = 0;
+            g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
+            Assert.Equal("Mangle (Cat)", Fire(g, new SoloFeral(s))?.Name);
+        }
+
+        // --- Faerie Fire (Feral) armor debuff ---
+
+        [Fact]
+        public void Faerie_Fire_applied_when_missing()
+        {
+            var g = CatGame();
+            g.TargetUnit.Auras.Remove("Faerie Fire (Feral)"); // debuff missing → FF (priority 4) leads
+            Assert.Equal("Faerie Fire (Feral)", Fire(g)?.Name);
+        }
+
+        // --- form switching ---
+
+        [Fact]
+        public void Bear_Form_switch_when_surrounded()
+        {
+            var g = CatGame();
+            // Two attackers in melee on us (default BearCount 2) → switch to bear.
+            g.TargetUnit.IsTargetingMe = true;
+            g.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 6, IsTargetingMe = true, IsAttackable = true });
+            // Already in cat form (CatGame), but surrounded → Bear/Dire Bear switch wins. The step name is the
+            // generic "Bear Form"; the actual cast (Dire Bear preferred, known by default) shows in the CastLog.
+            Assert.Equal("Bear Form", Fire(g)?.Name);
+            Assert.Contains("Dire Bear Form", g.CastLog);
+        }
+
+        [Fact]
+        public void Cat_Form_switch_when_not_in_a_form_and_not_surrounded()
+        {
+            var g = CatGame();
+            g.MeUnit.Auras.Remove("Cat Form"); // not in any form, single target → switch to cat
+            Assert.Equal("Cat Form", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Bear_Form_falls_back_to_Bear_when_Dire_Bear_is_unknown()
+        {
+            var g = CatGame();
+            g.UnknownSpells.Add("Dire Bear Form"); // low-level druid → plain Bear Form
+            g.TargetUnit.IsTargetingMe = true;
+            g.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 6, IsTargetingMe = true, IsAttackable = true });
+            Assert.Equal("Bear Form", Fire(g)?.Name);
+            Assert.Contains("Bear Form", g.CastLog); // Dire Bear unknown → plain Bear Form cast
+        }
+
+        // --- bear ladder ---
+
+        private static FakeGameClient BearGame()
+        {
+            var g = CatGame();
+            g.MeUnit.Auras.Remove("Cat Form");
+            g.MeUnit.WithAura("Dire Bear Form"); // in bear form
+            g.MeUnit.Rage = 100;
+            // Surround so the form-switch steps don't fire and the bear ladder is eligible.
+            g.TargetUnit.IsTargetingMe = true;
+            g.EnemyList.Add(new FakeUnit { Guid = 2, Reaction = Reaction.Hostile, Distance = 6, IsTargetingMe = true, IsAttackable = true });
+            return g;
+        }
+
+        [Fact]
+        public void Mangle_Bear_maintained_when_missing()
+        {
+            var g = BearGame();
+            // Demoralizing Roar (priority 5) would fire first on a pack; give the target the roar so Mangle shows.
+            g.TargetUnit.WithAura("Demoralizing Roar", mine: true);
+            g.MeUnit.WithAura("Enrage"); // keep Enrage out of the way
+            Assert.Equal("Mangle (Bear)", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Swipe_Bear_cleaves_a_pack()
+        {
+            var g = BearGame();
+            g.TargetUnit.WithAura("Demoralizing Roar", mine: true);
+            g.MeUnit.WithAura("Enrage");
+            g.TargetUnit.WithAura("Mangle", mine: true);   // Mangle up
+            g.TargetUnit.WithAura("Lacerate", mine: true, timeLeftMs: 15000); // Lacerate up → Swipe is next
+            Assert.Equal("Swipe (Bear)", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Frenzied_Regeneration_fires_low_in_bear_form()
+        {
+            var g = BearGame();
+            g.MeUnit.HealthPercent = 50; // below 60, with rage → bear survival
+            Assert.Equal("Frenzied Regeneration", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Demoralizing_Roar_applied_on_a_pack_when_missing()
+        {
+            var g = BearGame();
+            g.MeUnit.WithAura("Enrage"); // keep Enrage out of the way
+            // Pack on us, roar missing → Demoralizing Roar (priority 5) wins.
+            Assert.Equal("Demoralizing Roar", Fire(g)?.Name);
+        }
+
+        // --- survival: Barkskin + in-combat heals ---
+
+        [Fact]
+        public void Barkskin_fires_below_the_threshold()
+        {
+            var g = CatGame();
+            g.MeUnit.HealthPercent = 30; // below the default 35
+            Assert.Equal("Barkskin", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Instant_proc_heal_preferred_over_shift_out_in_cat_form()
+        {
+            var g = CatGame();
+            g.MeUnit.HealthPercent = 30;            // below the IC-heal threshold (35)
+            g.SpellsOnCooldown.Add("Barkskin");     // isolate the heal (Barkskin would win otherwise)
+            g.MeUnit.WithAura("Predator's Swiftness"); // free instant proc up → form-preserving Regrowth
+            Assert.Equal("Regrowth", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Shift_out_heal_used_when_no_proc_and_mana_allows()
+        {
+            var g = CatGame();
+            g.MeUnit.HealthPercent = 30;
+            g.SpellsOnCooldown.Add("Barkskin");
+            g.MeUnit.PowerPercent = 80; // plenty of mana, no proc → shift-out Regrowth
+            Assert.Equal("Regrowth", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Shift_out_heal_held_when_mana_too_low()
+        {
+            var g = CatGame();
+            g.MeUnit.HealthPercent = 30;
+            g.SpellsOnCooldown.Add("Barkskin");
+            // Between the Innervate threshold (25) and the heal mana gate (30): no Innervate, and the shift-out
+            // heal is held by the mana gate (no proc) → don't thrash out of form; keep fighting.
+            g.MeUnit.PowerPercent = 28;
+            g.ComboPointCount = 0;
+            g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
+            Assert.Equal("Mangle (Cat)", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Innervate_fires_low_on_mana()
+        {
+            var g = CatGame();
+            g.MeUnit.PowerPercent = 20; // below the default 25
+            g.SpellsOnCooldown.Add("Barkskin");
+            Assert.Equal("Innervate", Fire(g)?.Name);
+        }
+
+        // --- prowl opener (opt-in) ---
+
+        [Fact]
+        public void Auto_prowl_opener_uses_Ravage_when_behind()
+        {
+            var s = new DruidSettings();
+            s.UseProwl.Value = true;
+            var g = CatGame();
+            g.MeUnit.WithAura("Prowl");
+            g.BehindTargetFlag = true; // behind → Auto picks Ravage
+            Assert.Equal("Ravage", Fire(g, new SoloFeral(s))?.Name);
+        }
+
+        [Fact]
+        public void Auto_prowl_opener_uses_Pounce_from_the_front()
+        {
+            var s = new DruidSettings();
+            s.UseProwl.Value = true;
+            var g = CatGame();
+            g.MeUnit.WithAura("Prowl");
+            g.BehindTargetFlag = false; // not behind → Auto picks the positional-free Pounce
+            Assert.Equal("Pounce", Fire(g, new SoloFeral(s))?.Name);
+        }
+
+        // --- pre-form caster fallback (a low-level druid, no Cat/Bear yet) ---
+
+        [Fact]
+        public void Pre_form_druid_applies_Moonfire_then_Wraths()
+        {
+            var g = CatGame();
+            g.MeUnit.Auras.Remove("Cat Form"); // no form
+            g.UnknownSpells.Add("Cat Form");   // and can't shift (pre-form)
+            g.UnknownSpells.Add("Bear Form");
+            g.UnknownSpells.Add("Dire Bear Form");
+            // Moonfire missing on a healthy target → it leads the caster fallback.
+            Assert.Equal("Moonfire", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Pre_form_druid_casts_Wrath_when_Moonfire_is_up()
+        {
+            var g = CatGame();
+            g.MeUnit.Auras.Remove("Cat Form");
+            g.UnknownSpells.Add("Cat Form");
+            g.UnknownSpells.Add("Bear Form");
+            g.UnknownSpells.Add("Dire Bear Form");
+            g.TargetUnit.WithAura("Moonfire", mine: true); // Moonfire up → Wrath fills
+            Assert.Equal("Wrath", Fire(g)?.Name);
+        }
+    }
+}

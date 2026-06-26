@@ -29,7 +29,9 @@ casters → DoT-spreading — and then fills in the remaining classes.
 - [ ] **Priest** (Shadow) — caster DoTs (+ healing later).
 - [ ] **Death Knight** — melee, runes / runic power + temporary pet.
 - [ ] **Shaman** — hybrid (Enhancement / Elemental / Restoration) + totems.
-- [ ] **Druid** — shapeshifting forms (Feral / Balance / Restoration); most complex, last.
+- [~] **Druid** — shapeshifting forms. *(Feral (cat DPS + bear tank + form management + in-combat self-heals +
+      the rogue's positional opener for Ravage) and Balance (Moonkin eclipse caster) solo specs built and
+      unit-tested; not yet in-game-verified. Restoration deferred — a healer, not a solo leveling spec.)*
 
 ## Cross-cutting systems (built alongside)
 

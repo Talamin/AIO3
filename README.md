@@ -7,10 +7,10 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
 > **Status — functional and in active use.** **Warrior** (Fury / Arms / Protection), **Paladin**
 > (Retribution / Protection), **Hunter** (Beast Mastery / Marksmanship / Survival), **Mage**
 > (Frost / Fire / Arcane) and **Warlock** (Affliction / Demonology / Destruction) run end-to-end
-> in-game as solo leveling APLs (10–80). **Rogue** Phase 1 (Combat) is built and unit-tested, in-game
-> verification pending. Each class is a self-contained **module** (`IClassModule`), so the entry point
-> is class-agnostic and adding the next class is dropping in a module. Remaining classes (Priest, Death
-> Knight, Shaman, Druid) are not implemented yet — the foundation is built to add them.
+> in-game as solo leveling APLs (10–80). **Rogue** (Combat / Assassination) and **Druid** (Feral / Balance)
+> are built and unit-tested, with in-game verification ongoing. Each class is a self-contained **module**
+> (`IClassModule`), so the entry point is class-agnostic and adding the next class is dropping in a module.
+> Remaining classes (Priest, Death Knight, Shaman) are not implemented yet — the foundation is built to add them.
 
 ## Why AIO3 (vs. the original AIO-Public)
 
@@ -105,6 +105,14 @@ below (interrupts, racials, target switching, performance).
 - **Cooldowns:** Adrenaline Rush · Killing Spree (boss / elite / pack).
 - **Utility / survival:** Kick interrupt · Evasion · Cloak of Shadows (vs. magic) · Sprint · emergency item.
 
+### Druid — Feral / Balance
+
+*Hybrid: a melee combo-point form, a rage tank form, and an eclipse caster — one spec list that shifts between them. Restoration is intentionally absent (a healer).*
+
+- **Feral (cat + bear, with form management):** **Cat** for single targets (Mangle / Claw builders · Rake bleed · Rip / Ferocious Bite finishers · Tiger's Fury), shifting to **Bear** when surrounded (Mangle / Lacerate / Swipe / Maul · Demoralizing Roar · Frenzied Regeneration). A **positional stealth opener** — **Ravage** from behind (the same behind-detection the rogue's Garrote uses), else **Pounce** from the front — and a caster fallback (Wrath / Moonfire) before the forms are learned.
+- **Balance (eclipse caster):** Moonkin Form · Insect Swarm / Moonfire DoTs · **Eclipse-aware** nukes (Starfire under a Lunar proc, Wrath under Solar) · Starfall / Hurricane / Typhoon AoE · Force of Nature.
+- **Survival (the hybrid's edge):** in-combat self-heal — an instant Regrowth / Healing Touch off a **Predator's Swiftness** proc, else a mana-gated shift out to heal · Barkskin · Innervate · Mark of the Wild / Thorns.
+
 ## Shared systems
 
 Cross-cutting behaviour every class composes — built once, not per spec.
@@ -167,4 +175,4 @@ A successful build copies `AIO3.dll` into the WRobot `FightClass` folder (overri
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md) for the class order (Warrior ✓ → Paladin ✓ → Hunter ✓ → Mage ✓ → Warlock ✓ →
-**Rogue** (in progress) → Priest → Death Knight → Shaman → Druid) and the cross-cutting systems built alongside them.
+**Rogue** (built) → Priest → Death Knight → Shaman → **Druid** (built)) and the cross-cutting systems built alongside them.
