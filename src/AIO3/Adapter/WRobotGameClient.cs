@@ -336,15 +336,29 @@ namespace AIO3.Adapter
 
         // ~150° rear cone (full cone width) — a generous "behind" with margin, so a positional ability (Garrote/
         // Shred) is only chosen when we're comfortably behind, not at the very edge where the cast would fail.
-        private const float BehindArcRadians = 2.618f;
+        private const float BehindArcRadians = 2.618f; // 150° rear cone (full width)
 
-        // Is the local player in the current target's rear arc? WoWUnit.IsBehind(target.Position, target.Rotation,
-        // arc) hard-wires me=ObjectManager.Me.Position (scout-verified); Rotation is radians, 0=east, CCW. Pure
-        // memory reads, no Lua. Class-agnostic positional check (rogue Garrote opener now; feral Shred later).
-        public bool PlayerIsBehindTarget()
+        // Signed offset (radians, [-π,π]) between the target's facing and the direction TO the player: ~0 = player
+        // in FRONT of the target, ~±π = directly BEHIND it. NaN if there's no target. robotManager.Helpful.Math.
+        // TargetFacingToRadian is atan2 in WRobot's Rotation convention (0=east, CCW — scout-verified live), so
+        // subtracting the target's Rotation gives the front/back offset directly (no axis swap). This REPLACES
+        // WoWUnit.IsBehind, which is control-flow-obfuscated and reported "front" while we were visibly behind the
+        // mob. Pure memory reads, no Lua. Class-agnostic (rogue Garrote opener now; feral Shred/Mangle later).
+        private double TargetFacingOffset()
         {
             WoWUnit t = ObjectManager.Target;
-            return t != null && t.IsValid && t.IsBehind(t.Position, t.Rotation, BehindArcRadians);
+            if (t == null || !t.IsValid) return double.NaN;
+            double a = robotManager.Helpful.Math.TargetFacingToRadian(t.Position, ObjectManager.Me.Position);
+            double diff = a - t.Rotation;
+            while (diff > System.Math.PI) diff -= 2 * System.Math.PI;
+            while (diff < -System.Math.PI) diff += 2 * System.Math.PI;
+            return diff;
+        }
+
+        public bool PlayerIsBehindTarget()
+        {
+            double diff = TargetFacingOffset();
+            return !double.IsNaN(diff) && System.Math.Abs(diff) > System.Math.PI - BehindArcRadians / 2.0;
         }
 
         // WRobot's own fight state — true throughout a fight including the approach. Mirrors how the old
@@ -640,7 +654,7 @@ namespace AIO3.Adapter
                     case "Rogue":
                         // behind = the positional check that drives the "Auto" stealth opener (Garrote behind /
                         // Cheap Shot in front) — logged so we can verify the front/back detection in-game.
-                        pwr = $"energy={meUnit.Energy} cp={ObjectManager.Me.ComboPoint} stealth={(meUnit.HaveBuff("Stealth") ? "Y" : "N")} behind={(PlayerIsBehindTarget() ? "Y" : "N")}";
+                        pwr = $"energy={meUnit.Energy} cp={ObjectManager.Me.ComboPoint} stealth={(meUnit.HaveBuff("Stealth") ? "Y" : "N")} behind={(PlayerIsBehindTarget() ? "Y" : "N")}@{System.Math.Abs(TargetFacingOffset()) * 57.2958:0}deg";
                         break;
                     case "Druid":
                         pwr = $"mp={meUnit.ManaPercentage:0}% energy={meUnit.Energy} rage={meUnit.Rage} cp={ObjectManager.Me.ComboPoint}";
