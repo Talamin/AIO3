@@ -638,7 +638,9 @@ namespace AIO3.Adapter
                 switch (meUnit.WowClass.ToString())
                 {
                     case "Rogue":
-                        pwr = $"energy={meUnit.Energy} cp={ObjectManager.Me.ComboPoint} stealth={(meUnit.HaveBuff("Stealth") ? "Y" : "N")}";
+                        // behind = the positional check that drives the "Auto" stealth opener (Garrote behind /
+                        // Cheap Shot in front) — logged so we can verify the front/back detection in-game.
+                        pwr = $"energy={meUnit.Energy} cp={ObjectManager.Me.ComboPoint} stealth={(meUnit.HaveBuff("Stealth") ? "Y" : "N")} behind={(PlayerIsBehindTarget() ? "Y" : "N")}";
                         break;
                     case "Druid":
                         pwr = $"mp={meUnit.ManaPercentage:0}% energy={meUnit.Energy} rage={meUnit.Rage} cp={ObjectManager.Me.ComboPoint}";
