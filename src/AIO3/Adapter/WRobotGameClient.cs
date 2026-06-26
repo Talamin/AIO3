@@ -792,6 +792,7 @@ namespace AIO3.Adapter
         private WeaponEnchant _weaponEnchant;
         private int _weaponEnchantAt;
         private bool _weaponEnchantFresh;
+        private int _weaponEnchantLogAt;
 
         public WeaponEnchant GetWeaponEnchant()
         {
@@ -801,17 +802,24 @@ namespace AIO3.Adapter
             bool offEquipped = ObjectManager.Me.GetEquipedItemBySlot(InventorySlot.INVSLOT_OFFHAND) != 0;
 
             // GetWeaponEnchantInfo() -> hasMain, mainExpirationMs, mainCharges, hasOff, offExpirationMs, offCharges.
-            // Expiration is MILLISECONDS remaining; a hand with no enchant returns 0 (so the upkeep treats it as
-            // needing poison). We only read the has-flag + expiration for each hand.
+            // Do the has-enchant truthy test IN Lua and return the remaining ms (or 0 when a hand has no enchant).
+            // The has-flag is 1/nil on 3.3.5a (NOT true/false), so a C# `tostring(hm)=="true"` test reads EVERY hand
+            // as un-enchanted and re-poisons it forever (the bug Daniel saw — Instant Poison re-applied to the main
+            // hand every ~5s). `(hm and me) or 0` is truthy for 1 or true and yields 0 when not enchanted.
             string[] r = Lua.LuaDoString<string[]>(
                 "local hm, me, _, ho, oe = GetWeaponEnchantInfo(); " +
-                "return tostring(hm), tostring(me or 0), tostring(ho), tostring(oe or 0);");
-            int mainMs = (r != null && r.Length > 1 && r[0] == "true") ? ParseIntSafe(r[1]) : 0;
-            int offMs = (r != null && r.Length > 3 && r[2] == "true") ? ParseIntSafe(r[3]) : 0;
+                "return tostring((hm and me) or 0), tostring((ho and oe) or 0);");
+            int mainMs = (r != null && r.Length > 0) ? ParseIntSafe(r[0]) : 0;
+            int offMs = (r != null && r.Length > 1) ? ParseIntSafe(r[1]) : 0;
 
             _weaponEnchant = new WeaponEnchant(mainEquipped, mainMs, offEquipped, offMs);
             _weaponEnchantAt = Now;
             _weaponEnchantFresh = true;
+            if (unchecked(Now - _weaponEnchantLogAt) >= 5000) // throttled diagnostic (this runs ~1/s OOC otherwise)
+            {
+                _weaponEnchantLogAt = Now;
+                DebugLog.Write($"weaponEnchant main={mainMs}ms(eq={mainEquipped}) off={offMs}ms(eq={offEquipped})");
+            }
             return _weaponEnchant;
         }
 
