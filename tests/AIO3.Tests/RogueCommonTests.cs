@@ -257,12 +257,24 @@ namespace AIO3.Tests
             var s = new RogueSettings();
             s.EvasionEnemies.Value = 99; // disable the surrounded trigger; isolate the HP trigger
             var g = Game();
-            g.MeUnit.HealthPercent = 20; // low HP — the HP trigger is live
+            // MODERATE low HP (below the 35 trigger, above the 25 panic) so the dying-mob qualifier applies.
+            g.MeUnit.HealthPercent = 30;
 
             g.TargetUnit.HealthPercent = RogueCommon.EvasionMinTargetHealth - 1; // mob is dying → don't burn Evasion
             Assert.Null(Fire(g, RogueCommon.Evasion(s, 1f)));
 
             g.TargetUnit.HealthPercent = RogueCommon.EvasionMinTargetHealth + 1; // healthy target → fire
+            Assert.Equal("Evasion", Fire(g, RogueCommon.Evasion(s, 1f))?.Name);
+        }
+
+        [Fact]
+        public void Evasion_panics_at_critical_HP_even_on_a_dying_target()
+        {
+            var s = new RogueSettings();
+            s.EvasionEnemies.Value = 99; // isolate the HP trigger
+            var g = Game();
+            g.MeUnit.HealthPercent = RogueCommon.EvasionPanicHealthPercent - 1; // critically low — losing the race
+            g.TargetUnit.HealthPercent = 26; // dying mob, but survival wins: Evasion fires anyway (the 1%-HP-Kodo case)
             Assert.Equal("Evasion", Fire(g, RogueCommon.Evasion(s, 1f))?.Name);
         }
 

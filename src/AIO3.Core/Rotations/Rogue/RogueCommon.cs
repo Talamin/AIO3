@@ -136,14 +136,23 @@ namespace AIO3.Core.Rotations.Rogue
         /// HP-based Evasion (the surrounded / lone-elite triggers carry no such qualifier).</summary>
         public const int EvasionMinTargetHealth = 70;
 
-        /// <summary>Evasion — the dodge defensive. Fire when low on health AND the target is still healthy (don't burn
-        /// it on a dying mob), when surrounded (>= the configured attacker count meleeing us), or on a solo elite/boss
-        /// fight (a long, dangerous fight). Self-cast, off the GCD. Mirrors the old SoloCombat's three Evasion triggers
-        /// (HP+healthy target, enemy count, lone elite); only the HP trigger carries the target-health qualifier.</summary>
+        /// <summary>Below this health %, Evasion is a PANIC button — fire it regardless of the target's health. The
+        /// "don't burn it on a dying mob" qualifier is right at moderate HP (you'll win the race), but when we're this
+        /// low we're LOSING the race and need the dodge wall now, even against a near-dead mob (the 1%-HP-vs-26%-Kodo
+        /// near-death that prompted this).</summary>
+        public const int EvasionPanicHealthPercent = 25;
+
+        /// <summary>Evasion — the dodge defensive. Fire when low on health (AND the target is still healthy so we don't
+        /// burn it on a dying mob — UNLESS we're below <see cref="EvasionPanicHealthPercent"/>, where survival wins and
+        /// it fires regardless), when surrounded (>= the configured attacker count meleeing us), or on a solo elite/boss
+        /// fight. Self-cast, off the GCD. Mirrors the old SoloCombat's three Evasion triggers (HP, enemy count, lone
+        /// elite) plus the panic override.</summary>
         public static RotationStep Evasion(RogueSettings s, float priority) =>
             Skill.Spell("Evasion").Priority(priority).On(Targets.Self)
                  .When(ctx => (s.EvasionHealthPercent.Value > 0 && ctx.Me.HealthPercent < s.EvasionHealthPercent.Value
-                               && ctx.HasEnemyTarget && ctx.Target.HealthPercent > EvasionMinTargetHealth)
+                               && ctx.HasEnemyTarget
+                               && (ctx.Target.HealthPercent > EvasionMinTargetHealth
+                                   || ctx.Me.HealthPercent < EvasionPanicHealthPercent))
                               || ctx.Enemies.Count(e => e.IsTargetingMe && e.Distance <= MeleeRange) >= s.EvasionEnemies.Value
                               || LoneElite(ctx))
                  .OffGcd();
