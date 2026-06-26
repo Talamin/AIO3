@@ -26,9 +26,12 @@ namespace AIO3.Persistence
         {
             try
             {
-                if (File.Exists(_path))
+                // Prefer the live file; fall back to the .bak that Save() keeps, so a crash that truncated the
+                // main file (the disconnect-then-WRobot-killed data loss) still recovers the last good settings.
+                string text = ReadIfNonEmpty(_path) ?? ReadIfNonEmpty(_path + ".bak");
+                if (text != null)
                 {
-                    SettingsSerializer.ApplyText(_settings, File.ReadAllText(_path));
+                    SettingsSerializer.ApplyText(_settings, text);
                     Logging.Write($"[AIO3] Loaded settings from {_path}");
                 }
             }
@@ -42,13 +45,34 @@ namespace AIO3.Persistence
         {
             try
             {
+                string text = SettingsSerializer.ToText(_settings);
+                // Never overwrite a good file with nothing (guards against a serializer returning empty).
+                if (string.IsNullOrWhiteSpace(text)) return;
+
                 Directory.CreateDirectory(Path.GetDirectoryName(_path));
-                File.WriteAllText(_path, SettingsSerializer.ToText(_settings));
+
+                // ATOMIC save: write a temp file, then swap it in. File.WriteAllText alone truncates the real file
+                // to 0 bytes BEFORE writing, so a kill mid-write (a server disconnect closing WRobot) left the
+                // .conf empty and every setting reset to default on the next load. File.Replace is atomic on NTFS
+                // and keeps a .bak; if anything throws, the previous file stays intact (no data loss).
+                string tmp = _path + ".tmp";
+                File.WriteAllText(tmp, text);
+                if (File.Exists(_path))
+                    File.Replace(tmp, _path, _path + ".bak");
+                else
+                    File.Move(tmp, _path);
             }
             catch (Exception e)
             {
                 Logging.WriteError("[AIO3] settings save failed: " + e.Message);
             }
+        }
+
+        private static string ReadIfNonEmpty(string path)
+        {
+            if (!File.Exists(path)) return null;
+            string text = File.ReadAllText(path);
+            return string.IsNullOrWhiteSpace(text) ? null : text;
         }
 
         private static string Sanitize(string profile)

@@ -61,8 +61,18 @@ namespace AIO3.Combat
         {
             try
             {
+                string text = _tracker.Serialize();
+                if (string.IsNullOrWhiteSpace(text)) return; // nothing learned yet → don't write an empty file
                 Directory.CreateDirectory(Path.GetDirectoryName(_path));
-                File.WriteAllText(_path, _tracker.Serialize());
+
+                // ATOMIC write (same as SettingsStore): temp file + File.Replace so a kill mid-save can't truncate
+                // the real file to 0 bytes. Keeps a .bak the load falls back to.
+                string tmp = _path + ".tmp";
+                File.WriteAllText(tmp, text);
+                if (File.Exists(_path))
+                    File.Replace(tmp, _path, _path + ".bak");
+                else
+                    File.Move(tmp, _path);
             }
             catch (Exception e)
             {
@@ -74,12 +84,20 @@ namespace AIO3.Combat
         {
             try
             {
-                if (File.Exists(_path)) _tracker.Load(File.ReadAllText(_path));
+                string text = ReadIfNonEmpty(_path) ?? ReadIfNonEmpty(_path + ".bak");
+                if (text != null) _tracker.Load(text);
             }
             catch (Exception e)
             {
                 Logging.WriteError("[AIO3] interrupt blacklist load failed: " + e.Message);
             }
+        }
+
+        private static string ReadIfNonEmpty(string path)
+        {
+            if (!File.Exists(path)) return null;
+            string text = File.ReadAllText(path);
+            return string.IsNullOrWhiteSpace(text) ? null : text;
         }
 
         private static ulong ParseGuid(string hex)
