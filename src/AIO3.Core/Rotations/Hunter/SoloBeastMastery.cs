@@ -42,6 +42,9 @@ namespace AIO3.Core.Rotations.Hunter
 
             // --- pet upkeep (all skip when petless) ---
             PetControl.Summon(ctx => _settings.ManagePet.Value, "Call Pet", "Revive Pet", priority: 0.5f),
+            // Feed an unhappy pet out of combat (Feed Pet — keeps the pet's damage / loyalty up). Gated on Manage
+            // pet too, so the product-owns-the-pet toggle silences it like the rest of the pet upkeep.
+            PetControl.FeedWhenUnhappy(ctx => _settings.Petfeed.Value && _settings.ManagePet.Value, priority: 0.55f),
             PetControl.Heal(ctx => _settings.ManagePet.Value && _settings.PetHealPercent.Value > 0,
                 "Mend Pet", ctx => _settings.PetHealPercent.Value, priority: 0.6f),
             PetControl.Attack(ctx => _settings.ManagePet.Value, priority: 0.7f),

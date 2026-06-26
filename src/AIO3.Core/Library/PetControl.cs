@@ -1,5 +1,6 @@
 using System;
 using AIO3.Core.Combat;
+using AIO3.Core.Data;
 using AIO3.Core.Dsl;
 using AIO3.Core.Engine;
 using AIO3.Core.Game;
@@ -130,6 +131,31 @@ namespace AIO3.Core.Library
                  .When((ctx, t) => enabled(ctx) && t.IsAlive
                                    && t.HealthPercent < belowPercent(ctx)
                                    && !t.HasAura(mendSpell));
+
+        // Mirrors the old AIO's 5s feed timer: Feed Pet's happiness regen registers over a few seconds, so re-issuing
+        // it every tick would queue the cast + eat a second food before the first one took effect. The recast delay
+        // throttles re-feeds to one every ~5s; happiness ticks back up between them and the step then idles.
+        private const int FeedReuseMs = 5000;
+
+        /// <summary>OUT-OF-COMBAT pet upkeep: feed an unhappy pet so it stops dealing -25% damage (and doesn't run
+        /// off). Fires only out of combat (Feed Pet is interrupted by damage) when the pet is alive and its happiness
+        /// is 1 (unhappy) or 2 (content) — i.e. > 0 and < 3, the same band the old FC fed on. The action asks the
+        /// adapter to feed the first in-bag food the pet accepts (<see cref="Consumables.PetFood"/>); if it carries
+        /// none, FeedPet returns false and the step falls through. Keyed on the pet EXISTING (never on level), like
+        /// every PetControl block. Throttled to one feed per ~5s (<see cref="FeedReuseMs"/>) so it isn't re-issued
+        /// every tick while happiness slowly regenerates.</summary>
+        public static RotationStep FeedWhenUnhappy(Func<CombatContext, bool> enabled, float priority) =>
+            new RotationStep(
+                name: "Pet feed",
+                priority: priority,
+                targets: Targets.Self,
+                condition: (ctx, t) => enabled(ctx)
+                                       && !ctx.Game.PlayerInCombat
+                                       && ctx.Pet != null && ctx.Pet.IsAlive
+                                       && ctx.Game.PetHappiness > 0 && ctx.Game.PetHappiness < 3,
+                action: (ctx, t) => ctx.Game.FeedPet(Consumables.PetFood) ? CastResult.Success : CastResult.Failed,
+                ignoreGcd: true,
+                recastDelayMs: FeedReuseMs);
 
         /// <summary>Keep the current target on the pet with its taunt (e.g. "Growl" for a hunter pet, "Torment"
         /// for a Voidwalker). PROACTIVE: taunts as soon as the engaged target is NOT already on the pet — it's on

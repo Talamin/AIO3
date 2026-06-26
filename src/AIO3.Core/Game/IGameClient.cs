@@ -54,6 +54,19 @@ namespace AIO3.Core.Game
         /// step can gate on it without a per-tick scan and won't try to cast an ability that's recharging.</summary>
         bool PetAbilityReady(string name);
 
+        /// <summary>The current pet's happiness: 1 = unhappy, 2 = content, 3 = happy; 0 when there is no pet
+        /// (defensive). An unhappy pet deals up to -25% damage and can run off, so the hunter feeds it back up.
+        /// First return of the WoW GetPetHappiness() API.</summary>
+        int PetHappiness { get; }
+
+        /// <summary>Feed the pet the first in-bag food whose type the pet accepts. <paramref name="foodByType"/>
+        /// maps a food TYPE ("Meat" / "Fungus" / "Fish" / "Fruit" / "Bread") to the candidate item names for that
+        /// type. The adapter reads the pet's accepted food types (GetPetFoodTypes), iterates the matching type(s),
+        /// finds the first food it actually carries, then casts "Feed Pet" + uses that item. Returns true if it fed
+        /// the pet; false when no matching food is in the bags (so the rotation step falls through). No-op (false)
+        /// when there is no pet.</summary>
+        bool FeedPet(IReadOnlyDictionary<string, IReadOnlyList<string>> foodByType);
+
         /// <summary>The local player's class (drives which rotation is selected).</summary>
         WowClass PlayerClass { get; }
 

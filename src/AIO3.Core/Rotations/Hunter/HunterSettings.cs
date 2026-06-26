@@ -22,6 +22,11 @@ namespace AIO3.Core.Rotations.Hunter
         public readonly IntSetting PetHealPercent =
             new IntSetting("petHeal", "Mend Pet below HP%", value: 60, min: 0, max: 100, step: 5);
 
+        /// <summary>Feed the pet (out of combat) when it gets unhappy. An unhappy pet deals up to -25% damage and
+        /// can run off; Feed Pet uses the appropriate food from the bags. Also gated on Manage pet.</summary>
+        public readonly ToggleSetting Petfeed =
+            new ToggleSetting("petfeed", "Feed pet when unhappy", value: true);
+
         /// <summary>Cast Misdirection on the pet to hand it threat (solo) so it keeps the mobs.</summary>
         public readonly ToggleSetting UseMisdirection =
             new ToggleSetting("misdirect", "Misdirection to pet", value: true);
@@ -123,6 +128,7 @@ namespace AIO3.Core.Rotations.Hunter
             // Spec = spec/mode/talents; General = meta toggles only.
             ManagePet.Category = "Pet";
             PetHealPercent.Category = "Pet";
+            Petfeed.Category = "Pet";
             UseMisdirection.Category = "Pet";
             UseBackpedal.Category = "Pet";
             BackpedalYards.Category = "Pet";
@@ -149,7 +155,7 @@ namespace AIO3.Core.Rotations.Hunter
             _all = new Setting[]
             {
                 // Pet
-                ManagePet, PetHealPercent, UseMisdirection, UseBackpedal, BackpedalYards,
+                ManagePet, PetHealPercent, Petfeed, UseMisdirection, UseBackpedal, BackpedalYards,
                 // Rotation
                 CombatRange, AoeThreshold, UseAoe, AspectViperManaPercent, AspectHawkManaPercent, ViperStingManaPercent,
                 UseFeignDeath, UseDisengage, InterruptCasts, UseRacials, UseCooldowns, EmergencyHealthPercent,

@@ -840,6 +840,73 @@ namespace AIO3.Adapter
 
         public bool PetAbilityReady(string name) => PetReadySet().Contains(name);
 
+        // Pet happiness: GetPetHappiness()'s first return (1 unhappy / 2 content / 3 happy). 0 when there's no pet
+        // (defensive — the Lua returns nil, which LuaDoString<int> reads back as 0). Mirrors the old PetHelper.
+        public int PetHappiness
+        {
+            get
+            {
+                WoWUnit pet = ObjectManager.Pet;
+                if (pet == null || !pet.IsValid || pet.Guid == 0) return 0; // no pet → no upkeep
+                try { return Lua.LuaDoString<int>("local h = GetPetHappiness() return h or 0"); }
+                catch { return 0; }
+            }
+        }
+
+        // Brief cache of the pet's accepted food TYPES (GetPetFoodTypes, e.g. "Meat" or "Meat,Fish"). It's static
+        // per pet, and FeedPet runs rarely (only while unhappy, on a 5s recast), so a short TTL keyed on the pet
+        // keeps the Lua read off the hot path without going stale across a re-tame (GUID change clears it).
+        private ulong _petFoodTypesGuid;
+        private int _petFoodTypesAt;
+        private string _petFoodTypes = "";
+
+        private string PetFoodTypes(WoWUnit pet)
+        {
+            ulong guid = (pet != null && pet.IsValid) ? pet.Guid : 0;
+            if (guid != 0 && guid == _petFoodTypesGuid && unchecked(Now - _petFoodTypesAt) < 10000) return _petFoodTypes;
+            string types;
+            try { types = Lua.LuaDoString<string>("return GetPetFoodTypes() or ''") ?? ""; }
+            catch { types = ""; }
+            _petFoodTypes = types;
+            _petFoodTypesGuid = guid;
+            _petFoodTypesAt = Now;
+            return types;
+        }
+
+        // Feed the pet the first in-bag food whose type the pet accepts. Mirrors the old PetHelper.Feed exactly:
+        // read the accepted food types, walk the type→names map, find the first food we carry
+        // (GetItemCountByNameLUA > 0), then CastSpellByName('Feed Pet') + UseItemByName(food). Returns false when no
+        // matching food is in the bags (the rotation step then falls through). Defensive: never throws.
+        public bool FeedPet(IReadOnlyDictionary<string, IReadOnlyList<string>> foodByType)
+        {
+            if (foodByType == null) return false;
+            WoWUnit pet = ObjectManager.Pet;
+            if (pet == null || !pet.IsValid || pet.Guid == 0) return false; // no pet → nothing to feed
+
+            string types = PetFoodTypes(pet);
+            if (string.IsNullOrEmpty(types)) return false;
+
+            try
+            {
+                // GetPetFoodTypes() returns the accepted types as a comma-joined string (e.g. "Meat,Fish"); a
+                // substring match is safe because the keys (Meat/Fungus/Fish/Fruit/Bread) don't overlap one another.
+                foreach (KeyValuePair<string, IReadOnlyList<string>> entry in foodByType)
+                {
+                    if (!types.Contains(entry.Key)) continue; // pet doesn't accept this food type
+                    foreach (string food in entry.Value)
+                    {
+                        if (ItemsManager.GetItemCountByNameLUA(food) <= 0) continue; // not in the bags
+                        Lua.LuaDoString("CastSpellByName('Feed Pet')", false);
+                        Lua.LuaDoString($"UseItemByName('{food}')", false);
+                        DebugLog.Write($"FeedPet: feeding {pet.Name} a '{food}'");
+                        return true;
+                    }
+                }
+            }
+            catch { return false; }
+            return false; // accepted a type but carry none of its foods
+        }
+
         // Names of pet abilities that are on the bar AND off cooldown, scanned in one pass (500ms TTL).
         private HashSet<string> PetReadySet()
         {

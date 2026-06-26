@@ -1,12 +1,50 @@
+using System.Collections.Generic;
+
 namespace AIO3.Core.Data
 {
     /// <summary>
-    /// Consumable item names used by the emergency-heal logic. The bot uses the first one that is
-    /// present in bags and off cooldown. Names are enUS; add localized names if needed.
-    /// Healthstone list ported from the old AIO Consumables; common health potions added.
+    /// Consumable item data: emergency-heal items, mana/conjure items, soul shards, and hunter pet food.
+    /// Item-use logic picks the first entry present in bags (and off cooldown, where that applies). Names are
+    /// enUS; add localized names if needed. Lists ported from the old AIO; common potions added.
     /// </summary>
     public static class Consumables
     {
+        /// <summary>Hunter PET FOOD by food TYPE → candidate item names. A pet accepts one or more food types
+        /// ("Meat" / "Meat,Fish" / ...); the adapter reads the accepted types (GetPetFoodTypes) and feeds the
+        /// first food it carries of a matching type. Ported verbatim from the old AIO PetHelper "Buffet".
+        /// Pure data — the WoW item/Lua calls live in the adapter only (Layer 0 stays WRobot-free).</summary>
+        public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> PetFood =
+            new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["Meat"] = new[]
+                {
+                    "Tough Jerky", "Haunch of Meat", "Mutton Chop", "Wild Hog Shank", "Cured Ham Steak",
+                    "Roasted Quail", "Smoked Talbuk Venison", "Clefthoof Ribs", "Salted Venison",
+                    "Mead Basted Caribou", "Mystery Meat", "Red Wolf Meat"
+                },
+                ["Fungus"] = new[]
+                {
+                    "Raw Black Truffle"
+                },
+                ["Fish"] = new[]
+                {
+                    "Slitherskin Mackerel", "Longjaw Mud Snapper", "Bristle Whisker Catfish", "Rockscale Cod",
+                    "Striped Yellowtail", "Spinefin Halibut", "Sunspring Carp", "Zangar Trout",
+                    "Fillet of Icefin", "Poached Emperor Salmon"
+                },
+                ["Fruit"] = new[]
+                {
+                    "Shiny Red Apple", "Tel'Abim Banana", "Snapvine Watermelon", "Goldenbark Apple",
+                    "Heaven Peach", "Moon Harvest Pumpkin", "Deep Fried Plantains", "Skethyl Berries",
+                    "Telaari Grapes", "Tundra Berries", "Savory Snowplum"
+                },
+                ["Bread"] = new[]
+                {
+                    "Tough Hunk of Bread", "Freshly Baked Bread", "Moist Cornbread", "Mulgore Spice Bread",
+                    "Soft Banana Bread", "Homemade Cherry Pie", "Mag'har Grainbread", "Crusty Flatbread"
+                }
+            };
+
         /// <summary>Warlock Healthstone ranks (lowest→highest). Used to decide whether to Create Healthstone
         /// (warlocks carry exactly one; create it when we have none and a Soul Shard to spend). Subset of
         /// <see cref="HealthItems"/>, which also includes potions the create-check must ignore.</summary>

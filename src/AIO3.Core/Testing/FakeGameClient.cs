@@ -172,6 +172,23 @@ namespace AIO3.Core.Testing
 
         public bool PetAbilityReady(string name) => PetAbilities.Contains(name) && !PetAbilitiesOnCooldown.Contains(name);
 
+        /// <summary>Pet happiness (1 unhappy / 2 content / 3 happy; 0 = no pet), returned by <see cref="PetHappiness"/>.</summary>
+        public int PetHappinessValue;
+        public int PetHappiness => PetHappinessValue;
+
+        /// <summary>Whether <see cref="FeedPet"/> "succeeds" (true = it found + used a food). Set false to simulate
+        /// no matching food in the bags so the rotation step falls through.</summary>
+        public bool FeedPetResult = true;
+
+        /// <summary>How many times <see cref="FeedPet"/> was invoked (assert the feed step actually ran).</summary>
+        public int FeedPetCalls;
+
+        public bool FeedPet(IReadOnlyDictionary<string, IReadOnlyList<string>> foodByType)
+        {
+            FeedPetCalls++;
+            return FeedPetResult;
+        }
+
         public bool CastPetAbility(string name)
         {
             if (!PetAbilities.Contains(name)) return false;
