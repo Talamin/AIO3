@@ -75,8 +75,21 @@ namespace AIO3.Core.Combat
 
         public int EnemiesTargetingMe => Enemies.Count(e => e.IsTargetingMe);
 
-        /// <summary>Number of enemies within <paramref name="yards"/> of the player (AoE sizing).</summary>
+        /// <summary>Number of enemies within <paramref name="yards"/> of the player (AoE sizing).
+        /// Use this for threats ON the player (e.g. "am I surrounded?"); for placing a ground/cone AoE that
+        /// lands around the TARGET, use <see cref="EnemiesNearTarget"/> instead.</summary>
         public int EnemiesWithin(float yards) => Enemies.Count(e => e.Distance <= yards);
+
+        /// <summary>Number of enemies within <paramref name="yards"/> of <paramref name="center"/> (3D).
+        /// The general form behind <see cref="EnemiesNearTarget"/>: a ranged AoE hits the cluster around the
+        /// spell's anchor, which is rarely the player.</summary>
+        public int EnemiesNear(IWowUnit center, float yards) =>
+            center == null ? 0 : Enemies.Count(e => e.DistanceTo(center) <= yards);
+
+        /// <summary>Number of enemies within <paramref name="yards"/> of the CURRENT TARGET (0 if no target).
+        /// The correct pack gate for target-anchored AoE shots (Multi-Shot, Volley): a ranged hunter stands far
+        /// from the pack, so the player-relative <see cref="EnemiesWithin"/> would almost never trip.</summary>
+        public int EnemiesNearTarget(float yards) => EnemiesNear(Target, yards);
 
         public bool HasTarget => Target != null && Target.IsAlive;
 

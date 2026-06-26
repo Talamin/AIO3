@@ -32,6 +32,12 @@ namespace AIO3.Adapter
         public int Rage => (int)_unit.Rage;
         public int Energy => (int)_unit.Energy; // WoWUnit.Energy is a UInt32 (absolute energy, 0..100)
         public float Distance => _unit.GetDistance;
+
+        // 3D distance to another unit, via the Vector3 returned by WoWObject.Position (scout-verified:
+        // robotManager.Helpful.Vector3 has an instance Single DistanceTo(Vector3)). Falls back to the
+        // player-distance for a non-WRobot IWowUnit (e.g. a test fake) rather than throwing.
+        public float DistanceTo(IWowUnit other) =>
+            other is WRobotUnit w ? _unit.Position.DistanceTo(w.Inner.Position) : _unit.GetDistance;
         public bool IsCasting => _unit.IsCast;
         public int CastingSpellId => _unit.CastingSpellId;
         public bool IsTargetingMe => _unit.IsTargetingMe;

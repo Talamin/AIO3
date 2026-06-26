@@ -34,6 +34,12 @@ namespace AIO3.Core.Game
         /// <summary>Distance to the local player ("Me"), in yards.</summary>
         float Distance { get; }
 
+        /// <summary>3D distance (yards) from this unit to <paramref name="other"/>. Lets a step measure a
+        /// cluster around a unit OTHER than the player — e.g. counting adds packed around a ranged hunter's
+        /// distant TARGET, where the player-relative <see cref="Distance"/> says nothing. Matches the
+        /// <see cref="Distance"/> convention (3D); never throws.</summary>
+        float DistanceTo(IWowUnit other);
+
         bool IsCasting { get; }
 
         /// <summary>Spell id the unit is currently casting, or 0.</summary>

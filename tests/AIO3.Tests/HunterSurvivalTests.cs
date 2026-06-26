@@ -94,10 +94,12 @@ namespace AIO3.Tests
         public void Volley_fires_on_a_pack_and_holds_while_moving()
         {
             // BM1/AoE: Volley is a shared channelled AoE wired into every spec; it gates on the same
-            // player-relative pack gate as Multi-Shot and on standing still.
+            // target-relative pack gate as Multi-Shot and on standing still. Positional model (X1): cluster the
+            // adds around the TARGET (28yd downrange of the player), not around the player.
             FakeGameClient g = Game();
-            for (ulong i = 2; i <= 4; i++) // three extra mobs in 10yd → pack of 4 (>= default AoE threshold 3)
-                g.EnemyList.Add(new FakeUnit { Guid = i, Distance = 6, IsAttackable = true, Reaction = Reaction.Hostile });
+            g.TargetUnit.X = 28; g.TargetUnit.Y = 0;
+            for (ulong i = 2; i <= 4; i++) // three extra mobs within 10yd of the target → pack of 4 (>= default threshold 3)
+                g.EnemyList.Add(new FakeUnit { Guid = i, Distance = 28, X = 29, Y = 0, IsAttackable = true, Reaction = Reaction.Hostile });
             g.SpellsOnCooldown.Add("Kill Command"); // clear the lead filler so we reach the AoE band
             var s = new HunterSettings();
             s.UseCooldowns.Value = false; // Rapid Fire fires on a pack; isolate the AoE shot
@@ -106,6 +108,28 @@ namespace AIO3.Tests
 
             g.Moving = true; // channelled → can't start on the move
             Assert.NotEqual("Volley", Fire(g, s)?.Name);
+        }
+
+        [Fact]
+        public void Multi_Shot_fires_on_a_distant_pack_the_old_player_relative_gate_would_have_missed()
+        {
+            // X1: a ranged SV hunter at ~28yd on a pack clustered on the distant target. Every add is far from
+            // the player, so the old EnemiesWithin(AoeRadius) gate saw zero and Multi-Shot never fired; the new
+            // target-relative gate sees the cluster. Volley is on cooldown here so Multi-Shot is the AoE that wins.
+            FakeGameClient g = Game();
+            g.SpellsOnCooldown.Add("Kill Command");
+            g.SpellsOnCooldown.Add("Black Arrow");
+            g.SpellsOnCooldown.Add("Explosive Shot");
+            g.SpellsOnCooldown.Add("Aimed Shot");
+            g.SpellsOnCooldown.Add("Volley"); // isolate Multi-Shot as the AoE that fires
+            g.TargetUnit.X = 28; g.TargetUnit.Y = 0;
+            for (ulong i = 2; i <= 4; i++)
+                g.EnemyList.Add(new FakeUnit { Guid = i, Distance = 28, X = 30, Y = 1, IsAttackable = true, Reaction = Reaction.Hostile });
+            var s = new HunterSettings();
+            s.UseCooldowns.Value = false;
+
+            Assert.Equal(0, CombatContext.Capture(g).EnemiesWithin(HunterCommon.AoeRadius)); // old gate: zero
+            Assert.Equal("Multi-Shot", Fire(g, s)?.Name);
         }
     }
 }

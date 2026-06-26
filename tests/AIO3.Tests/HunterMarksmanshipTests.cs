@@ -110,5 +110,26 @@ namespace AIO3.Tests
             g.TargetUnit.HealthPercent = HunterCommon.SerpentStingMinTargetHealth - 1; // 69%
             Assert.Equal("Chimera Shot", Fire(g)?.Name);
         }
+
+        [Fact]
+        public void Multi_Shot_fires_on_a_distant_pack_the_old_player_relative_gate_would_have_missed()
+        {
+            // X1: a ranged MM hunter at ~28yd on a pack clustered on the distant target. The adds are all far
+            // from the player, so the old EnemiesWithin(AoeRadius) gate counted zero; the new target-relative
+            // gate sees the cluster. Clear the higher-priority shots so Multi-Shot is the AoE that wins.
+            var s = new HunterSettings();
+            s.UseCooldowns.Value = false;
+            FakeGameClient g = Game();
+            g.SpellsOnCooldown.Add("Chimera Shot");
+            g.SpellsOnCooldown.Add("Aimed Shot");
+            g.SpellsOnCooldown.Add("Volley"); // AoE band above Multi-Shot — isolate Multi-Shot as the AoE
+            g.TargetUnit.X = 28; g.TargetUnit.Y = 0;
+            for (ulong i = 2; i <= 4; i++)
+                g.EnemyList.Add(new FakeUnit { Guid = i, Distance = 28, X = 30, Y = 1, IsAttackable = true, Reaction = Reaction.Hostile });
+
+            Assert.Equal(0, CombatContext.Capture(g).EnemiesWithin(HunterCommon.AoeRadius)); // old gate: zero
+            RotationStep step = new RotationEngine(new SoloMarksmanship(s).BuildSteps()).Tick(CombatContext.Capture(g));
+            Assert.Equal("Multi-Shot", step?.Name);
+        }
     }
 }

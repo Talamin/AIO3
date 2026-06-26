@@ -64,14 +64,16 @@ namespace AIO3.Core.Rotations.Hunter
             CombatBlocks.SelfBuff("Trueshot Aura", priority);
 
         /// <summary>Volley: BM's primary grind-AoE — a channelled ground AoE ranked above Kill Shot in the old FC
-        /// (SoloBeastMastery.cs:21, default-on while Multi-Shot defaulted off). Gated on the same player-relative
-        /// pack gate as Multi-Shot (UseAoe + EnemiesWithin(AoeRadius) >= AoeThreshold) and on standing still — it's
-        /// channelled, like Steady Shot, so it can't start on the move. IsSpellKnown auto-skips until learned.</summary>
+        /// (SoloBeastMastery.cs:21, default-on while Multi-Shot defaulted off). Gated on the same pack gate as
+        /// Multi-Shot (UseAoe + a pack near the TARGET) and on standing still — it's channelled, like Steady Shot,
+        /// so it can't start on the move. The pack gate is TARGET-relative (EnemiesNearTarget): the AoE lands on the
+        /// cluster around the target, and a ranged hunter stands too far back for a player-relative count to trip.
+        /// IsSpellKnown auto-skips until learned.</summary>
         public static RotationStep Volley(HunterSettings s, float priority) =>
             Skill.Spell("Volley").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.Distance >= RangedMin
                               && s.UseAoe.Value
-                              && ctx.EnemiesWithin(AoeRadius) >= s.AoeThreshold.Value
+                              && ctx.EnemiesNearTarget(AoeRadius) >= s.AoeThreshold.Value
                               && !ctx.Game.PlayerIsMoving);
 
         /// <summary>Viper Sting: MM's mana-sustain vs caster mobs — drains the target's mana into yours. Old MM

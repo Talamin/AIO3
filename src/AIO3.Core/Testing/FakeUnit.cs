@@ -16,6 +16,20 @@ namespace AIO3.Core.Testing
         public int Rage { get; set; }
         public int Energy { get; set; }
         public float Distance { get; set; }
+
+        // 2D position for DistanceTo tests. The player is conceptually at the origin; a unit's Distance is its
+        // player-distance and is independent of X/Y. Tests that exercise DistanceTo set X/Y to place a cluster.
+        public float X, Y;
+
+        public float DistanceTo(IWowUnit other)
+        {
+            if (other is FakeUnit f)
+            {
+                float dx = X - f.X, dy = Y - f.Y;
+                return (float)System.Math.Sqrt((dx * dx) + (dy * dy));
+            }
+            return System.Math.Abs(Distance - (other?.Distance ?? 0f));
+        }
         public bool IsCasting { get; set; }
         public int CastingSpellId { get; set; }
         public Reaction Reaction { get; set; } = Reaction.Hostile;

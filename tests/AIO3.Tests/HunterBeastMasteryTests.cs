@@ -279,10 +279,13 @@ namespace AIO3.Tests
         public void Volley_is_BM_primary_AoE_on_a_pack()
         {
             // BM1: Volley is BM's primary grind-AoE (channelled), ranked above Kill Shot / Multi-Shot.
+            // Positional model (X1): the pack is measured around the TARGET, not the player. Place the target
+            // and the adds at the same spot (~28yd downrange of the player at the origin) so they cluster.
             FakeGameClient g = Marked(HunterGame());
             g.MeUnit.WithAura("Trueshot Aura"); // keep the upkeep band quiet
-            for (ulong i = 2; i <= 4; i++) // pack of 4 in 10yd (>= AoE threshold 3)
-                g.EnemyList.Add(new FakeUnit { Guid = i, Distance = 6, IsAttackable = true, Reaction = Reaction.Hostile });
+            g.TargetUnit.X = 28; g.TargetUnit.Y = 0; // the target stands 28yd downrange of the player
+            for (ulong i = 2; i <= 4; i++) // pack of 4 within 10yd of the target (>= AoE threshold 3)
+                g.EnemyList.Add(new FakeUnit { Guid = i, Distance = 28, X = 29, Y = 0, IsAttackable = true, Reaction = Reaction.Hostile });
             var s = new HunterSettings();
             s.UseCooldowns.Value = false; // Bestial Wrath / Rapid Fire fire on a pack; isolate the AoE shot
 
@@ -294,12 +297,59 @@ namespace AIO3.Tests
         {
             FakeGameClient g = Marked(HunterGame());
             g.MeUnit.WithAura("Trueshot Aura");
+            g.TargetUnit.X = 28; g.TargetUnit.Y = 0;
             for (ulong i = 2; i <= 4; i++)
-                g.EnemyList.Add(new FakeUnit { Guid = i, Distance = 6, IsAttackable = true, Reaction = Reaction.Hostile });
+                g.EnemyList.Add(new FakeUnit { Guid = i, Distance = 28, X = 29, Y = 0, IsAttackable = true, Reaction = Reaction.Hostile });
             g.Moving = true; // channelled → can't start on the move
             var s = new HunterSettings();
             s.UseCooldowns.Value = false;
 
+            Assert.NotEqual("Volley", Fire(g, s)?.Name);
+        }
+
+        [Fact]
+        public void Volley_fires_on_a_distant_pack_the_old_player_relative_gate_would_have_missed()
+        {
+            // X1: the regression the seam fixes. A ranged BM hunter stands ~28yd back; the pack is clustered on
+            // the distant target. Every add is FAR from the player (player-relative Distance = 28 > AoeRadius 10),
+            // so the old EnemiesWithin(AoeRadius) gate counted ZERO and Volley/Multi-Shot never fired. The new
+            // target-relative gate counts the cluster around the target and triggers the AoE.
+            FakeGameClient g = Marked(HunterGame());
+            g.MeUnit.WithAura("Trueshot Aura");
+            g.TargetUnit.X = 28; g.TargetUnit.Y = 0; // 28yd downrange
+            for (ulong i = 2; i <= 4; i++) // adds packed on the target, all 28yd from the player
+                g.EnemyList.Add(new FakeUnit { Guid = i, Distance = 28, X = 30, Y = 1, IsAttackable = true, Reaction = Reaction.Hostile });
+            var s = new HunterSettings();
+            s.UseCooldowns.Value = false;
+
+            // Sanity: the old player-relative count is zero (no add within AoeRadius of the player) ...
+            Assert.Equal(0, CombatContext.Capture(g).EnemiesWithin(HunterCommon.AoeRadius));
+            // ... yet the target-relative count sees the full pack, so Volley fires.
+            Assert.True(CombatContext.Capture(g).EnemiesNearTarget(HunterCommon.AoeRadius) >= s.AoeThreshold.Value);
+            Assert.Equal("Volley", Fire(g, s)?.Name);
+        }
+
+        [Fact]
+        public void Multi_Shot_does_not_fire_on_an_add_near_the_player_but_far_from_the_target()
+        {
+            // X1 (negative): adds hugging the player but nowhere near the distant target are NOT a pack for a
+            // target-anchored AoE. The old player-relative gate would have counted them and tripped the AoE; the
+            // new gate (correctly) sees only the target itself near the target, so the AoE band stays quiet.
+            FakeGameClient g = Marked(HunterGame());
+            g.MeUnit.WithAura("Trueshot Aura");
+            g.SpellsOnCooldown.Add("Kill Command"); // clear the lead filler so we'd reach the AoE band if it tripped
+            g.TargetUnit.X = 28; g.TargetUnit.Y = 0;
+            // Three adds right on top of the player (Distance ~2) but 28yd from the target — under the OLD gate
+            // this is a "pack of 3 near me" and would have tripped the default AoE threshold (3).
+            for (ulong i = 5; i <= 7; i++)
+                g.EnemyList.Add(new FakeUnit { Guid = i, Distance = 2, X = 0, Y = 0, IsAttackable = true, Reaction = Reaction.Hostile });
+            var s = new HunterSettings(); // default AoE threshold (3)
+            s.UseCooldowns.Value = false;
+
+            // Old gate would have seen 3 near the player; the new gate sees only the target itself (1) near the target.
+            Assert.True(CombatContext.Capture(g).EnemiesWithin(HunterCommon.AoeRadius) >= s.AoeThreshold.Value);
+            Assert.Equal(1, CombatContext.Capture(g).EnemiesNearTarget(HunterCommon.AoeRadius));
+            Assert.NotEqual("Multi-Shot", Fire(g, s)?.Name);
             Assert.NotEqual("Volley", Fire(g, s)?.Name);
         }
 

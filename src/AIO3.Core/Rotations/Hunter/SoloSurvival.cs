@@ -76,9 +76,11 @@ namespace AIO3.Core.Rotations.Hunter
             HunterCommon.ExplosiveShot(priority: 8.5f),
             Skill.Spell("Aimed Shot").Priority(9f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.Distance >= HunterCommon.RangedMin),
+            // Multi-Shot: target-relative pack gate (EnemiesNearTarget) — the AoE hits the cluster around the
+            // target, not the player, who stands ~28yd back.
             Skill.Spell("Multi-Shot").Priority(10f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.Distance >= HunterCommon.RangedMin
-                              && _settings.UseAoe.Value && ctx.EnemiesWithin(HunterCommon.AoeRadius) >= _settings.AoeThreshold.Value),
+                              && _settings.UseAoe.Value && ctx.EnemiesNearTarget(HunterCommon.AoeRadius) >= _settings.AoeThreshold.Value),
             Skill.Spell("Arcane Shot").Priority(11f).On(Targets.CurrentEnemy)
                  .When(ctx => ctx.Target.Distance >= HunterCommon.RangedMin),
             Skill.Spell("Steady Shot").Priority(12f).On(Targets.CurrentEnemy)
