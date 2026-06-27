@@ -416,16 +416,19 @@ namespace AIO3.Overlay
             foreach (var group in _settings.Where(s => s.AppliesTo(spec))
                                            .GroupBy(s => string.IsNullOrEmpty(s.Category) ? "General" : s.Category))
             {
+                var groupSettings = group.ToList();
+                string cat = group.Key;
                 var stack = new StackPanel { Margin = new Thickness(2) };
-                foreach (Setting setting in group)
+                foreach (Setting setting in groupSettings)
                 {
-                    // Each row gets a hover highlight + a subtle divider; kept in _rows so the filter can hide it.
+                    // Each row gets a hover highlight + a subtle divider + a tooltip; kept in _rows so the filter can hide it.
                     var holder = new Border
                     {
                         Child = Row(setting),
                         Padding = new Thickness(6, 1, 6, 1),
                         BorderBrush = Divider,
-                        BorderThickness = new Thickness(0, 0, 0, 1)
+                        BorderThickness = new Thickness(0, 0, 0, 1),
+                        ToolTip = Hint(setting)
                     };
                     holder.MouseEnter += (s, e) => holder.Background = RowHover;
                     holder.MouseLeave += (s, e) => holder.Background = Brushes.Transparent;
@@ -433,12 +436,28 @@ namespace AIO3.Overlay
                     _rows.Add((setting, holder));
                 }
 
+                // Per-tab "reset to defaults".
+                var reset = new Button
+                {
+                    Content = "↺ Reset", HorizontalAlignment = HorizontalAlignment.Left,
+                    Margin = new Thickness(6, 6, 6, 2), Padding = new Thickness(8, 1, 8, 1),
+                    Foreground = Fg, Background = BarBg, BorderThickness = new Thickness(0), Cursor = Cursors.Hand,
+                    ToolTip = "Reset this tab's settings to their defaults"
+                };
+                reset.Click += (s, e) =>
+                {
+                    foreach (Setting st in groupSettings) st.Reset();
+                    Changed("reset " + cat, "defaults");
+                    BuildControls(_builtForSpec);
+                };
+                stack.Children.Add(reset);
+
                 var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = stack };
                 _tabs.Items.Add(new TabItem
                 {
                     // Set size AND colour on the header TEXT directly: TabItem.FontSize/Foreground don't reach the
                     // header in the active theme. ApplyTabAccent() then accents the selected tab.
-                    Header = new TextBlock { Text = group.Key, FontSize = 11, Foreground = Fg },
+                    Header = new TextBlock { Text = cat, FontSize = 11, Foreground = Fg },
                     Content = scroll,
                     Padding = new Thickness(7, 1, 7, 1)
                 });
@@ -447,6 +466,19 @@ namespace AIO3.Overlay
             if (selected >= 0 && selected < _tabs.Items.Count) _tabs.SelectedIndex = selected;
             ApplyTabAccent();
             ApplyFilter();
+        }
+
+        /// <summary>The hover tooltip for a setting: its Description when set, else a derived hint (an int's range,
+        /// a choice's options) so even un-described settings get a useful tooltip.</summary>
+        private static string Hint(Setting s)
+        {
+            if (!string.IsNullOrEmpty(s.Description)) return s.Description;
+            switch (s)
+            {
+                case IntSetting i: return i.Label + ": " + i.Min + "–" + i.Max + " (step " + i.Step + ")";
+                case ChoiceSetting c: return c.Label + ": " + string.Join(" / ", c.Options);
+                default: return s.Label;
+            }
         }
 
         /// <summary>Apply a control edit: log it (so the WRobot log confirms the change, like the Lua panel did)

@@ -25,6 +25,10 @@ namespace AIO3.Core.Settings
         /// <see cref="Spec"/> tag always applies; a null active spec (unknown/not spec-aware) disables filtering.</summary>
         public bool AppliesTo(string activeSpec) => Spec == null || activeSpec == null || Spec == activeSpec;
 
+        /// <summary>Optional one-line description shown as a hover tooltip in the overlay. Null = the overlay
+        /// derives a hint (e.g. an int's range, a choice's options).</summary>
+        public string Description { get; set; }
+
         protected Setting(string key, string label)
         {
             Key = key;
@@ -36,16 +40,21 @@ namespace AIO3.Core.Settings
 
         /// <summary>Restore the value from a serialized string (ignored if invalid).</summary>
         public abstract void Deserialize(string raw);
+
+        /// <summary>Restore the value to the default it was constructed with (the overlay's "reset to defaults").</summary>
+        public abstract void Reset();
     }
 
     /// <summary>A boolean toggle, rendered as a checkbox.</summary>
     public sealed class ToggleSetting : Setting
     {
         public bool Value;
+        private readonly bool _default;
 
         public ToggleSetting(string key, string label, bool value) : base(key, label)
         {
             Value = value;
+            _default = value;
         }
 
         public override string Serialize() => Value ? "1" : "0";
@@ -54,6 +63,8 @@ namespace AIO3.Core.Settings
         {
             Value = raw == "1" || string.Equals(raw, "true", StringComparison.OrdinalIgnoreCase);
         }
+
+        public override void Reset() => Value = _default;
     }
 
     /// <summary>A choice among fixed options, rendered as a cycle button (e.g. spec selection).</summary>
@@ -61,11 +72,13 @@ namespace AIO3.Core.Settings
     {
         public string Value;
         public readonly string[] Options;
+        private readonly string _default;
 
         public ChoiceSetting(string key, string label, string value, string[] options) : base(key, label)
         {
             Value = value;
             Options = options;
+            _default = value;
         }
 
         public override string Serialize() => Value ?? "";
@@ -76,6 +89,8 @@ namespace AIO3.Core.Settings
                 if (o == raw) { Value = raw; return; }
             // unknown option → keep current value
         }
+
+        public override void Reset() => Value = _default;
     }
 
     /// <summary>An integer with bounds and a step, rendered as a value with [-]/[+] buttons.</summary>
@@ -85,6 +100,7 @@ namespace AIO3.Core.Settings
         public int Min;
         public int Max;
         public int Step;
+        private readonly int _default;
 
         public IntSetting(string key, string label, int value, int min, int max, int step) : base(key, label)
         {
@@ -92,6 +108,7 @@ namespace AIO3.Core.Settings
             Min = min;
             Max = max;
             Step = step;
+            _default = value;
         }
 
         public override string Serialize() => Value.ToString(CultureInfo.InvariantCulture);
@@ -101,5 +118,7 @@ namespace AIO3.Core.Settings
             if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int v))
                 Value = Math.Max(Min, Math.Min(Max, v));
         }
+
+        public override void Reset() => Value = _default;
     }
 }
