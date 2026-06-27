@@ -9,7 +9,7 @@ namespace AIO3.Core.Rotations
     /// </summary>
     public static class ClassModules
     {
-        public static IClassModule For(WowClass playerClass)
+        public static IClassModule For(WowClass playerClass, IGameClient game = null)
         {
             switch (playerClass)
             {
@@ -19,7 +19,8 @@ namespace AIO3.Core.Rotations
                 case WowClass.Rogue: return new RogueModule();
                 case WowClass.Mage: return new MageModule();
                 case WowClass.Warlock: return new WarlockModule();
-                case WowClass.Druid: return new DruidModule();
+                // Druid takes the game client so its Range can switch caster↔melee on whether a form is learned.
+                case WowClass.Druid: return new DruidModule(game);
                 default: return null;
             }
         }

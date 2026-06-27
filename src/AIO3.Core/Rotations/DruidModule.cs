@@ -24,13 +24,15 @@ namespace AIO3.Core.Rotations
         private readonly ChoiceSetting _spec =
             new ChoiceSetting("spec", "Spec", DruidSpecs.Auto, DruidSpecs.Choices) { Category = "Spec" };
         private readonly List<Setting> _all;
+        private readonly IGameClient _game; // to read whether a melee form is learned (drives the dynamic Range)
 
         private DruidSpec? _activeSpec;
         private string _activeMode;
         private IRotation _rotation;
 
-        public DruidModule()
+        public DruidModule(IGameClient game = null)
         {
+            _game = game;
             // The Spec selector sits first; the shared druid tunables follow.
             _all = new List<Setting> { _spec };
             _all.AddRange(_settings.All);
@@ -40,13 +42,23 @@ namespace AIO3.Core.Rotations
         public string DisplayName => "Druid";
         public IReadOnlyList<Setting> Settings => _all;
 
-        /// <summary>Combat distance reported to WRobot. Feral is melee in its steady state (once Cat/Bear is
-        /// learned), Balance is a caster. NOTE: a pre-form leveling Feral (no Cat/Bear yet) nukes with Wrath at
-        /// caster range, but the module can't see "form known" without a game client; it reports the melee range
-        /// for Feral. The pre-form window is brief and WRobot closes to melee anyway — flagged as the one range
-        /// nuance to revisit if a low-level Feral struggles to reach its caster filler.</summary>
-        public float Range =>
-            _activeSpec == DruidSpec.Balance ? _settings.CasterRange.Value : _settings.MeleeRange.Value;
+        /// <summary>Combat distance reported to WRobot. Balance is always a caster. Feral reports MELEE only once a
+        /// shapeshift form is learned (Bear Form at ~level 10, then Cat) — before that a formless leveling druid
+        /// nukes with Wrath, so it reports CASTER range, otherwise WRobot drags the still-caster low-level druid
+        /// into melee (the level-1 behaviour Daniel saw). Mirrors the old AIO's DruidBehavior range logic
+        /// (melee if it knows a form, else caster). Re-read live, so it switches to melee the moment a form is
+        /// learned. A null game client (tests) keeps the melee default.</summary>
+        public float Range
+        {
+            get
+            {
+                if (_activeSpec == DruidSpec.Balance) return _settings.CasterRange.Value;
+                bool hasMeleeForm = _game == null
+                    || _game.IsSpellKnown("Bear Form") || _game.IsSpellKnown("Cat Form")
+                    || _game.IsSpellKnown("Dire Bear Form");
+                return hasMeleeForm ? _settings.MeleeRange.Value : _settings.CasterRange.Value;
+            }
+        }
 
         public string ActiveLabel { get; private set; } = "Solo Feral";
         public string ActiveSpec => _activeSpec?.ToString();

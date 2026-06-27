@@ -4,6 +4,7 @@ using AIO3.Core.Game;
 using AIO3.Core.Rotations;
 using AIO3.Core.Rotations.Druid;
 using AIO3.Core.Settings;
+using AIO3.Core.Testing;
 using Xunit;
 
 namespace AIO3.Tests
@@ -83,6 +84,24 @@ namespace AIO3.Tests
             Assert.Equal(5f, m.Range);
             m.ResolveRotation(1); // Balance
             Assert.Equal(29f, m.Range);
+        }
+
+        [Fact]
+        public void Feral_range_is_caster_until_a_form_is_learned()
+        {
+            var game = new FakeGameClient { Class = WowClass.Druid };
+            var m = new DruidModule(game);
+            m.ResolveRotation(2); // Feral
+
+            // A formless low-level druid nukes with Wrath → caster range (so WRobot doesn't drag it into melee).
+            game.UnknownSpells.Add("Bear Form");
+            game.UnknownSpells.Add("Cat Form");
+            game.UnknownSpells.Add("Dire Bear Form");
+            Assert.Equal(29f, m.Range);
+
+            // Bear Form learned (~level 10) → melee range, switched live.
+            game.UnknownSpells.Remove("Bear Form");
+            Assert.Equal(5f, m.Range);
         }
 
         [Fact]

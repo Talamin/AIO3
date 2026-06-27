@@ -64,7 +64,7 @@ public class Main : ICustomClass
         _damageLearner = new DamageLearner(_damageTracker);
         EventsLuaWithArgs.OnEventsLuaStringWithArgs += _damageLearner.OnCombatLog;
 
-        _class = ClassModules.For(_game.PlayerClass);
+        _class = ClassModules.For(_game.PlayerClass, _game);
         if (_class != null)
         {
             // Panel/persistence cover the module's full setting set (spec/mode selectors first).
