@@ -191,48 +191,82 @@ namespace AIO3.Core.Rotations.Druid
         public DruidSettings()
         {
             UseMarkOfTheWild.Category = "Buffs";
+            UseMarkOfTheWild.Description = "Keep Mark of the Wild (or Gift of the Wild in a group) up on yourself out of combat.";
             UseThorns.Category = "Buffs";
+            UseThorns.Description = "Keep Thorns up on yourself out of combat (reflects melee damage back at attackers).";
 
             MeleeRange.Category = "Rotation";
+            MeleeRange.Description = "Melee combat distance Feral uses once shifted into Cat/Bear form.";
             CasterRange.Category = "Rotation";
+            CasterRange.Description = "Caster combat distance used by Balance (and a pre-form Feral nuking with Wrath).";
             UseRacials.Category = "Rotation";
+            UseRacials.Description = "Use your race's combat racial (Blood Fury, Berserking, Arcane Torrent, War Stomp, etc.).";
             UseCooldowns.Category = "Rotation";
+            UseCooldowns.Description = "Use major offensive cooldowns on elites/bosses/packs (Feral: Berserk; Balance: Force of Nature).";
 
             // Feral-only knobs live in the Rotation tab but tag their spec, so the overlay shows them ONLY while
             // Feral is active (Spec strings match DruidSpec.ToString()).
             BearCount.Category = "Rotation";            BearCount.Spec = "Feral";
+            BearCount.Description = "Shift to (Dire) Bear Form when at least this many enemies are meleeing you; below it, stay in Cat.";
             FinisherComboPoints.Category = "Rotation";  FinisherComboPoints.Spec = "Feral";
+            FinisherComboPoints.Description = "Combo points required before spending a Cat finisher (Rip / Ferocious Bite).";
             RipHealth.Category = "Rotation";            RipHealth.Spec = "Feral";
+            RipHealth.Description = "Only apply/refresh Rip above this enemy HP%; below it, spend combo points on Ferocious Bite instead.";
             UseTigersFury.Category = "Rotation";        UseTigersFury.Spec = "Feral";
+            UseTigersFury.Description = "Use Tiger's Fury (instant energy + damage cooldown) on cooldown while in Cat Form.";
             UseFaerieFire.Category = "Rotation";        UseFaerieFire.Spec = "Feral";
+            UseFaerieFire.Description = "Keep Faerie Fire (Feral) up on the target for the -armor debuff.";
             UseProwl.Category = "Rotation";             UseProwl.Spec = "Feral";
+            UseProwl.Description = "Open from Prowl stealth before the fight (off by default, since a stealthed pull can desync with WRobot).";
             ProwlOpener.Category = "Rotation";          ProwlOpener.Spec = "Feral";
+            ProwlOpener.Description = "Which Prowl opener to use: Auto picks Ravage from behind else Pounce from the front; or force one.";
             MaulRageReserve.Category = "Rotation";      MaulRageReserve.Spec = "Feral";
+            MaulRageReserve.Description = "Use Maul (the Bear rage dump) only when rage is above this reserve.";
             InterruptMode.Category = "Rotation";        InterruptMode.Spec = "Feral";
+            InterruptMode.Description = "Interrupt enemy casts with Bash while tanking: Smart learns what's interruptible; Never disables it.";
 
             // Balance-only knobs, same pattern (shown only while Balance is the active spec).
             UseMoonfire.Category = "Rotation";          UseMoonfire.Spec = "Balance";
+            UseMoonfire.Description = "Keep Moonfire up as a DoT; off keeps the Eclipse rotation cleaner on trash (still fires on bosses).";
             UseInsectSwarm.Category = "Rotation";       UseInsectSwarm.Spec = "Balance";
+            UseInsectSwarm.Description = "Keep Insect Swarm up on the target as a DoT.";
             DotHealth.Category = "Rotation";            DotHealth.Spec = "Balance";
+            DotHealth.Description = "Only apply/refresh DoTs (Moonfire / Insect Swarm) above this enemy HP%; below it, just nuke.";
             UseAoe.Category = "Rotation";               UseAoe.Spec = "Balance";
+            UseAoe.Description = "Use the Balance AoE spells (Hurricane / Typhoon) on packs.";
             UseStarfall.Category = "Rotation";          UseStarfall.Spec = "Balance";
+            UseStarfall.Description = "Use Starfall (the channelled star AoE cooldown) on packs and bosses.";
             AoeTargets.Category = "Rotation";           AoeTargets.Spec = "Balance";
+            AoeTargets.Description = "Minimum nearby enemies before the Balance AoE spells (Starfall / Hurricane / Typhoon) fire.";
             UseForceOfNature.Category = "Rotation";     UseForceOfNature.Spec = "Balance";
+            UseForceOfNature.Description = "Summon Force of Nature (treants) on a boss or elite.";
 
             BarkskinHealthPercent.Category = "Survival";
+            BarkskinHealthPercent.Description = "Cast Barkskin (off-GCD damage reduction, usable in any form) below this health %. 0 disables it.";
             InCombatHealHealthPercent.Category = "Survival";
+            InCombatHealHealthPercent.Description = "Self-heal in combat below this health %, preferring an instant proc so you don't drop form.";
             HealManaPercent.Category = "Survival";
+            HealManaPercent.Description = "Minimum mana % before an in-combat heal that shifts out of form is allowed (a free instant ignores this).";
             UseRegrowthIC.Category = "Survival";
+            UseRegrowthIC.Description = "Use Regrowth as the in-combat self-heal (instant via Predator's Swiftness, else a shift-out cast).";
             UseRejuvenationIC.Category = "Survival";
+            UseRejuvenationIC.Description = "Use Rejuvenation as an in-combat HoT (a shift-out cast).";
             UseHealingTouchIC.Category = "Survival";
+            UseHealingTouchIC.Description = "Use Healing Touch as the in-combat big heal (instant via Predator's Swiftness, else a shift-out cast).";
             InnervateManaPercent.Category = "Survival";
+            InnervateManaPercent.Description = "Use Innervate (the mana cooldown) on yourself below this mana %. 0 disables it.";
             EmergencyHealthPercent.Category = "Survival";
+            EmergencyHealthPercent.Description = "Use an emergency healthstone/potion below this health %. 0 disables it.";
 
             ContentMode.Category = "Spec";
+            ContentMode.Description = "Which rotation set to run. Only Solo exists today; Group is a placeholder that falls back to Solo.";
             AutoAssignTalents.Category = "Spec";
+            AutoAssignTalents.Description = "Automatically spend talent points using the active spec's default build.";
 
             AutoSwitchTarget.Category = "General";
+            AutoSwitchTarget.Description = "Auto-switch among attackers (never pulls). Off by default so it can't fight a product that owns targeting.";
             DebugProfiling.Category = "General";
+            DebugProfiling.Description = "Dev aid: periodically log rotation tick time, the most expensive steps, and learned damage.";
 
             _all = new Setting[]
             {

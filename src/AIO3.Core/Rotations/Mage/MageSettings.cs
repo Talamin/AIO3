@@ -188,45 +188,80 @@ namespace AIO3.Core.Rotations.Mage
         public MageSettings()
         {
             ArmorChoice.Category = "Buffs";
+            ArmorChoice.Description = "Which armor buff to keep up. Auto picks one for your spec and falls back to whatever you know.";
             UseArcaneIntellect.Category = "Buffs";
+            UseArcaneIntellect.Description = "Keep Arcane Intellect on yourself; skipped if Arcane Brilliance is already up.";
             UseWaterElemental.Category = "Buffs";
+            UseWaterElemental.Description = "Summon the Frost Water Elemental as a cooldown; auto-skips if not known. Turn off if a product manages the pet.";
             UseConjure.Category = "Buffs";
+            UseConjure.Description = "Out of combat, auto-conjure food / water / mana gem when stock runs low; skips spells not yet known.";
             ConjureCount.Category = "Buffs";
+            ConjureCount.Description = "Conjure more food/water when fewer than this many are in your bags.";
             ManageFood.Category = "Buffs";
+            ManageFood.Description = "Eat/drink the best food/water in your bags (and drink for mana) so it uses what you conjure. Off if a vendor plugin owns it.";
 
             CombatRange.Category = "Rotation";
+            CombatRange.Description = "Combat distance reported to WRobot; a mage casts at range while kite + wand cover mobs that close in.";
             UseAoe.Category = "Rotation";
+            UseAoe.Description = "Use AoE spells (Blizzard / Flamestrike / Arcane Explosion) on packs.";
             AoeThreshold.Category = "Rotation";
+            AoeThreshold.Description = "Minimum nearby enemies before AoE spells fire.";
             InterruptCasts.Category = "Rotation";
+            InterruptCasts.Description = "Interrupt enemy casts with Counterspell.";
             UsePolymorph.Category = "Rotation";
+            UsePolymorph.Description = "Polymorph (sheep) an extra attacker when several mobs are on you. Off by default; it can fight AoE/cleave.";
             UseRacials.Category = "Rotation";
+            UseRacials.Description = "Use your race's combat racial (Blood Fury / Berserking / Arcane Torrent / War Stomp / Gift of the Naaru).";
             UseCooldowns.Category = "Rotation";
+            UseCooldowns.Description = "Use major cooldowns (Icy Veins / Combustion / Arcane Power / Mirror Image) on elites / bosses / packs.";
             ArcaneBlastStacks.Category = "Rotation";        ArcaneBlastStacks.Spec = "Arcane";
+            ArcaneBlastStacks.Description = "Arcane: ramp Arcane Blast to this many stacks then dump (Missiles still, Barrage moving). Higher = more damage, more mana.";
             ArcaneConserveManaPercent.Category = "Rotation"; ArcaneConserveManaPercent.Spec = "Arcane";
+            ArcaneConserveManaPercent.Description = "Arcane: below this mana %, conserve - cap Arcane Blast at 2 stacks and lean on Missiles / wand / Evocation.";
             EmergencyHealthPercent.Category = "Rotation";
+            EmergencyHealthPercent.Description = "Use an emergency healthstone/potion below this health %. 0 disables it.";
 
             UseKiting.Category = "Survival";
+            UseKiting.Description = "Kite a mob that reaches melee: Frost Nova to root, then step back to regain range. Won't walk off a ledge. Off if a product owns movement.";
             KiteYards.Category = "Survival";
+            KiteYards.Description = "How far to step back when kiting - a hop, not a run. The rotation pauses for the step so it doesn't slide-cast.";
             KiteMinTargetHealth.Category = "Survival";
+            KiteMinTargetHealth.Description = "Only kite an attacker still above this health %; a near-dead mob isn't worth a root and hop. 0 = always kite.";
             KiteSkipGreyLevels.Category = "Survival";
+            KiteSkipGreyLevels.Description = "Don't kite a mob this many levels (or more) below you - just nuke trivial mobs down. 0 = kite regardless of level.";
             UseBlink.Category = "Survival";
+            UseBlink.Description = "Blink-escape when a mob reaches melee: faces away, Blinks clear, then faces back. Off if a product owns movement.";
             UseIceBlock.Category = "Survival";
+            UseIceBlock.Description = "Ice Block (full immunity, clears debuffs) when low and being hit. A panic button - you can't act during it.";
             IceBlockHealthPercent.Category = "Survival";
+            IceBlockHealthPercent.Description = "Health % at which Ice Block triggers.";
             UseIceBarrier.Category = "Survival";
+            UseIceBarrier.Description = "Keep Ice Barrier up in combat (Frost; auto-skips if not known).";
             UseManaShield.Category = "Survival";
+            UseManaShield.Description = "Mana Shield (spend mana to absorb damage) when low and being hit.";
             ManaShieldHealthPercent.Category = "Survival";
+            ManaShieldHealthPercent.Description = "Health % at which Mana Shield triggers.";
 
             EvocationManaPercent.Category = "Mana";
+            EvocationManaPercent.Description = "Channel Evocation to refill mana below this %, when nothing is meleeing you.";
             UseManaGem.Category = "Mana";
+            UseManaGem.Description = "Use a conjured Mana Gem (or mana potion) when mana runs low.";
             ManaGemManaPercent.Category = "Mana";
+            ManaGemManaPercent.Description = "Mana % at which the mana gem / potion is used.";
             UseWand.Category = "Mana";
+            UseWand.Description = "Wand (Shoot) the target to conserve mana when low; needs a wand equipped.";
             WandManaPercent.Category = "Mana";
+            WandManaPercent.Description = "Mana % below which the wand is used instead of spells.";
 
             ContentMode.Category = "Spec";
+            ContentMode.Description = "Which rotation set to run. Only Solo exists today; Group is a placeholder that falls back to Solo.";
             AutoAssignTalents.Category = "Spec";
+            AutoAssignTalents.Description = "Automatically spend talent points using the active spec's default build.";
 
             AutoSwitchTarget.Category = "General";
+            AutoSwitchTarget.Description = "Auto-switch targets among attackers (never pulls). Off if a product owns targeting and the two fight over the target.";
             DebugProfiling.Category = "General";
+            DebugProfiling.Description = "Dev aid: periodically log rotation tick time, the most expensive steps, and learned damage.";
 
             _all = new Setting[]
             {

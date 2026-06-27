@@ -127,30 +127,52 @@ namespace AIO3.Core.Rotations.Hunter
             // Tab assignment for the in-game overlay. Pet = pet management; Rotation = how we fight;
             // Spec = spec/mode/talents; General = meta toggles only.
             ManagePet.Category = "Pet";
+            ManagePet.Description = "Keep the pet summoned, revived, healed and attacking the target. Turn off if a WRobot product manages the pet.";
             PetHealPercent.Category = "Pet";
+            PetHealPercent.Description = "Cast Mend Pet when the pet drops below this health %. Set to 0 to disable pet healing.";
             Petfeed.Category = "Pet";
+            Petfeed.Description = "Feed the pet out of combat when it gets unhappy, so it keeps full damage and doesn't run off.";
             UseMisdirection.Category = "Pet";
+            UseMisdirection.Description = "Cast Misdirection on the pet to hand it threat so it holds the mobs.";
             UseBackpedal.Category = "Pet";
+            UseBackpedal.Description = "Step back to ranged distance when a mob reaches melee while the pet is tanking. Turn off if a product owns movement.";
             BackpedalYards.Category = "Pet";
+            BackpedalYards.Description = "How far to step back when regaining ranged distance; a short hop, raised to clear mobs with a big hitbox.";
 
             CombatRange.Category = "Rotation";
+            CombatRange.Description = "Combat distance reported to WRobot; a hunter fights at range, with Raptor Strike covering mobs that close in.";
             AoeThreshold.Category = "Rotation";
+            AoeThreshold.Description = "Minimum number of nearby enemies before AoE shots like Multi-Shot start firing.";
             UseAoe.Category = "Rotation";
+            UseAoe.Description = "Use Multi-Shot on packs once the AoE enemy threshold is met.";
             AspectViperManaPercent.Category = "Rotation";
+            AspectViperManaPercent.Description = "Swap to Aspect of the Viper to regenerate mana when mana drops below this %.";
             AspectHawkManaPercent.Category = "Rotation";
+            AspectHawkManaPercent.Description = "Swap back to the damage aspect (Dragonhawk / Hawk) once mana recovers above this %.";
             ViperStingManaPercent.Category = "Rotation";
+            ViperStingManaPercent.Description = "Marksmanship: cast Viper Sting on caster targets when your mana is at/below this %, draining their mana into yours.";
             UseFeignDeath.Category = "Rotation";
+            UseFeignDeath.Description = "Use Feign Death to drop aggro when low on health, leaving the pet to keep the mobs.";
             UseDisengage.Category = "Rotation";
+            UseDisengage.Description = "Use Disengage to leap backwards when a mob reaches melee range.";
             InterruptCasts.Category = "Rotation";
+            InterruptCasts.Description = "Interrupt enemy casts with Intimidation (the pet's stun); requires an alive pet.";
             UseRacials.Category = "Rotation";
+            UseRacials.Description = "Use your race's combat racial (Blood Fury / Berserking / Arcane Torrent / War Stomp / Gift of the Naaru).";
             UseCooldowns.Category = "Rotation";
+            UseCooldowns.Description = "Use major cooldowns (Bestial Wrath / Rapid Fire) on elites, bosses and packs.";
             EmergencyHealthPercent.Category = "Rotation";
+            EmergencyHealthPercent.Description = "Use an emergency healthstone or potion below this health %. Set to 0 to disable.";
 
             ContentMode.Category = "Spec";
+            ContentMode.Description = "Which rotation set to run. Only Solo exists today; Group is a placeholder that falls back to Solo.";
             AutoAssignTalents.Category = "Spec";
+            AutoAssignTalents.Description = "Automatically spend talent points using the active spec's default build.";
 
             AutoSwitchTarget.Category = "General";
+            AutoSwitchTarget.Description = "Automatically switch targets among attackers (never pulls). Turn off if a product owns targeting.";
             DebugProfiling.Category = "General";
+            DebugProfiling.Description = "Dev aid: periodically log rotation tick time, the most expensive steps and learned damage.";
 
             _all = new Setting[]
             {

@@ -178,40 +178,67 @@ namespace AIO3.Core.Rotations.Rogue
         public RogueSettings()
         {
             CombatRange.Category = "Rotation";
+            CombatRange.Description = "Melee distance reported to WRobot; ~5y keeps you behind the target without standing on it.";
             InterruptMode.Category = "Rotation";
+            InterruptMode.Description = "How Kick interrupts enemy casts: Smart (learns what's interruptible) / Always / Never.";
             FinisherComboPoints.Category = "Rotation";
+            FinisherComboPoints.Description = "Combo points required before spending a finisher (Eviscerate / Rupture).";
             UseRupture.Category = "Rotation";
+            UseRupture.Description = "Keep the Rupture bleed up on durable targets; off by default so trash gets Eviscerate instead.";
             UseStealth.Category = "Rotation";
+            UseStealth.Description = "Open fights from Stealth with the chosen opener; off by default so it won't desync with a product's pull.";
             StealthOpener.Category = "Rotation";
+            StealthOpener.Description = "Stealth opener: Auto picks Garrote from behind else Cheap Shot; or force Cheap Shot / Garrote.";
             UseSprint.Category = "Rotation";
+            UseSprint.Description = "Sprint to close the gap to an out-of-range target; turn off if a product owns movement.";
             UseRacials.Category = "Rotation";
+            UseRacials.Description = "Use your race's combat racial (Blood Fury, Berserking, Arcane Torrent, War Stomp, Gift of the Naaru).";
             UseCooldowns.Category = "Rotation";
+            UseCooldowns.Description = "Use major offensive cooldowns (Adrenaline Rush / Killing Spree) on elites, bosses and packs.";
             UsePoisons.Category = "Rotation";
+            UsePoisons.Description = "Keep weapon poisons applied out of combat (Instant main hand, Deadly/Instant off hand, best rank).";
             PoisonRefreshMinutes.Category = "Rotation";
+            PoisonRefreshMinutes.Description = "Reapply a weapon poison once it drops below this many minutes remaining (poisons last ~60 min).";
 
             // Combat-only knobs live in the Rotation tab but tag their spec, so the overlay shows them ONLY while
             // Combat is active (Spec strings match RogueSpec.ToString()).
             BladeFlurryEnemies.Category = "Rotation";    BladeFlurryEnemies.Spec = "Combat";
+            BladeFlurryEnemies.Description = "Use Blade Flurry once at least this many enemies are in melee (its cleave is wasted on one target).";
             AdrenalineRushEnemies.Category = "Rotation"; AdrenalineRushEnemies.Spec = "Combat";
+            AdrenalineRushEnemies.Description = "Use Adrenaline Rush once at least this many enemies are in melee (also fires on any elite).";
             KillingSpreeEnemies.Category = "Rotation";   KillingSpreeEnemies.Spec = "Combat";
+            KillingSpreeEnemies.Description = "Use Killing Spree once at least this many enemies are in melee.";
 
             // Assassination-only knobs, same pattern (shown only while Assassination is the active spec).
             AssassinationUseRupture.Category = "Rotation"; AssassinationUseRupture.Spec = "Assassination";
+            AssassinationUseRupture.Description = "Keep the Rupture bleed up on elites/bosses; on by default since it feeds Hunger for Blood.";
             UseHungerForBlood.Category = "Rotation";       UseHungerForBlood.Spec = "Assassination";
+            UseHungerForBlood.Description = "Maintain Hunger for Blood (a damage buff needing a bleed on the target); auto-skips if untalented.";
             UseColdBlood.Category = "Rotation";            UseColdBlood.Spec = "Assassination";
+            UseColdBlood.Description = "Pair Cold Blood (guaranteed crit) with a finisher on elites/bosses/packs; auto-skips if untalented.";
             AssassinationFinisher.Category = "Rotation";   AssassinationFinisher.Spec = "Assassination";
+            AssassinationFinisher.Description = "Which finisher to spend combo points on: Auto picks Envenom when learned else Eviscerate.";
             FanOfKnivesEnemies.Category = "Rotation";      FanOfKnivesEnemies.Spec = "Assassination";
+            FanOfKnivesEnemies.Description = "Use Fan of Knives once at least this many enemies are in melee (instant AoE, wasted on one target).";
 
             EvasionHealthPercent.Category = "Survival";
+            EvasionHealthPercent.Description = "Use Evasion (dodge cooldown) below this health %; 0 disables the HP trigger.";
             EvasionEnemies.Category = "Survival";
+            EvasionEnemies.Description = "Use Evasion once at least this many enemies are meleeing you (also fires on a solo elite).";
             UseCloakOfShadows.Category = "Survival";
+            UseCloakOfShadows.Description = "Use Cloak of Shadows when you carry a Magic debuff (wipes it and adds spell resistance); auto-skips if unknown.";
             EmergencyHealthPercent.Category = "Survival";
+            EmergencyHealthPercent.Description = "Use an emergency healthstone/potion below this health %; 0 disables it.";
 
             ContentMode.Category = "Spec";
+            ContentMode.Description = "Which rotation set to run; only Solo exists today (Group falls back to Solo).";
             AutoAssignTalents.Category = "Spec";
+            AutoAssignTalents.Description = "Automatically spend talent points using the active spec's default build.";
 
             AutoSwitchTarget.Category = "General";
+            AutoSwitchTarget.Description = "Auto-switch targets among attackers (never pulls); off by default so it won't fight a product's targeting.";
             DebugProfiling.Category = "General";
+            DebugProfiling.Description = "Dev aid: periodically log rotation tick time, the most expensive steps and learned damage.";
 
             _all = new Setting[]
             {

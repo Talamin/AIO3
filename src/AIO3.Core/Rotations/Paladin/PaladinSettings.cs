@@ -116,28 +116,47 @@ namespace AIO3.Core.Rotations.Paladin
             // rotation fights; General = meta toggles only (targeting policy, dev logging) that don't
             // change which abilities we cast.
             Seal.Category = "Buffs";
+            Seal.Description = "Which seal to keep up. Auto picks Seal of Command if learned, otherwise Seal of Righteousness.";
             Aura.Category = "Buffs";
+            Aura.Description = "Which aura to keep up. Auto uses Retribution Aura for Ret and Devotion Aura for Prot.";
             Blessing.Category = "Buffs";
+            Blessing.Description = "Self-blessing to keep up when solo. Auto picks Blessing of Kings if learned, otherwise Blessing of Might.";
             Judgement.Category = "Buffs";
+            Judgement.Description = "Which judgement to apply on cooldown. Auto picks Judgement of Wisdom (mana) if learned, otherwise Light.";
 
             AoeThreshold.Category = "Rotation";
+            AoeThreshold.Description = "Minimum nearby enemies before AoE abilities (Consecration / Holy Wrath / Avenging Wrath) fire.";
             CombatRange.Category = "Rotation";
+            CombatRange.Description = "How close the bot stands to the target. Lower it if the bot ends up inside the mob instead of in front.";
             UseRacials.Category = "Rotation";
+            UseRacials.Description = "Use your race's combat racial (Blood Fury, Berserking, Arcane Torrent, War Stomp, Gift of the Naaru).";
             InterruptMode.Category = "Rotation";
+            InterruptMode.Description = "How to interrupt enemy casts with Hammer of Justice: Smart, Always or Never.";
             UseCooldowns.Category = "Rotation";
+            UseCooldowns.Description = "Use Avenging Wrath (Wings) on elites, bosses and packs for a burst of damage.";
 
             SelfHealPercent.Category = "Survival";
+            SelfHealPercent.Description = "Hard-cast Holy Light on yourself below this health %. 0 disables it.";
             ArtOfWarHealPercent.Category = "Survival";
+            ArtOfWarHealPercent.Description = "Use a free instant Flash of Light from Art of War procs below this health %. 0 disables it.";
             LayOnHandsPercent.Category = "Survival";
+            LayOnHandsPercent.Description = "Emergency Lay on Hands (full heal, long cooldown) below this health %. 0 disables it.";
             UseDivineProtection.Category = "Survival";
+            UseDivineProtection.Description = "Cast Divine Protection for damage reduction when several enemies are attacking you.";
             DivinePleaManaPercent.Category = "Survival";
+            DivinePleaManaPercent.Description = "Cast Divine Plea to refill below this mana %. 0 disables it.";
             EmergencyHealthPercent.Category = "Survival";
+            EmergencyHealthPercent.Description = "Use an emergency healthstone or potion below this health %. 0 disables it.";
 
             ContentMode.Category = "Spec";
+            ContentMode.Description = "Which rotation set to run. Only Solo exists today; Group falls back to Solo.";
             AutoAssignTalents.Category = "Spec";
+            AutoAssignTalents.Description = "Automatically spend talent points using the active spec's default build.";
 
             AutoSwitchTarget.Category = "General";
+            AutoSwitchTarget.Description = "Re-target among attackers when several enemies are on you (never pulls). Off if a product owns targeting.";
             DebugProfiling.Category = "General";
+            DebugProfiling.Description = "Dev aid: periodically log rotation tick time, the most expensive steps and learned damage.";
 
             _all = new Setting[]
             {

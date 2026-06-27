@@ -216,52 +216,89 @@ namespace AIO3.Core.Rotations.Warlock
         public WarlockSettings()
         {
             ArmorChoice.Category = "Buffs";
+            ArmorChoice.Description = "Which armor buff to keep up; Auto picks the best you know (Fel > Demon Armor > Demon Skin).";
             CreateHealthstone.Category = "Buffs";
+            CreateHealthstone.Description = "Out of combat, spend a Soul Shard to make a Healthstone when you carry none, so the emergency heal has supply.";
 
             Pet.Category = "Pet";
+            Pet.Description = "Which demon to summon; Auto picks per spec (Felguard/Imp/Voidwalker) with a fallback to the tanky Voidwalker.";
             ManagePet.Category = "Pet";
+            ManagePet.Description = "Keep the demon summoned and attacking the target; turn off if a WRobot product manages the pet.";
             PetHealPercent.Category = "Pet";
+            PetHealPercent.Description = "Health Funnel the pet when its health drops below this %, if you have HP to spare; 0 disables it.";
             PetTank.Category = "Pet";
+            PetTank.Description = "Let the Voidwalker taunt mobs off you (Torment) to tank for the cloth caster; auto-skips for Imp/Felhunter.";
             ImpFirebolt.Category = "Pet";
+            ImpFirebolt.Description = "Keep the Imp's Firebolt on autocast so it fires its ranged nuke itself; auto-skips for non-Imps.";
             ImpPhaseShift.Category = "Pet";
+            ImpPhaseShift.Description = "Keep the Imp's Phase Shift on autocast so it phases out of danger; turn off to never interrupt its DPS.";
 
             CombatRange.Category = "Rotation";
+            CombatRange.Description = "Combat distance reported to WRobot; the warlock casts at range and wands at low mana.";
             Curse.Category = "Rotation";
+            Curse.Description = "Which curse to keep on the target; Agony is the leveling default (a ramping DoT).";
             UseRacials.Category = "Rotation";
+            UseRacials.Description = "Use your race's combat racial (Blood Fury, Berserking, Arcane Torrent, War Stomp, Gift of the Naaru).";
             InterruptCasts.Category = "Rotation";
+            InterruptCasts.Description = "How to interrupt enemy casts with the Felhunter's Spell Lock (Smart/Always/Never); auto-skips without a Felhunter.";
             LetDotsFinishHealthPercent.Category = "Rotation";
+            LetDotsFinishHealthPercent.Description = "Stop nuking a normal mob below this HP% if 2+ of your DoTs tick, letting them finish it; 0 disables it.";
             UseDrainSoul.Category = "Rotation";
+            UseDrainSoul.Description = "Drain Soul a low, dying mob to harvest a Soul Shard when short, supplying Healthstones and Soulstones.";
             DrainSoulHealthPercent.Category = "Rotation";
+            DrainSoulHealthPercent.Description = "Only Drain Soul a target at or below this HP%, since you only keep the shard if the mob dies.";
             SoulShardKeep.Category = "Rotation";
+            SoulShardKeep.Description = "Only harvest shards while you hold this many or fewer; stop draining once stocked to this count.";
             EmergencyHealthPercent.Category = "Rotation";
+            EmergencyHealthPercent.Description = "Use an emergency Healthstone or potion when your health drops below this %; 0 disables it.";
 
             // Spec-only knobs live in the Rotation tab but tag their spec, so the overlay shows them ONLY while
             // that spec is active (Spec strings match WarlockSpec.ToString()). No more standalone spec tabs.
             Metamorphosis.Category = "Rotation";      Metamorphosis.Spec = "Demonology";
+            Metamorphosis.Description = "When to pop Metamorphosis (the Demonology damage/survival form): on cooldown, only on bosses, or off.";
             DemonicEmpowerment.Category = "Rotation"; DemonicEmpowerment.Spec = "Demonology";
+            DemonicEmpowerment.Description = "Keep Demonic Empowerment up on the demon; auto-skips if unknown or petless.";
             UseSoulFire.Category = "Rotation";        UseSoulFire.Spec = "Demonology";
+            UseSoulFire.Description = "Cast Soul Fire when a Decimation/Molten-Core-style proc is up; off the proc it stays behind Shadow Bolt.";
 
             UseConflagrate.Category = "Rotation"; UseConflagrate.Spec = "Destruction";
+            UseConflagrate.Description = "Use Conflagrate for a burst; only fires while Immolate is up on the target, which it consumes.";
             UseChaosBolt.Category = "Rotation";   UseChaosBolt.Spec = "Destruction";
+            UseChaosBolt.Description = "Use Chaos Bolt as a nuke when known; sits between Incinerate and the Shadow Bolt fallback.";
             UseShadowburn.Category = "Rotation";  UseShadowburn.Spec = "Destruction";
+            UseShadowburn.Description = "Use Shadowburn to instantly execute a sub-20% target; only when you hold more than your kept shards.";
 
             DrainLifeHealthPercent.Category = "Survival";
+            DrainLifeHealthPercent.Description = "Channel Drain Life to self-heal when low and solo (no healer to rely on); 0 disables it.";
             UseDeathCoil.Category = "Survival";
+            UseDeathCoil.Description = "When low and meleed, Death Coil the attacker: an instant 1.5s horror that also heals you for the damage.";
             UseFear.Category = "Survival";
+            UseFear.Description = "When low with no Frost Nova, Fear the mob meleeing you to buy a brief heal window; a panic button, not a kite.";
             FearHealthPercent.Category = "Survival";
+            FearHealthPercent.Description = "Fire the emergency Fear and Howl only below this health %; 0 disables both.";
             UseHowl.Category = "Survival";
+            UseHowl.Description = "When low and surrounded (2+ mobs meleeing you), Howl of Terror to fear everything nearby (self-cast PBAoE).";
 
             LifeTapManaPercent.Category = "Mana";
+            LifeTapManaPercent.Description = "Life Tap (trade health for mana, the signature warlock engine) when mana drops below this %.";
             LifeTapHealthFloor.Category = "Mana";
+            LifeTapHealthFloor.Description = "Only Life Tap while health is above this %, so you never trade HP you can't afford.";
             GlyphLifeTap.Category = "Mana";
+            GlyphLifeTap.Description = "Re-tap to keep the Glyph of Life Tap spell-power buff up; only worth enabling if you have that glyph.";
             UseWand.Category = "Mana";
+            UseWand.Description = "Wand (Shoot) the target to conserve mana when low; needs a wand equipped.";
             WandManaPercent.Category = "Mana";
+            WandManaPercent.Description = "Start wanding to conserve mana once your mana drops below this %.";
 
             ContentMode.Category = "Spec";
+            ContentMode.Description = "Which rotation set to run; only Solo exists today (Group is a placeholder that falls back to Solo).";
             AutoAssignTalents.Category = "Spec";
+            AutoAssignTalents.Description = "Automatically spend talent points using the active spec's default build.";
 
             AutoSwitchTarget.Category = "General";
+            AutoSwitchTarget.Description = "Auto-switch among attackers (never pulls); off by default since a DoT/pet class prefers committing to one target.";
             DebugProfiling.Category = "General";
+            DebugProfiling.Description = "Dev aid: periodically log rotation tick time, the most expensive steps, and learned damage.";
 
             _all = new Setting[]
             {

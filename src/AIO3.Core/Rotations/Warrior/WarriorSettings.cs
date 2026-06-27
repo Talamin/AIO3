@@ -99,22 +99,37 @@ namespace AIO3.Core.Rotations.Warrior
             // rotation fights; Spec = spec/mode/talents; General = meta toggles only (targeting policy,
             // damage-learning advisory, dev logging) that don't change which abilities the rotation casts.
             HeroicStrikeRageReserve.Category = "Rotation";
+            HeroicStrikeRageReserve.Description = "Rage kept in reserve before Heroic Strike dumps spare rage; lower fires it sooner but starves rage-costed specials.";
             AoeThreshold.Category = "Rotation";
+            AoeThreshold.Description = "Minimum nearby enemies before AoE abilities (Whirlwind/Cleave) fire.";
             CombatRange.Category = "Rotation";
+            CombatRange.Description = "How close the bot stands to the target; raise if it ends up inside the mob instead of in front of it.";
             UseGapClosers.Category = "Rotation";
+            UseGapClosers.Description = "Use Charge / Intercept to close distance on engage; off by default as it can interfere with the product's movement.";
             UseTauntPull.Category = "Rotation";
+            UseTauntPull.Description = "Tank opener: in Defensive Stance, Taunt the target at range to pull it when you can't Charge; turn off if a product owns pulling.";
             UseHamstring.Category = "Rotation";
+            UseHamstring.Description = "Cast Hamstring to slow fleeing targets below 40% health.";
             UseRacials.Category = "Rotation";
+            UseRacials.Description = "Use your race's combat racial (Blood Fury, Berserking, Arcane Torrent, War Stomp, Gift of the Naaru).";
             InterruptMode.Category = "Rotation";
+            InterruptMode.Description = "How to interrupt enemy casts: Smart (learns what's interruptible), Always, or Never (if a product handles interrupts).";
             UseCooldowns.Category = "Rotation";
+            UseCooldowns.Description = "Use the major offensive cooldown (Recklessness) on elites, bosses, and packs.";
             EmergencyHealthPercent.Category = "Rotation";
+            EmergencyHealthPercent.Description = "Use an emergency healthstone/potion below this health %; 0 disables it.";
 
             ContentMode.Category = "Spec";
+            ContentMode.Description = "Which rotation set to run; only Solo (questing/grinding) exists today, Group falls back to Solo until added.";
             AutoAssignTalents.Category = "Spec";
+            AutoAssignTalents.Description = "Automatically spend talent points using the active spec's default build.";
 
             AutoSwitchTarget.Category = "General";
+            AutoSwitchTarget.Description = "When several enemies attack, switch the current target to an attacker; only picks what to hit, never pulls or starts a fight.";
             UseDamageLearning.Category = "General";
+            UseDamageLearning.Description = "Let learned per-ability damage choose between interchangeable strikes (advisory); off uses the hand-tuned order.";
             DebugProfiling.Category = "General";
+            DebugProfiling.Description = "Dev aid: periodically log rotation tick time, the most expensive steps, and learned per-ability damage.";
 
             _all = new Setting[]
             {
