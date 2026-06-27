@@ -27,6 +27,10 @@ namespace AIO3.Core.Rotations.Druid
         private readonly DruidSettings _settings;
         private readonly List<RotationStep> _steps;
 
+        /// <summary>Don't refresh the pre-form Moonfire DoT on a target below this HP% — it won't tick out before the
+        /// mob dies. A named floor for the caster filler (was reusing the cat RipHealth knob, which is unrelated).</summary>
+        private const int PreFormDotHealthFloor = 30;
+
         public SoloFeral() : this(new DruidSettings()) { }
 
         public SoloFeral(DruidSettings settings)
@@ -117,7 +121,7 @@ namespace AIO3.Core.Rotations.Druid
             Skill.Spell("Moonfire").Priority(8f).On(Targets.CurrentEnemy)
                  .When(ctx => !DruidCommon.InAnyForm(ctx)
                               && !ctx.Target.HasMyAura("Moonfire")
-                              && ctx.Target.HealthPercent > _settings.RipHealth.Value),
+                              && ctx.Target.HealthPercent > PreFormDotHealthFloor),
             Skill.Spell("Wrath").Priority(9f).On(Targets.CurrentEnemy)
                  .When(ctx => !DruidCommon.InAnyForm(ctx) && !ctx.Game.PlayerIsMoving),
 

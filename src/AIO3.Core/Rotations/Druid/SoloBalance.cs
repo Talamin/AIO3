@@ -29,8 +29,10 @@ namespace AIO3.Core.Rotations.Druid
         // pack, so a player-relative count would rarely trip). 33y mirrors the old AIO's Starfall radius.
         private const float AoeRadius = 33f;
 
-        /// <summary>The opener (Starfire) only fires on a still-full-HP target — the first hit of a fresh pull.</summary>
-        private const int FullHealthPercent = 100;
+        /// <summary>The opener (Starfire) only fires on an essentially-fresh target — at or above this HP%. Not a
+        /// hard 100% (a pre-pull DoT / pet / a stray tick can chip it to 99% and the opener would never fire); this
+        /// is the "first hit of a fresh pull" threshold paired with the not-yet-attacking check.</summary>
+        private const int OpenerHealthPercent = 90;
 
         private readonly DruidSettings _settings;
         private readonly List<RotationStep> _steps;
@@ -104,7 +106,7 @@ namespace AIO3.Core.Rotations.Druid
             // closes) instead of front-loading a DoT — then the DoTs go up on the next GCDs.
             Skill.Spell("Starfire").Priority(3.9f).On(Targets.CurrentEnemy)
                  .When(ctx => !ctx.Game.PlayerIsMoving
-                              && ctx.Target.HealthPercent >= FullHealthPercent && !ctx.Target.IsTargetingMe),
+                              && ctx.Target.HealthPercent >= OpenerHealthPercent && !ctx.Target.IsTargetingMe),
 
             // --- DoTs (maintain when missing/expiring, with the dying-mob HP-floor) ---
             // Suppressed DURING an Eclipse window on trash: re-applying a DoT mid-Eclipse clips a GCD out of the
