@@ -29,10 +29,7 @@ public class Main : ICustomClass
 {
     private readonly IGameClient _game = new WRobotGameClient();
     private RotationEngine _engine;
-    private SettingsOverlay _overlay;
-    private NativeOverlay _nativeOverlay; // native window over the game; the Lua panel is the fallback
-    private int _overlayStart;            // when the overlays were created (for the native-vs-Lua fallback grace)
-    private const int OverlayFallbackMs = 2000; // if the native overlay isn't up by now, fall back to the Lua panel
+    private NativeOverlay _nativeOverlay; // the settings UI (native over-the-game window; the Lua panel is retired)
     private volatile string _statusLine = ""; // live HUD line for the overlay (computed here, read on the UI thread)
     private string _lastAction = "";          // last fired step name (sticky, so the HUD doesn't flicker to idle)
     private SettingsStore _store;
@@ -77,14 +74,15 @@ public class Main : ICustomClass
             _store = new SettingsStore(profile, list);
             _store.Load(); // apply persisted values (incl. the saved spec override) before running
 
-            // Pass the live active spec so the overlay hides settings tagged for other specs (and rebuilds when
-            // the spec changes). _class is captured; ActiveSpec updates as the module resolves the spec.
-            _overlay = new SettingsOverlay(_class.DisplayName, list, () => _class.ActiveSpec);
-            // Native over-the-game overlay (Phase 1, in PARALLEL with the Lua panel as a fallback). Self-guards on
-            // its own STA thread; if WPF can't start in this byte[]-loaded fightclass it logs and we keep the panel.
+            // Settings UI = the NATIVE over-the-game overlay ONLY. The old in-game Lua panel (SettingsOverlay) is
+            // DEACTIVATED on purpose: it built WoW CreateFrame frames + did per-tick Lua reads through an AIO3Bridge
+            // table, which a private server's anti-cheat can observe. The native WPF overlay never touches the WoW
+            // UI/Lua — it's a separate window that only reads the WoW window position — so it leaves no in-game
+            // footprint. It self-guards on its own STA thread; if WPF can't start it just logs and there's no panel
+            // (settings still load from the .conf and the rotation runs). The active spec is passed so the overlay
+            // hides settings tagged for other specs (and rebuilds when the spec changes).
             try { _nativeOverlay = new NativeOverlay(_class.DisplayName, list, () => _class.ActiveSpec, profile, () => _statusLine); }
             catch (Exception e) { Logging.WriteError("[AIO3] native overlay init failed: " + e.Message); }
-            _overlayStart = Environment.TickCount;
             _talentTrainer = new TalentTrainer();
 
             // Empirical interrupt learner: feeds the tracker from the combat log (the API's
@@ -127,7 +125,6 @@ public class Main : ICustomClass
         var idleHeartbeat = Stopwatch.StartNew();
         string lastFired = null;
         var sinceLastLog = Stopwatch.StartNew();
-        var overlayPoll = Stopwatch.StartNew();
         var reconcile = Stopwatch.StartNew();
         var talentTimer = Stopwatch.StartNew();
         var profileTimer = Stopwatch.StartNew();
@@ -161,26 +158,8 @@ public class Main : ICustomClass
                     _lastManageFood = manageFood;
                 }
 
-                // Overlay polling and spec reconcile use Lua but DON'T need the frame lock — running them
-                // under it pauses the game's frame (stutter) for ~12 Lua reads. Keep them out of the lock.
-                // ONE overlay at a time: while the native overlay is up, suppress the Lua panel — running both
-                // lets the Lua Poll() write its (stale) bridge value back over a native edit, which reverted edits
-                // and re-saved the old value. Fall back to the Lua panel only if native isn't up (with a short
-                // startup grace so the panel doesn't flash before the window appears).
-                bool nativeUp = _nativeOverlay != null && _nativeOverlay.IsActive;
-                bool useLuaPanel = !nativeUp &&
-                                   (_nativeOverlay == null || unchecked(Environment.TickCount - _overlayStart) > OverlayFallbackMs);
-                if (useLuaPanel)
-                {
-                    _overlay?.EnsureCreated();
-                    if (overlayPoll.ElapsedMilliseconds > 400)
-                    {
-                        overlayPoll.Restart();
-                        settingsChanged = _overlay != null && _overlay.Poll();
-                    }
-                }
-                // Native overlay edits bind straight into the Setting objects; this just picks up "something
-                // changed" so we Reconcile (spec) + Save the same way a Lua-panel edit does. Cheap (a bool read).
+                // Native overlay edits bind straight into the Setting objects; this picks up "something changed"
+                // so we Reconcile (spec) + Save. Cheap (a bool read). The Lua panel is deactivated (see Initialize).
                 if (_nativeOverlay != null && _nativeOverlay.TakeDirty())
                     settingsChanged = true;
                 if (settingsChanged || reconcile.ElapsedMilliseconds > 2000)

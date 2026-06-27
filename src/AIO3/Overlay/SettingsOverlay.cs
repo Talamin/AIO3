@@ -8,6 +8,11 @@ using wManager.Wow.Helpers;
 namespace AIO3.Overlay
 {
     /// <summary>
+    /// DEACTIVATED — NOT wired into Main any more. The settings UI is the native <see cref="NativeOverlay"/>
+    /// (a separate WPF window) because this Lua panel builds WoW CreateFrame frames + does per-tick Lua reads
+    /// through the AIO3Bridge table, which a private server's anti-cheat can observe. Kept (unreferenced) only as a
+    /// reference / emergency fallback; re-wire it in Main if the native window ever can't start. It never runs as-is.
+    ///
     /// In-game settings overlay. Builds a movable WoW UI frame whose contents are generated
     /// automatically from a rotation's settings, grouped into tabs by <see cref="Setting.Category"/>
     /// (e.g. Spec / Rotation / General). Edits flow Lua -> C# via the AIO3Bridge table; Poll() mirrors
