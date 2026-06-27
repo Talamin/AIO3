@@ -213,5 +213,68 @@ namespace AIO3.Tests
             g.MeUnit.PowerPercent = 80;
             Assert.Equal("Regrowth", Fire(g)?.Name);
         }
+
+        // --- DoT suppression during Eclipse (trash) vs upkeep on bosses ---
+
+        [Fact]
+        public void DoTs_suppressed_under_Eclipse_on_trash()
+        {
+            // Insect Swarm missing on a trash mob, but a Lunar Eclipse is up → don't clip the burst with a DoT;
+            // spend the GCD on the Eclipse nuke (Starfire) instead.
+            var g = MoonkinGame();
+            g.MeUnit.WithAura("Eclipse (Lunar)");
+            Assert.Equal("Starfire", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void DoTs_suppressed_under_Solar_Eclipse_on_trash_routes_to_Wrath()
+        {
+            var g = MoonkinGame();
+            g.MeUnit.WithAura("Eclipse (Solar)"); // Solar → the nuke is Wrath, and the DoT is still suppressed
+            Assert.Equal("Wrath", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void DoTs_kept_on_a_boss_during_Eclipse()
+        {
+            // On a BOSS the long fight makes DoT uptime worth more than one clipped Eclipse GCD → the DoT still
+            // refreshes even under Eclipse.
+            var s = new DruidSettings();
+            s.UseStarfall.Value = false;       // Starfall (a boss cooldown, 3.0) would preempt; isolate the DoT
+            s.UseForceOfNature.Value = false;  // ...and Force of Nature (a boss cooldown, 3.5)
+            var g = MoonkinGame();
+            g.TargetUnit.Entry = 31146; // a BossList entry
+            g.TargetUnit.WithAura("Faerie Fire"); // armor debuff already up so it doesn't preempt the DoT (3.8 < 4.0)
+            g.MeUnit.WithAura("Eclipse (Lunar)");
+            Assert.Equal("Insect Swarm", Fire(g, new SoloBalance(s))?.Name);
+        }
+
+        // --- Starfire opener leads the DoTs on a fresh pull ---
+
+        [Fact]
+        public void Starfire_opener_fires_before_the_DoTs()
+        {
+            // A fresh, full-HP target not yet attacking, with NO DoTs up: the opener (now above the DoT maintenance)
+            // leads with Starfire rather than front-loading a DoT.
+            var g = MoonkinGame();
+            g.TargetUnit.IsTargetingMe = false; // a fresh pull
+            // (no Insect Swarm / Moonfire applied → they'd otherwise want to go up first under the old ordering)
+            Assert.Equal("Starfire", Fire(g)?.Name);
+        }
+
+        // --- Starfire Solar guard ---
+
+        [Fact]
+        public void Starfire_routes_to_Wrath_under_Solar_even_with_Natures_Grace()
+        {
+            // Nature's Grace would normally enable the Lunar-side Starfire, but a Solar Eclipse must always route to
+            // Wrath — the Solar guard on the Starfire gate ensures it.
+            var g = MoonkinGame();
+            g.TargetUnit.WithAura("Insect Swarm", mine: true, timeLeftMs: 12000); // DoTs up so they don't preempt
+            g.TargetUnit.WithAura("Moonfire", mine: true, timeLeftMs: 12000);
+            g.MeUnit.WithAura("Eclipse (Solar)");
+            g.MeUnit.WithAura("Nature's Grace");
+            Assert.Equal("Wrath", Fire(g)?.Name);
+        }
     }
 }

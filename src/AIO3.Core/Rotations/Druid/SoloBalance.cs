@@ -99,23 +99,31 @@ namespace AIO3.Core.Rotations.Druid
                  .When(ctx => _settings.UseFaerieFire.Value && ctx.Target.IsBoss()
                               && !ctx.Target.HasAura("Faerie Fire")),
 
-            // --- DoTs (maintain when missing/expiring, with the dying-mob HP-floor) ---
-            CombatBlocks.MaintainMyDebuff("Insect Swarm", DotRefreshMs, priority: 4.0f,
-                extraGate: ctx => _settings.UseInsectSwarm.Value
-                                  && ctx.Target.HealthPercent > _settings.DotHealth.Value),
-            CombatBlocks.MaintainMyDebuff("Moonfire", DotRefreshMs, priority: 4.1f,
-                extraGate: ctx => _settings.UseMoonfire.Value
-                                  && ctx.Target.HealthPercent > _settings.DotHealth.Value),
-
             // --- opener: Starfire on a full-HP, not-yet-attacking target (a big front-loaded nuke) ---
-            Skill.Spell("Starfire").Priority(4.5f).On(Targets.CurrentEnemy)
+            // Sits ABOVE the DoT maintenance so a fresh pull LEADS with Starfire (its long cast lands as the mob
+            // closes) instead of front-loading a DoT — then the DoTs go up on the next GCDs.
+            Skill.Spell("Starfire").Priority(3.9f).On(Targets.CurrentEnemy)
                  .When(ctx => !ctx.Game.PlayerIsMoving
                               && ctx.Target.HealthPercent >= FullHealthPercent && !ctx.Target.IsTargetingMe),
 
+            // --- DoTs (maintain when missing/expiring, with the dying-mob HP-floor) ---
+            // Suppressed DURING an Eclipse window on trash: re-applying a DoT mid-Eclipse clips a GCD out of the
+            // damage burst the proc exists for. On a BOSS the fight is long enough that the DoT uptime is worth more
+            // than one clipped Eclipse GCD, so the suppression lifts (mirrors the old FC keeping DoTs up on bosses).
+            CombatBlocks.MaintainMyDebuff("Insect Swarm", DotRefreshMs, priority: 4.0f,
+                extraGate: ctx => _settings.UseInsectSwarm.Value
+                                  && ctx.Target.HealthPercent > _settings.DotHealth.Value
+                                  && (!InEclipse(ctx) || ctx.Target.IsBoss())),
+            CombatBlocks.MaintainMyDebuff("Moonfire", DotRefreshMs, priority: 4.1f,
+                extraGate: ctx => _settings.UseMoonfire.Value
+                                  && ctx.Target.HealthPercent > _settings.DotHealth.Value
+                                  && (!InEclipse(ctx) || ctx.Target.IsBoss())),
+
             // --- Eclipse rotation (cast-time → stand still) ---
-            // Starfire under Lunar eclipse / Nature's Grace (the arcane side of the cycle).
+            // Starfire under Lunar eclipse / Nature's Grace (the arcane side of the cycle). Guarded so a Solar
+            // eclipse always routes to Wrath (never Starfire), even if Nature's Grace happens to overlap.
             Skill.Spell("Starfire").Priority(5.0f).On(Targets.CurrentEnemy)
-                 .When(ctx => !ctx.Game.PlayerIsMoving
+                 .When(ctx => !ctx.Game.PlayerIsMoving && !ctx.Me.HasAura("Eclipse (Solar)")
                               && (ctx.Me.HasAura("Eclipse (Lunar)") || ctx.Me.HasAura("Nature's Grace"))),
             // Wrath under Solar eclipse (the nature side of the cycle).
             Skill.Spell("Wrath").Priority(5.1f).On(Targets.CurrentEnemy)
@@ -126,6 +134,11 @@ namespace AIO3.Core.Rotations.Druid
                  .When(ctx => !ctx.Game.PlayerIsMoving),
 
         }, ctx => _settings.UseRacials.Value, basePriority: 2.5f);
+
+        /// <summary>True while either Eclipse proc is up (Lunar or Solar) — the window during which a DoT refresh on
+        /// trash is suppressed so it doesn't clip the burst. Read once here so both DoT gates agree.</summary>
+        private static bool InEclipse(CombatContext ctx) =>
+            ctx.Me.HasAura("Eclipse (Lunar)") || ctx.Me.HasAura("Eclipse (Solar)");
 
         // DoT refresh window (re-apply when under this many ms remain). Routes through MaintainMyDebuff so the
         // shared post-cast grace stops the apply-latency double-cast (Moonfire/Insect Swarm last ~12s).

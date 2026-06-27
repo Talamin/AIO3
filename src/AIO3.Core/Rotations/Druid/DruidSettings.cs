@@ -70,6 +70,11 @@ namespace AIO3.Core.Rotations.Druid
         public readonly ToggleSetting UseTigersFury =
             new ToggleSetting("tigersFury", "Use Tiger's Fury on cooldown", value: true);
 
+        /// <summary>Keep Savage Roar up — the cat's "Slice and Dice" (a self-buff finisher that boosts melee damage
+        /// while in Cat Form). On by default; keep it up always at the low CP threshold. Feral-only.</summary>
+        public readonly ToggleSetting UseSavageRoar =
+            new ToggleSetting("savageRoar", "Keep Savage Roar up", value: true);
+
         /// <summary>Keep Faerie Fire (Feral) up (the -armor debuff). Feral-only.</summary>
         public readonly ToggleSetting UseFaerieFire =
             new ToggleSetting("faerieFire", "Use Faerie Fire (Feral)", value: true);
@@ -86,9 +91,11 @@ namespace AIO3.Core.Rotations.Druid
         public readonly ChoiceSetting ProwlOpener =
             new ChoiceSetting("prowlOpener", "Prowl opener", "Auto", new[] { "Auto", "Ravage", "Pounce" });
 
-        /// <summary>Use Maul (the Bear rage dump) when rage is above this reserve. Feral-only.</summary>
+        /// <summary>Use Maul (the Bear rage dump) when rage is above this reserve. Lowered to 15 so a leveling bear
+        /// (which rarely sits on rage) actually dumps it instead of starving the swing — the old FC dumped at 16.
+        /// Feral-only.</summary>
         public readonly IntSetting MaulRageReserve =
-            new IntSetting("maulRage", "Maul above rage", value: 30, min: 0, max: 90, step: 5);
+            new IntSetting("maulRage", "Maul above rage", value: 15, min: 0, max: 90, step: 5);
 
         /// <summary>Interrupt enemy casts with Bash (Bear) while tanking. Smart learns what's interruptible; Never
         /// disables it (e.g. a product owns interrupts). Feral-only.</summary>
@@ -133,6 +140,11 @@ namespace AIO3.Core.Rotations.Druid
         /// <summary>Cast Barkskin (off-GCD damage reduction; usable in any form) below this health %. 0 disables it.</summary>
         public readonly IntSetting BarkskinHealthPercent =
             new IntSetting("barkskinHp", "Barkskin below HP%", value: 35, min: 0, max: 90, step: 5);
+
+        /// <summary>Cast Survival Instincts (off-GCD max-health cooldown; cat or bear only) below this health %. 0
+        /// disables it. Auto-skips until the talent is learned (the old GroupFeralTank popped it at 35%).</summary>
+        public readonly IntSetting SurvivalInstinctsHealthPercent =
+            new IntSetting("survivalInstinctsHp", "Survival Instincts below HP%", value: 35, min: 0, max: 90, step: 5);
 
         /// <summary>In-combat self-heal below this health %. Prefer an INSTANT via the Predator's Swiftness proc so
         /// it doesn't drop form; otherwise shift out to heal (gated on enough mana). The druid's survival edge.</summary>
@@ -214,6 +226,8 @@ namespace AIO3.Core.Rotations.Druid
             RipHealth.Description = "Only apply/refresh Rip above this enemy HP%; below it, spend combo points on Ferocious Bite instead.";
             UseTigersFury.Category = "Rotation";        UseTigersFury.Spec = "Feral";
             UseTigersFury.Description = "Use Tiger's Fury (instant energy + damage cooldown) on cooldown while in Cat Form.";
+            UseSavageRoar.Category = "Rotation";        UseSavageRoar.Spec = "Feral";
+            UseSavageRoar.Description = "Keep Savage Roar up — the cat's Slice and Dice (a melee-damage self-buff finisher). Kept up at a low combo-point threshold.";
             UseFaerieFire.Category = "Rotation";        UseFaerieFire.Spec = "Feral";
             UseFaerieFire.Description = "Keep Faerie Fire (Feral) up on the target for the -armor debuff.";
             UseProwl.Category = "Rotation";             UseProwl.Spec = "Feral";
@@ -243,6 +257,8 @@ namespace AIO3.Core.Rotations.Druid
 
             BarkskinHealthPercent.Category = "Survival";
             BarkskinHealthPercent.Description = "Cast Barkskin (off-GCD damage reduction, usable in any form) below this health %. 0 disables it.";
+            SurvivalInstinctsHealthPercent.Category = "Survival";
+            SurvivalInstinctsHealthPercent.Description = "Cast Survival Instincts (off-GCD max-health cooldown, cat or bear) below this health %. 0 disables it; auto-skips until learned.";
             InCombatHealHealthPercent.Category = "Survival";
             InCombatHealHealthPercent.Description = "Self-heal in combat below this health %, preferring an instant proc so you don't drop form.";
             HealManaPercent.Category = "Survival";
@@ -274,11 +290,11 @@ namespace AIO3.Core.Rotations.Druid
                 UseMarkOfTheWild, UseThorns,
                 // Rotation (general, then the Feral-only and Balance-only knobs that show only in their spec)
                 MeleeRange, CasterRange, UseRacials, UseCooldowns,
-                BearCount, FinisherComboPoints, RipHealth, UseTigersFury, UseFaerieFire, UseProwl, ProwlOpener,
+                BearCount, FinisherComboPoints, RipHealth, UseTigersFury, UseSavageRoar, UseFaerieFire, UseProwl, ProwlOpener,
                 MaulRageReserve, InterruptMode, // Feral-only
                 UseMoonfire, UseInsectSwarm, DotHealth, UseAoe, UseStarfall, AoeTargets, UseForceOfNature, // Balance-only
                 // Survival
-                BarkskinHealthPercent, InCombatHealHealthPercent, HealManaPercent,
+                BarkskinHealthPercent, SurvivalInstinctsHealthPercent, InCombatHealHealthPercent, HealManaPercent,
                 UseRegrowthIC, UseRejuvenationIC, UseHealingTouchIC, InnervateManaPercent, EmergencyHealthPercent,
                 // Spec
                 ContentMode, AutoAssignTalents,

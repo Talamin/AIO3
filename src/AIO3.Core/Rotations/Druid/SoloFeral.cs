@@ -46,6 +46,9 @@ namespace AIO3.Core.Rotations.Druid
                 ctx => _settings.EmergencyHealthPercent.Value > 0 && ctx.Me.HealthPercent < _settings.EmergencyHealthPercent.Value,
                 priority: 0.05f),
             DruidCommon.Barkskin(_settings, priority: 0.1f),
+            // Survival Instincts (off the GCD) — the Feral max-health emergency cooldown (cat or bear); auto-skips
+            // until the talent is learned. Sits beside Barkskin so both panic buttons fire when low.
+            DruidCommon.SurvivalInstincts(_settings, priority: 0.15f),
             // Bear survival (off the GCD) — Frenzied Regeneration converts rage to health when low in bear form.
             DruidCommon.FrenziedRegeneration(_settings, priority: 0.2f),
 
@@ -95,12 +98,17 @@ namespace AIO3.Core.Rotations.Druid
             DruidCommon.Maul(_settings, priority: 5.5f),         // off-GCD rage dump
 
             // --- Cat ladder (single-target DPS; each step gates on cat form so it's inert in bear) ---
-            DruidCommon.TigersFury(_settings, priority: 6f),    // off-GCD energy/damage CD
-            DruidCommon.Rake(_settings, priority: 6.2f),        // bleed (apply when missing, HP-floored)
-            DruidCommon.Rip(_settings, priority: 6.3f),         // bleed finisher (durable targets)
-            DruidCommon.FerociousBite(_settings, priority: 6.4f), // direct-damage finisher
-            DruidCommon.MangleCat(_settings, priority: 6.6f),   // primary builder
-            DruidCommon.Claw(_settings, priority: 6.7f),        // fallback builder
+            // Order: off-GCD CD → bleed apply → finishers (Savage Roar keeps the melee buff up, then Rip, then the
+            // Ferocious Bite dump) → debuff-maintain → builders (Shred behind, else Mangle, else Claw).
+            DruidCommon.TigersFury(_settings, priority: 6f),        // off-GCD energy/damage CD (held near energy cap)
+            DruidCommon.Rake(_settings, priority: 6.2f),            // bleed (apply when missing, boss-aware HP-floor)
+            DruidCommon.SavageRoar(_settings, priority: 6.25f),     // highest finisher: keep the +melee-damage buff up
+            DruidCommon.Rip(_settings, priority: 6.3f),             // bleed finisher (durable targets)
+            DruidCommon.FerociousBite(_settings, priority: 6.4f),   // direct-damage dump finisher
+            DruidCommon.MangleCatDebuff(_settings, priority: 6.5f), // maintain the +30% bleed debuff (cat)
+            DruidCommon.Shred(_settings, priority: 6.6f),           // best builder, behind-only
+            DruidCommon.MangleCat(_settings, priority: 6.7f),       // front-fallback builder
+            DruidCommon.Claw(_settings, priority: 6.8f),            // fallback builder
 
             // --- pre-form caster fallback (only while NOT in any combat form — a low-level druid before Cat/Bear) ---
             // These auto-skip once shifted (the form gate) AND once unlearned spells are replaced by the forms, so

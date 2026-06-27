@@ -22,11 +22,18 @@ namespace AIO3.Core.Rotations.Druid
     /// </summary>
     public static class DruidCommon
     {
-        /// <summary>An attacker within this range counts as "in melee" on us — the trigger for the Bear-form
-        /// switch and the surrounded gates. One named constant so every melee gate uses the same radius (mirrors
-        /// the old AIO's enemy-count radius for the form decision). Named distinctly from
-        /// <see cref="DruidSettings.MeleeRange"/> (the WRobot ICustomClass.Range), which is an unrelated concept.</summary>
+        /// <summary>An attacker within this range counts as "in melee" on us — the trigger for the bear AoE gates
+        /// (Swipe / Demoralizing Roar) and the surrounded count. One named constant so every TIGHT melee gate uses
+        /// the same radius. Named distinctly from <see cref="DruidSettings.MeleeRange"/> (the WRobot
+        /// ICustomClass.Range), which is an unrelated concept.</summary>
         public const float SurroundRadius = 8f;
+
+        /// <summary>The WIDER, target-anchored radius that drives the Cat/Bear FORM decision (mirrors the old AIO's
+        /// 12-20y enemy-count radius for the form switch — SoloFeral.cs:38,48). A pack about to land on us is
+        /// counted around the TARGET (not the tight 8y player-melee radius), so the bear switch fires a beat before
+        /// every mob is already on top of us. Kept separate from <see cref="SurroundRadius"/> so the Swipe/AoE gates
+        /// stay tight while the form decision sees the whole approaching pack.</summary>
+        public const float FormDecisionRadius = 18f;
 
         // --- form facts (one definition each, so every step agrees) ---
 
@@ -44,11 +51,17 @@ namespace AIO3.Core.Rotations.Druid
         /// must drop the form first, so the "needs to shift out" gate reads this.</summary>
         public static bool InAnyForm(CombatContext ctx) => InCatForm(ctx) || InBearForm(ctx) || InMoonkinForm(ctx);
 
-        /// <summary>Number of enemies meleeing us within <see cref="SurroundRadius"/> — the "am I surrounded?"
-        /// count that drives the Bear-form switch and the bear AoE gate. Shared so the form decision and the AoE
+        /// <summary>Number of enemies meleeing us within the TIGHT <see cref="SurroundRadius"/> — the "is a pack
+        /// actually on me?" count that drives the bear AoE gates (Swipe / Demoralizing Roar). Shared so the AoE
         /// abilities agree on what a "pack on me" is.</summary>
         public static int Surrounding(CombatContext ctx) =>
             ctx.Enemies.Count(e => e.IsTargetingMe && e.Distance <= SurroundRadius);
+
+        /// <summary>Number of enemies clustered around the TARGET within the wider <see cref="FormDecisionRadius"/>
+        /// — the count that drives the Cat/Bear FORM switch (so the bear decision sees the whole approaching pack,
+        /// not just what's already in tight melee). Target-anchored via <see cref="CombatContext.EnemiesNearTarget"/>,
+        /// the same seam the Balance AoE uses.</summary>
+        public static int FormDecisionCount(CombatContext ctx) => ctx.EnemiesNearTarget(FormDecisionRadius);
 
         // --- out-of-combat buffs (CombatBlocks.SelfBuff pattern; Gift of the Wild supersedes Mark of the Wild) ---
 
@@ -76,11 +89,26 @@ namespace AIO3.Core.Rotations.Druid
                               && ctx.Me.HealthPercent < s.BarkskinHealthPercent.Value)
                  .OffGcd();
 
-        /// <summary>Innervate — the mana cooldown, on yourself below the configured mana %. Solo only (the group
-        /// "innervate the healer" case is a Group-mode concern, deferred).</summary>
+        /// <summary>Survival Instincts — the Feral max-health emergency cooldown (off-GCD). Only in a combat form
+        /// (cat or bear; it's a feral talent), fired below the configured health %. Auto-skips until the talent is
+        /// learned, so a non-feral or untalented druid never sees it. The old GroupFeralTank popped it at 35% in
+        /// bear; here it covers cat too.</summary>
+        public static RotationStep SurvivalInstincts(DruidSettings s, float priority) =>
+            Skill.Spell("Survival Instincts").Priority(priority).On(Targets.Self)
+                 .When(ctx => s.SurvivalInstinctsHealthPercent.Value > 0
+                              && (InCatForm(ctx) || InBearForm(ctx))
+                              && ctx.Me.HealthPercent < s.SurvivalInstinctsHealthPercent.Value)
+                 .OffGcd();
+
+        /// <summary>Innervate — the mana cooldown, on yourself below the configured mana %. NOT while in cat/bear
+        /// form: a feral has no mana to regen mid-fight and casting Innervate would shift it OUT of form for nothing
+        /// (the old SoloFeral gated Innervate on being formless — SoloFeral.cs:17). Balance is a caster, never in
+        /// cat/bear, so it is unaffected. Solo only (the group "innervate the healer" case is a Group-mode concern,
+        /// deferred).</summary>
         public static RotationStep Innervate(DruidSettings s, float priority) =>
             Skill.Spell("Innervate").Priority(priority).On(Targets.Self)
                  .When(ctx => s.InnervateManaPercent.Value > 0
+                              && !InCatForm(ctx) && !InBearForm(ctx)
                               && ctx.Me.PowerPercent <= s.InnervateManaPercent.Value);
 
         // --- in-combat self-heal (the druid's edge) ---
@@ -121,13 +149,22 @@ namespace AIO3.Core.Rotations.Druid
 
         // --- Cat Form: builders / finishers / cooldowns (energy + combo points) ---
 
-        /// <summary>Switch to Cat Form for single-target DPS — when not surrounded (fewer than BearCount attackers
-        /// in melee) and not already in cat. The form switch itself; the cat ladder runs once shifted. Auto-skips
+        /// <summary>The bear-switch hysteresis: enter Bear at <c>>= BearCount</c> around the target, but once in
+        /// bear DON'T return to cat until the pack drops below <c>BearCount - 1</c> (one fewer than the entry gate).
+        /// This makes bear HARDER to leave than to enter, so a pack hovering right at the threshold can't thrash the
+        /// druid in and out of form every tick (the old AIO did the same with its -1/-2 cat-switch counts —
+        /// SoloFeral.cs:48-49). The cat return floor never goes below 1, so a single straggler can't re-trigger it.</summary>
+        public static int BearReturnCount(DruidSettings s) => System.Math.Max(1, s.BearCount.Value - 1);
+
+        /// <summary>Switch to Cat Form for single-target DPS. From a non-bear state, shift to cat whenever the pack
+        /// around the target is below the bear ENTRY count (<c>BearCount</c>); from bear, only once it drops below
+        /// the lower RETURN count (<see cref="BearReturnCount"/>) — the hysteresis that stops form thrash. Auto-skips
         /// until Cat Form is learned (a low-level druid stays a caster). Sits ABOVE the bear switch in the spec so
-        /// the surrounded check there wins when a pack is on us.</summary>
+        /// the form decision is consistent.</summary>
         public static RotationStep CatForm(DruidSettings s, float priority) =>
             Skill.Spell("Cat Form").Priority(priority).On(Targets.Self)
-                 .When(ctx => !InCatForm(ctx) && Surrounding(ctx) < s.BearCount.Value);
+                 .When(ctx => !InCatForm(ctx)
+                              && FormDecisionCount(ctx) < (InBearForm(ctx) ? BearReturnCount(s) : s.BearCount.Value));
 
         /// <summary>Prowl — enter stealth out of combat (opt-in) so the spec's positional opener (Ravage/Pounce) can
         /// fire. Gated like the rogue's Stealth: only while the product commits to a fight, not idle / mounted /
@@ -166,10 +203,13 @@ namespace AIO3.Core.Rotations.Druid
         }
 
         /// <summary>Tiger's Fury — an instant energy + damage cooldown. Pop it on cooldown while in Cat Form and not
-        /// prowling (don't break the stealth opener). Off the GCD (instant). Opt-out via the toggle.</summary>
+        /// prowling (don't break the stealth opener), but ONLY below <see cref="TigersFuryEnergyMax"/> energy so the
+        /// instant +energy burst isn't wasted overcapping (the old GroupFeral gated the same way — only when energy
+        /// has room to absorb the burst). Off the GCD (instant). Opt-out via the toggle.</summary>
         public static RotationStep TigersFury(DruidSettings s, float priority) =>
             Skill.Spell("Tiger's Fury").Priority(priority).On(Targets.Self)
-                 .When(ctx => s.UseTigersFury.Value && InCatForm(ctx) && !ctx.Me.HasAura("Prowl"))
+                 .When(ctx => s.UseTigersFury.Value && InCatForm(ctx) && !ctx.Me.HasAura("Prowl")
+                              && ctx.Me.Energy < TigersFuryEnergyMax)
                  .OffGcd();
 
         /// <summary>Berserk — the Feral burst cooldown (cat: free combo-point spam; bear: removes Maul/Mangle CD).
@@ -197,16 +237,36 @@ namespace AIO3.Core.Rotations.Druid
                  .When(ctx => s.UseFaerieFire.Value && !ctx.Me.HasAura("Prowl")
                               && !ctx.Target.HasMyAura("Faerie Fire (Feral)"));
 
-        /// <summary>Rake — the Cat bleed, applied when missing on a healthy target (the dying-mob HP-floor reuses
-        /// the Rip-health setting so a fresh bleed isn't wasted on a mob about to die). Not on bleed-immune
-        /// creatures, not while prowling (the opener goes first), and only below the finisher CP threshold (no point
-        /// building Rake when a finisher should fire). Routes through MaintainMyDebuff for the shared post-cast
-        /// grace (so the freshly applied bleed isn't double-cast before it becomes visible).</summary>
+        /// <summary>Savage Roar — the cat's "Slice and Dice": a self-buff finisher that boosts melee (white) damage
+        /// by ~30-40% while in Cat Form. Spend combo points to KEEP IT UP whenever it's missing at the low
+        /// <see cref="SavageRoarComboPoints"/> threshold — it's a near-permanent buff, so we refresh it cheaply
+        /// rather than wait for a full bar (the old GroupFeral refreshed it at the finisher CP count, but a low floor
+        /// keeps the buff up far more reliably). Highest-priority cat finisher (above Rip/Ferocious Bite) so the buff
+        /// never falls off. Opt-out via the toggle; auto-skips until learned. Not while prowling.</summary>
+        public static RotationStep SavageRoar(DruidSettings s, float priority) =>
+            Skill.Spell("Savage Roar").Priority(priority).On(Targets.Self)
+                 .When(ctx => s.UseSavageRoar.Value && InCatForm(ctx) && !ctx.Me.HasAura("Prowl")
+                              && !ctx.Me.HasAura("Savage Roar")
+                              && ctx.ComboPoints >= SavageRoarComboPoints);
+
+        /// <summary>Rake's OWN dying-mob HP-floor (distinct from Rip's). Rake lasts ~9s — much shorter than Rip's
+        /// ~16s — so it pays off on lower-HP targets, hence a LOWER floor than Rip. On a boss it pays off down to
+        /// almost nothing, so the floor drops further. Mirrors the old AIO's Rake gate
+        /// (<c>HealthPercent >= 35 || (>= 20 &amp;&amp; boss)</c> — SoloFeral.cs:63).</summary>
+        public static double RakeFloor(CombatContext ctx) =>
+            ctx.Target.IsBoss() ? RakeBossFloor : RakeNormalFloor;
+
+        /// <summary>Rake — the Cat bleed, applied when missing on a healthy target (its OWN HP-floor —
+        /// <see cref="RakeFloor"/> — is lower than Rip's, and lower still on a boss, since Rake's short duration pays
+        /// off on lower-HP mobs). Not on bleed-immune creatures, not while prowling (the opener goes first), and only
+        /// below the finisher CP threshold (no point building Rake when a finisher should fire). Routes through
+        /// MaintainMyDebuff for the shared post-cast grace (so the freshly applied bleed isn't double-cast before it
+        /// becomes visible).</summary>
         public static RotationStep Rake(DruidSettings s, float priority) =>
             CombatBlocks.MaintainMyDebuff("Rake", RakeRefreshMs, priority,
                 extraGate: ctx => InCatForm(ctx) && !ctx.Me.HasAura("Prowl")
                                   && ctx.ComboPoints < s.FinisherComboPoints.Value
-                                  && ctx.Target.HealthPercent > s.RipHealth.Value
+                                  && ctx.Target.HealthPercent > RakeFloor(ctx)
                                   && !IsBleedImmune(ctx.Target));
 
         /// <summary>Rip — the Cat bleed FINISHER, spent at the finisher CP threshold on a durable target (above the
@@ -228,8 +288,33 @@ namespace AIO3.Core.Rotations.Druid
                  .When(ctx => InCatForm(ctx) && !ctx.Me.HasAura("Prowl")
                               && ctx.ComboPoints >= s.FinisherComboPoints.Value);
 
-        /// <summary>Mangle (Cat) — the primary combo-point builder (also a bleed-damage debuff). Build below the
-        /// finisher threshold so we don't overbuild past a finisher-worthy bar. Not while prowling.</summary>
+        /// <summary>Mangle (Cat) maintaining the +30% bleed-damage DEBUFF — the cat counterpart to
+        /// <see cref="MangleBear"/>. Casts when the Mangle debuff is missing on the target, so the bleeds Rake/Rip
+        /// rely on are amplified. Uses the SAME aura name "Mangle" the bear maintainer keys on — in 3.3.5a both
+        /// Mangle (Cat) and Mangle (Bear) apply the same shared "Mangle" debuff (we deliberately DROP the old FC's
+        /// <c>"Mangle (Cat)"</c> aura-name check from GroupFeral.cs:66, which was drift). Sits ABOVE the Shred /
+        /// Mangle-builder block so the debuff is refreshed first; the builder Mangle below still spams as the energy
+        /// filler. Build below the finisher threshold. Not while prowling.</summary>
+        public static RotationStep MangleCatDebuff(DruidSettings s, float priority) =>
+            Skill.Spell("Mangle (Cat)").Priority(priority).On(Targets.CurrentEnemy)
+                 .When(ctx => InCatForm(ctx) && !ctx.Me.HasAura("Prowl")
+                              && ctx.ComboPoints < s.FinisherComboPoints.Value
+                              && !ctx.Target.HasMyAura("Mangle"));
+
+        /// <summary>Shred — the highest-damage Cat combo-point builder, but it can ONLY be used from BEHIND the
+        /// target (a positional). Gated on <see cref="IGameClient.PlayerIsBehindTarget"/> (the same seam the rogue's
+        /// Garrote opener uses), so it's chosen when behind and the front-fallback builder (Mangle/Claw) takes over
+        /// otherwise. Build below the finisher threshold so we don't overbuild past a finisher-worthy bar. Not while
+        /// prowling. Auto-skips until learned (a low-level cat builds with Mangle/Claw until Shred is trained).</summary>
+        public static RotationStep Shred(DruidSettings s, float priority) =>
+            Skill.Spell("Shred").Priority(priority).On(Targets.CurrentEnemy)
+                 .When(ctx => InCatForm(ctx) && !ctx.Me.HasAura("Prowl")
+                              && ctx.ComboPoints < s.FinisherComboPoints.Value
+                              && ctx.Game.PlayerIsBehindTarget());
+
+        /// <summary>Mangle (Cat) — the primary front-fallback combo-point builder (also applies the bleed-damage
+        /// debuff). Used when Shred can't land (we're in front) or as the steady builder. Build below the finisher
+        /// threshold so we don't overbuild past a finisher-worthy bar. Not while prowling.</summary>
         public static RotationStep MangleCat(DruidSettings s, float priority) =>
             Skill.Spell("Mangle (Cat)").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => InCatForm(ctx) && !ctx.Me.HasAura("Prowl")
@@ -245,12 +330,14 @@ namespace AIO3.Core.Rotations.Druid
 
         // --- Bear Form: tank / AoE (rage) ---
 
-        /// <summary>Switch to (Dire) Bear Form — the tank/AoE form. Fires when surrounded (>= BearCount attackers in
-        /// melee), AND also as the SINGLE-TARGET form while Cat Form isn't learned yet (level 10-19: the druid has
-        /// only Bear, so it fights in bear instead of dropping to the caster filler — Cat takes over single-target
-        /// once it's trained at ~20). Prefers Dire Bear Form (the upgrade) when known; Bear Form is the auto-skip
-        /// fallback for a lower-level druid (below ~10 neither is known, so it stays a caster). Sits ABOVE the cat
-        /// switch so the surrounded check wins when a pack is on us.</summary>
+        /// <summary>Switch to (Dire) Bear Form — the tank/AoE form. Fires when the pack around the target reaches
+        /// the bear ENTRY count (<c>>= BearCount</c>, measured at the wider <see cref="FormDecisionRadius"/>), AND
+        /// also as the SINGLE-TARGET form while Cat Form isn't learned yet (level 10-19: the druid has only Bear, so
+        /// it fights in bear instead of dropping to the caster filler — Cat takes over single-target once it's
+        /// trained at ~20). Prefers Dire Bear Form (the upgrade) when known; Bear Form is the auto-skip fallback for
+        /// a lower-level druid (below ~10 neither is known, so it stays a caster). Sits ABOVE the cat switch so the
+        /// form decision is consistent. The matching CatForm return is hysteretic (see <see cref="BearReturnCount"/>),
+        /// so a pack hovering at the threshold can't thrash the form every tick.</summary>
         public static RotationStep BearForm(DruidSettings s, float priority) =>
             new RotationStep(
                 name: "Bear Form",
@@ -259,9 +346,9 @@ namespace AIO3.Core.Rotations.Druid
                 condition: (ctx, t) =>
                 {
                     if (InBearForm(ctx)) return false;
-                    // Not surrounded AND Cat is available → let the Cat switch handle single-target. Otherwise
-                    // (surrounded, or no Cat Form yet) the bear is the form to be in.
-                    if (Surrounding(ctx) < s.BearCount.Value && ctx.Game.IsSpellKnown("Cat Form")) return false;
+                    // Below the bear ENTRY count AND Cat is available → let the Cat switch handle single-target.
+                    // Otherwise (pack at the entry count, or no Cat Form yet) the bear is the form to be in.
+                    if (FormDecisionCount(ctx) < s.BearCount.Value && ctx.Game.IsSpellKnown("Cat Form")) return false;
                     string form = ctx.Game.IsSpellKnown("Dire Bear Form") ? "Dire Bear Form" : "Bear Form";
                     return ctx.Game.IsSpellKnown(form) && ctx.Game.IsSpellReady(form);
                 },
@@ -329,6 +416,22 @@ namespace AIO3.Core.Rotations.Druid
         private const int RakeRefreshMs = 2000;     // Rake lasts ~9s
         private const int RipRefreshMs = 2000;      // Rip lasts ~12-16s
         private const int LacerateRefreshMs = 3000; // Lacerate lasts ~15s (refresh the stack)
+
+        /// <summary>Rake's dying-mob HP-floor on a NORMAL target: don't apply a fresh ~9s bleed below this (it won't
+        /// pay off before the mob dies). Lower than Rip's floor — Rake's short duration pays off on lower-HP targets.</summary>
+        private const double RakeNormalFloor = 35;
+
+        /// <summary>Rake's HP-floor on a BOSS: a boss lives long enough that the bleed pays off down to almost
+        /// nothing, so keep applying it far lower than on trash (old AIO: 20% on a boss).</summary>
+        private const double RakeBossFloor = 20;
+
+        /// <summary>Tiger's Fury only fires below this energy: its instant +energy burst is wasted if we're already
+        /// near full, so hold it until energy has room to absorb the gain (the old GroupFeral gated the same way).</summary>
+        private const int TigersFuryEnergyMax = 35;
+
+        /// <summary>Savage Roar is refreshed once we have at least this many combo points — a LOW floor (1) so the
+        /// melee-damage buff is kept up near-permanently rather than waiting for a full finisher bar.</summary>
+        private const int SavageRoarComboPoints = 1;
 
         /// <summary>Don't pop Enrage on a mob about to die (HP%) — the rage isn't worth it. Mirrors the old AIO's
         /// <c>t.HealthPercent >= 35</c> Enrage gate.</summary>
