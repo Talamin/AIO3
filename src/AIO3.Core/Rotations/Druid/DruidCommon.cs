@@ -245,10 +245,12 @@ namespace AIO3.Core.Rotations.Druid
 
         // --- Bear Form: tank / AoE (rage) ---
 
-        /// <summary>Switch to (Dire) Bear Form when surrounded (>= BearCount attackers in melee) and not already in
-        /// a bear form — the tank/AoE form. Prefers Dire Bear Form (the upgrade) when known; Bear Form is the
-        /// auto-skip fallback for a lower-level druid. Sits ABOVE the cat switch in the spec so the surrounded check
-        /// wins when a pack is on us.</summary>
+        /// <summary>Switch to (Dire) Bear Form — the tank/AoE form. Fires when surrounded (>= BearCount attackers in
+        /// melee), AND also as the SINGLE-TARGET form while Cat Form isn't learned yet (level 10-19: the druid has
+        /// only Bear, so it fights in bear instead of dropping to the caster filler — Cat takes over single-target
+        /// once it's trained at ~20). Prefers Dire Bear Form (the upgrade) when known; Bear Form is the auto-skip
+        /// fallback for a lower-level druid (below ~10 neither is known, so it stays a caster). Sits ABOVE the cat
+        /// switch so the surrounded check wins when a pack is on us.</summary>
         public static RotationStep BearForm(DruidSettings s, float priority) =>
             new RotationStep(
                 name: "Bear Form",
@@ -256,7 +258,10 @@ namespace AIO3.Core.Rotations.Druid
                 targets: Targets.Self,
                 condition: (ctx, t) =>
                 {
-                    if (InBearForm(ctx) || Surrounding(ctx) < s.BearCount.Value) return false;
+                    if (InBearForm(ctx)) return false;
+                    // Not surrounded AND Cat is available → let the Cat switch handle single-target. Otherwise
+                    // (surrounded, or no Cat Form yet) the bear is the form to be in.
+                    if (Surrounding(ctx) < s.BearCount.Value && ctx.Game.IsSpellKnown("Cat Form")) return false;
                     string form = ctx.Game.IsSpellKnown("Dire Bear Form") ? "Dire Bear Form" : "Bear Form";
                     return ctx.Game.IsSpellKnown(form) && ctx.Game.IsSpellReady(form);
                 },

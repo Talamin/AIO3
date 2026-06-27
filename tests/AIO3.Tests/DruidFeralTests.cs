@@ -223,6 +223,19 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Bear_Form_single_target_while_Cat_Form_is_not_learned_yet()
+        {
+            // Level 10-19: only Bear Form is known. Single-target, the druid fights in BEAR (not the caster filler),
+            // since Cat Form is trained later (~20). Bear takes single-target until then.
+            var g = CatGame();
+            g.MeUnit.Auras.Remove("Cat Form");     // not in any form
+            g.UnknownSpells.Add("Cat Form");       // not learned yet
+            g.UnknownSpells.Add("Dire Bear Form"); // plain Bear at this level
+            Assert.Equal("Bear Form", Fire(g)?.Name); // single target, no Cat → shift to Bear, not stay a caster
+            Assert.Contains("Bear Form", g.CastLog);
+        }
+
+        [Fact]
         public void Bear_Form_falls_back_to_Bear_when_Dire_Bear_is_unknown()
         {
             var g = CatGame();
