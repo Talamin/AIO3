@@ -30,6 +30,9 @@ public class Main : ICustomClass
     private readonly IGameClient _game = new WRobotGameClient();
     private RotationEngine _engine;
     private SettingsOverlay _overlay;
+    private NativeOverlay _nativeOverlay; // native window over the game; the Lua panel is the fallback
+    private int _overlayStart;            // when the overlays were created (for the native-vs-Lua fallback grace)
+    private const int OverlayFallbackMs = 2000; // if the native overlay isn't up by now, fall back to the Lua panel
     private SettingsStore _store;
     private TalentTrainer _talentTrainer;
     private bool _lastManageFood;             // last applied "use best bag food/drink" state (apply only on change)
@@ -75,6 +78,11 @@ public class Main : ICustomClass
             // Pass the live active spec so the overlay hides settings tagged for other specs (and rebuilds when
             // the spec changes). _class is captured; ActiveSpec updates as the module resolves the spec.
             _overlay = new SettingsOverlay(_class.DisplayName, list, () => _class.ActiveSpec);
+            // Native over-the-game overlay (Phase 1, in PARALLEL with the Lua panel as a fallback). Self-guards on
+            // its own STA thread; if WPF can't start in this byte[]-loaded fightclass it logs and we keep the panel.
+            try { _nativeOverlay = new NativeOverlay(_class.DisplayName, list, () => _class.ActiveSpec); }
+            catch (Exception e) { Logging.WriteError("[AIO3] native overlay init failed: " + e.Message); }
+            _overlayStart = Environment.TickCount;
             _talentTrainer = new TalentTrainer();
 
             // Empirical interrupt learner: feeds the tracker from the combat log (the API's
@@ -153,12 +161,26 @@ public class Main : ICustomClass
 
                 // Overlay polling and spec reconcile use Lua but DON'T need the frame lock — running them
                 // under it pauses the game's frame (stutter) for ~12 Lua reads. Keep them out of the lock.
-                _overlay?.EnsureCreated();
-                if (overlayPoll.ElapsedMilliseconds > 400)
+                // ONE overlay at a time: while the native overlay is up, suppress the Lua panel — running both
+                // lets the Lua Poll() write its (stale) bridge value back over a native edit, which reverted edits
+                // and re-saved the old value. Fall back to the Lua panel only if native isn't up (with a short
+                // startup grace so the panel doesn't flash before the window appears).
+                bool nativeUp = _nativeOverlay != null && _nativeOverlay.IsActive;
+                bool useLuaPanel = !nativeUp &&
+                                   (_nativeOverlay == null || unchecked(Environment.TickCount - _overlayStart) > OverlayFallbackMs);
+                if (useLuaPanel)
                 {
-                    overlayPoll.Restart();
-                    settingsChanged = _overlay != null && _overlay.Poll();
+                    _overlay?.EnsureCreated();
+                    if (overlayPoll.ElapsedMilliseconds > 400)
+                    {
+                        overlayPoll.Restart();
+                        settingsChanged = _overlay != null && _overlay.Poll();
+                    }
                 }
+                // Native overlay edits bind straight into the Setting objects; this just picks up "something
+                // changed" so we Reconcile (spec) + Save the same way a Lua-panel edit does. Cheap (a bool read).
+                if (_nativeOverlay != null && _nativeOverlay.TakeDirty())
+                    settingsChanged = true;
                 if (settingsChanged || reconcile.ElapsedMilliseconds > 2000)
                 {
                     reconcile.Restart();
@@ -281,6 +303,7 @@ public class Main : ICustomClass
             EventsLuaWithArgs.OnEventsLuaStringWithArgs -= _interruptLearner.OnCombatLog;
             _interruptLearner.Save();
         }
+        _nativeOverlay?.Dispose(); // close the overlay window + end its STA thread
         (_game as IDisposable)?.Dispose(); // unsubscribe the object-manager pulse handler
         Logging.Write("[AIO3] Disposed.");
     }
