@@ -33,6 +33,8 @@ public class Main : ICustomClass
     private NativeOverlay _nativeOverlay; // native window over the game; the Lua panel is the fallback
     private int _overlayStart;            // when the overlays were created (for the native-vs-Lua fallback grace)
     private const int OverlayFallbackMs = 2000; // if the native overlay isn't up by now, fall back to the Lua panel
+    private volatile string _statusLine = ""; // live HUD line for the overlay (computed here, read on the UI thread)
+    private string _lastAction = "";          // last fired step name (sticky, so the HUD doesn't flicker to idle)
     private SettingsStore _store;
     private TalentTrainer _talentTrainer;
     private bool _lastManageFood;             // last applied "use best bag food/drink" state (apply only on change)
@@ -80,7 +82,7 @@ public class Main : ICustomClass
             _overlay = new SettingsOverlay(_class.DisplayName, list, () => _class.ActiveSpec);
             // Native over-the-game overlay (Phase 1, in PARALLEL with the Lua panel as a fallback). Self-guards on
             // its own STA thread; if WPF can't start in this byte[]-loaded fightclass it logs and we keep the panel.
-            try { _nativeOverlay = new NativeOverlay(_class.DisplayName, list, () => _class.ActiveSpec); }
+            try { _nativeOverlay = new NativeOverlay(_class.DisplayName, list, () => _class.ActiveSpec, profile, () => _statusLine); }
             catch (Exception e) { Logging.WriteError("[AIO3] native overlay init failed: " + e.Message); }
             _overlayStart = Environment.TickCount;
             _talentTrainer = new TalentTrainer();
@@ -197,9 +199,9 @@ public class Main : ICustomClass
                 // pause casting while it plays out — no per-tick re-pressing (which jerked) and no blocking.
                 bool repositioning = _game.ServiceReposition();
 
+                CombatContext ctx = null;
                 if (!mounted && !repositioning && !dead)
                 {
-                    CombatContext ctx = null;
                     _game.RunLocked(() =>
                     {
                         ctx = CombatContext.Capture(_game, _interrupts, _damageTracker);
@@ -224,6 +226,8 @@ public class Main : ICustomClass
                         fired = _engine.Tick(ctx);
                     }
                 }
+
+                if (_nativeOverlay != null) UpdateStatusLine(ctx, fired, mounted, dead);
 
                 // Auto-assign talents out of combat. Runs on a background task because TalentTrainer
                 // sleeps between LearnTalent calls — doing it inline froze the whole rotation loop while
@@ -291,6 +295,27 @@ public class Main : ICustomClass
             // Sleep is at the end but ALWAYS reached (the old OOC spin-loop burned a core here).
             Thread.Sleep(50);
         }
+    }
+
+    // Build the one-line HUD the overlay shows: "<spec>  |  <state>". State is the engaged target + HP% and the
+    // last action while fighting, else mounted/dead/idle. Computed here (on the loop thread) and read by the
+    // overlay's UI thread via a Func, so the UI never touches the game directly.
+    private void UpdateStatusLine(CombatContext ctx, RotationStep fired, bool mounted, bool dead)
+    {
+        if (fired != null) _lastAction = fired.Name;
+        string spec = _class?.ActiveLabel ?? _class?.DisplayName ?? "";
+        // Two parts split by '\n': line 1 = spec + target, line 2 = the current cast/state. The overlay shows them
+        // as two rows in the minimized pill, and joined on one line in the expanded header.
+        string line1, line2;
+        if (dead) { line1 = spec; line2 = "dead"; }
+        else if (mounted) { line1 = spec; line2 = "mounted"; }
+        else if (ctx != null && ctx.HasEnemyTarget && ctx.Target != null)
+        {
+            line1 = spec + "  ·  " + ctx.Target.Name + " " + (int)ctx.Target.HealthPercent + "%";
+            line2 = string.IsNullOrEmpty(_lastAction) ? "—" : _lastAction;
+        }
+        else { line1 = spec; line2 = "idle"; }
+        _statusLine = line1 + "\n" + line2;
     }
 
     public void Dispose()
