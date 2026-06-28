@@ -57,18 +57,23 @@ namespace AIO3.Core.Rotations.Druid
             DruidCommon.FrenziedRegeneration(_settings, priority: 0.2f),
 
             // --- in-combat self-heal (the druid's edge) ---
-            // Prefer the form-preserving instant via Predator's Swiftness, then the shift-out heals (mana-gated).
+            // Prefer the form-preserving instant via Predator's Swiftness; otherwise drop form ONCE, then stack the two
+            // HoTs (Regrowth, then Rejuvenation) formless, then CatForm/BearForm re-enter (held meanwhile). Early-game
+            // survival before the talented instant heals exist: two HoTs ticking while back in form fighting.
             DruidCommon.InstantProcHeal(_settings, "Regrowth", s => s.UseRegrowthIC.Value, priority: 0.3f),
             DruidCommon.InstantProcHeal(_settings, "Healing Touch", s => s.UseHealingTouchIC.Value, priority: 0.31f),
+            DruidCommon.DropFormToHeal(_settings, priority: 0.38f),
             DruidCommon.ShiftOutHeal(_settings, "Regrowth", s => s.UseRegrowthIC.Value, priority: 0.4f),
             DruidCommon.ShiftOutHeal(_settings, "Rejuvenation", s => s.UseRejuvenationIC.Value, priority: 0.41f),
-            DruidCommon.ShiftOutHeal(_settings, "Healing Touch", s => s.UseHealingTouchIC.Value, priority: 0.42f),
             // Innervate when low on mana (so the self-heals stay affordable).
             DruidCommon.Innervate(_settings, priority: 0.5f),
 
             // --- out-of-combat buffs (Mark of the Wild / Thorns) ---
             DruidCommon.MarkOfTheWild(_settings, priority: 0.6f),
             DruidCommon.Thorns(_settings, priority: 0.61f),
+
+            // --- travel: Travel Form as a ground-mount substitute when on foot with no mount ---
+            DruidCommon.TravelForm(_settings, priority: 0.7f),
 
             // --- form switching (Bear when surrounded wins; else Cat for single-target) ---
             // Bear sits ABOVE Cat so the surrounded check decides the form; both auto-skip until learned.
@@ -117,16 +122,18 @@ namespace AIO3.Core.Rotations.Druid
             DruidCommon.MangleCat(_settings, priority: 6.7f),       // front-fallback builder
             DruidCommon.Claw(_settings, priority: 6.8f),            // fallback builder
 
-            // --- pre-form caster fallback (only while NOT in any combat form — a low-level druid before Cat/Bear) ---
-            // These auto-skip once shifted (the form gate) AND once unlearned spells are replaced by the forms, so
-            // the one list scales: at L10 it's Moonfire + Wrath, and the moment Cat/Bear is learned the form steps
-            // take over and these go quiet.
+            // --- pre-form caster fallback (ONLY a low-level druid that hasn't learned Cat/Bear yet) ---
+            // Gated on !KnowsCombatForm so a form-capable druid NEVER stands and casts Wrath instead of shifting:
+            // the form steps (prio 0.8/0.85) own the engage; these only fill at L1-9 before any form exists. Also
+            // gated on Fighting so a pre-form druid doesn't nuke an unengaged mob. They go quiet the moment Bear/Cat
+            // is learned (the form steps take over).
             Skill.Spell("Moonfire").Priority(8f).On(Targets.CurrentEnemy)
-                 .When(ctx => !DruidCommon.InAnyForm(ctx)
+                 .When(ctx => DruidCommon.Fighting(ctx) && !DruidCommon.KnowsCombatForm(ctx)
                               && !ctx.Target.HasMyAura("Moonfire")
                               && ctx.Target.HealthPercent > PreFormDotHealthFloor),
             Skill.Spell("Wrath").Priority(9f).On(Targets.CurrentEnemy)
-                 .When(ctx => !DruidCommon.InAnyForm(ctx) && !ctx.Game.PlayerIsMoving),
+                 .When(ctx => DruidCommon.Fighting(ctx) && !DruidCommon.KnowsCombatForm(ctx)
+                              && !ctx.Game.PlayerIsMoving),
 
         }, ctx => _settings.UseRacials.Value, basePriority: 2.5f);
     }

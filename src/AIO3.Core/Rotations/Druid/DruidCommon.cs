@@ -68,6 +68,14 @@ namespace AIO3.Core.Rotations.Druid
         /// must drop the form first, so the "needs to shift out" gate reads this.</summary>
         public static bool InAnyForm(CombatContext ctx) => InCatForm(ctx) || InBearForm(ctx) || InMoonkinForm(ctx);
 
+        /// <summary>True once the feral druid has learned a melee combat form (Cat / Bear / Dire Bear). The pre-form
+        /// caster fallback (Moonfire / Wrath) is gated on the NEGATION of this: only a druid that CAN'T yet shapeshift
+        /// fills with caster nukes. A form-capable druid must always shift into its form instead of standing and
+        /// casting Wrath (which is what the bare <c>!InAnyForm</c> gate wrongly allowed during a form-held window).</summary>
+        public static bool KnowsCombatForm(CombatContext ctx) =>
+            ctx.Game.IsSpellKnown("Cat Form") || ctx.Game.IsSpellKnown("Bear Form")
+            || ctx.Game.IsSpellKnown("Dire Bear Form");
+
         /// <summary>Number of enemies meleeing us within the TIGHT <see cref="SurroundRadius"/> — the "is a pack
         /// actually on me?" count that drives the bear AoE gates (Swipe / Demoralizing Roar). Shared so the AoE
         /// abilities agree on what a "pack on me" is.</summary>
@@ -87,7 +95,7 @@ namespace AIO3.Core.Rotations.Druid
         /// loop forever. Mirrors the old AIO's OOCBuffs gate — skip MotW when any of these (or Gift of the Wild) is on.
         /// "Armor" in particular is the Scroll of Protection buff that triggered the endless re-cast.</summary>
         private static readonly string[] MotwSupersedingBuffs =
-            { "Gift of the Wild", "Stamina", "Armor", "Agility", "Strength", "Spirit" };
+            { "Gift of the Wild", "Stamina", "Armor", "Agility", "Strength", "Spirit", "Intellect" };
 
         /// <summary>Keep Mark of the Wild up. Skipped when MotW/Gift of the Wild is already on, OR when a conflicting
         /// single-stat buff (<see cref="MotwSupersedingBuffs"/>, e.g. an "Armor" scroll) occupies the same stack group
@@ -105,6 +113,29 @@ namespace AIO3.Core.Rotations.Druid
         public static RotationStep Thorns(DruidSettings s, float priority) =>
             Skill.Spell("Thorns").Priority(priority).On(Targets.Self)
                  .When(ctx => s.UseThorns.Value && !ctx.Game.PlayerInCombat && !ctx.Me.HasAura("Thorns"));
+
+        /// <summary>Below this distance to the target the druid stops travelling and engages — Travel Form drops so a
+        /// single clean shift into Bear/Cat (and the ~30y Faerie Fire / Growl pull) takes over. Above it the target is
+        /// still a run-up away, where a mount (here Travel Form) belongs. Mirrors the old shaman FC's MountDistance
+        /// gate; keeping it ABOVE melee but within ranged-pull range avoids the Travel↔Bear GCD thrash at the engage.</summary>
+        public const float TravelFormDropRange = 20f;
+
+        /// <summary>Travel Form as a ground-mount substitute — the druid's equivalent of the old shaman FC's Ghost
+        /// Wolf. While moving on foot, NOT in real combat, with no mount configured, and the target still a run-up away
+        /// (no target, or it's beyond <see cref="TravelFormDropRange"/>), shift into Travel Form for the +40% outdoor
+        /// speed. The distance gate (not a bare <c>!PlayerInCombat</c>) is what stops the Travel↔Bear thrash: Travel
+        /// Form covers the FAR portion of every grind run-up and drops ONCE at ~20y, where the combat-form step makes a
+        /// single direct Travel→Bear/Cat switch (no GCD collision). Only while MOVING, so a stop to loot/interact drops
+        /// it. Suppressed when a ground mount exists (let WRobot mount it), while mounted, or while resting. Auto-skips
+        /// below level 16.</summary>
+        public static RotationStep TravelForm(DruidSettings s, float priority) =>
+            Skill.Spell("Travel Form").Priority(priority).On(Targets.Self)
+                 .When(ctx => s.UseTravelForm.Value
+                              && ctx.Game.PlayerIsMoving && !ctx.Game.PlayerInCombat
+                              && !ctx.Game.PlayerIsMounted && !ctx.Game.HasGroundMount
+                              && !ctx.Game.PlayerIsResting
+                              && (ctx.Target == null || ctx.Target.Distance > TravelFormDropRange)
+                              && !ctx.Me.HasAura("Travel Form"));
 
         // --- survival (form-agnostic) ---
 
@@ -160,19 +191,65 @@ namespace AIO3.Core.Rotations.Druid
                               && HasInstantHealProc(ctx)
                               && !ctx.Me.HasAura(spell)); // don't re-stack a HoT/Regrowth that's already on us
 
-        /// <summary>A shift-out in-combat heal: drop form and cast the heal when hurt below the IC-heal threshold,
-        /// gated on a SIMPLE mana % floor (we deliberately drop the old GetSpellCost arithmetic). Skipped while the
-        /// Predator's Swiftness proc is up (the instant version above is strictly better — keep form). Casting the
-        /// heal itself drops the form automatically in WoW, so we don't issue a separate shapeshift cast; the
-        /// engine just casts the heal. Not re-stacked if already on us (a HoT). The mana gate keeps a low-mana
-        /// druid from thrashing in and out of form for a heal it can't afford.</summary>
+        /// <summary>Grace after a shift-out heal lands before its step may re-issue. A cast-time heal (Regrowth ~1.5s)
+        /// applies its aura only at cast END + server latency, so without this the maintain check still reads the HoT
+        /// as "missing" and casts it 2-3× in a row (the in-game triple-Regrowth). Same idea as the DoT apply-grace.</summary>
+        private const int ShiftHealApplyGraceMs = 3000;
+
+        /// <summary>True while an in-combat shift-out heal is WANTED this tick: hurt below the IC-heal threshold, with
+        /// the mana to afford it, no instant proc up (that heals in-form instead), AND a chosen HoT (Regrowth /
+        /// Rejuvenation) still missing. The last clause is what lets us REFORM once both HoTs are up — we only leave
+        /// form to APPLY the missing HoTs, then return to fighting with them ticking. Drives the form-drop step AND
+        /// holds the form re-entry, so they don't fight over the GCD (mirrors the priest's WantsHardHeal interlock).</summary>
+        public static bool WantsShiftHeal(CombatContext ctx, DruidSettings s)
+        {
+            if (s.InCombatHealHealthPercent.Value <= 0) return false;
+            if (ctx.Me.HealthPercent >= s.InCombatHealHealthPercent.Value) return false;
+            if (ctx.Me.PowerPercent <= s.HealManaPercent.Value) return false;
+            if (HasInstantHealProc(ctx)) return false; // the instant proc heal keeps form — no shift-out needed
+            bool wantRegrowth = s.UseRegrowthIC.Value && !ctx.Me.HasAura("Regrowth");
+            bool wantRejuv = s.UseRejuvenationIC.Value && !ctx.Me.HasAura("Rejuvenation");
+            return wantRegrowth || wantRejuv;
+        }
+
+        /// <summary>The spell to toggle the CURRENT form off (cast a form's own spell while in it → back to caster).</summary>
+        private static string ActiveFormSpell(CombatContext ctx)
+        {
+            if (InCatForm(ctx)) return "Cat Form";
+            if (ctx.Me.HasAura("Dire Bear Form")) return "Dire Bear Form";
+            if (ctx.Me.HasAura("Bear Form")) return "Bear Form";
+            if (InMoonkinForm(ctx)) return "Moonkin Form";
+            return null;
+        }
+
+        /// <summary>Drop the combat form so a cast-time heal can actually be cast (forms block Regrowth/Rejuvenation —
+        /// an instant heal would auto-drop the form, but a cast-time Regrowth started in form spam-fails). Fires when
+        /// in a form and a shift-out heal is wanted; one beat, then the formless heals below fire in priority order
+        /// (Regrowth, then Rejuvenation), then <see cref="CatForm"/>/<see cref="BearForm"/> re-enter once both HoTs are
+        /// up (held meanwhile by <see cref="WantsShiftHeal"/>). The toggle is instant so its aura drops within the
+        /// GCD that follows — the form is gone before this step is eligible again, so it can't re-toggle.</summary>
+        public static RotationStep DropFormToHeal(DruidSettings s, float priority) =>
+            new RotationStep(
+                name: "Cancel Form (heal)",
+                priority: priority,
+                targets: Targets.Self,
+                condition: (ctx, t) => InAnyForm(ctx) && WantsShiftHeal(ctx, s),
+                action: (ctx, t) => ctx.Game.Cast(ActiveFormSpell(ctx), ctx.Me));
+
+        /// <summary>A shift-out in-combat heal, cast ONLY while formless (the <see cref="DropFormToHeal"/> step drops
+        /// the form first — a cast-time heal started in form spam-fails). Fires below the IC-heal threshold, gated on
+        /// a SIMPLE mana % floor (we deliberately drop the old GetSpellCost arithmetic), and skipped while the
+        /// Predator's Swiftness proc is up (the instant version keeps form). Not re-stacked if already on us (a HoT),
+        /// and RecastDelay-graced so the cast→aura latency can't double-cast it.</summary>
         public static RotationStep ShiftOutHeal(DruidSettings s, string spell, System.Func<DruidSettings, bool> enabled, float priority) =>
             Skill.Spell(spell).Priority(priority).On(Targets.Self)
                  .When(ctx => enabled(s)
+                              && !InAnyForm(ctx)            // formless only — DropFormToHeal got us here
                               && ctx.Me.HealthPercent < s.InCombatHealHealthPercent.Value
                               && ctx.Me.PowerPercent > s.HealManaPercent.Value
                               && !HasInstantHealProc(ctx)   // prefer the instant proc heal when it's available
-                              && !ctx.Me.HasAura(spell));
+                              && !ctx.Me.HasAura(spell))
+                 .RecastDelay(ShiftHealApplyGraceMs);
 
         // --- Cat Form: builders / finishers / cooldowns (energy + combo points) ---
 
@@ -190,7 +267,7 @@ namespace AIO3.Core.Rotations.Druid
         /// the form decision is consistent.</summary>
         public static RotationStep CatForm(DruidSettings s, float priority) =>
             Skill.Spell("Cat Form").Priority(priority).On(Targets.Self)
-                 .When(ctx => Fighting(ctx) && !InCatForm(ctx)
+                 .When(ctx => Fighting(ctx) && !InCatForm(ctx) && !WantsShiftHeal(ctx, s)
                               && FormDecisionCount(ctx) < (InBearForm(ctx) ? BearReturnCount(s) : s.BearCount.Value));
 
         /// <summary>Prowl — enter stealth out of combat (opt-in) so the spec's positional opener (Ravage/Pounce) can
@@ -255,14 +332,21 @@ namespace AIO3.Core.Rotations.Druid
         public static bool IsBleedImmune(IWowUnit unit) =>
             unit.CreatureType == "Elemental" || unit.CreatureType == "Mechanical";
 
-        /// <summary>Faerie Fire (Feral) — the -armor debuff, usable in cat or bear. Apply when missing; opt-out via
-        /// the toggle. Not while prowling (it would break stealth before the opener). Reuses the boss/elite-aware
-        /// MaintainMyDebuff so it isn't re-applied to a dying mob? No — armor debuff helps from the first hit, so we
-        /// apply it whenever it's missing, like the old AIO (no HP floor).</summary>
+        /// <summary>Grace after a debuff is applied before its maintain step may re-issue. The debuff lands only at
+        /// cast END + server latency, so a bare <c>!HasMyAura</c> maintain re-casts it several times in the gap before
+        /// the aura registers (the in-game Faerie Fire applied ~5× in half a second). One cast, then left alone for
+        /// the debuff's duration — exactly the "cast it once and leave it" behaviour these long debuffs want.</summary>
+        private const int DebuffApplyGraceMs = 1500;
+
+        /// <summary>Faerie Fire (Feral) — the -armor debuff and the bear's ranged threat/"taunt" opener. Apply ONCE
+        /// when missing, then leave it (it lasts ~40s); the RecastDelay grace bridges the cast→debuff-apply latency so
+        /// it isn't spam-reapplied. Not while prowling (it would break stealth before the opener). No HP floor — the
+        /// armor debuff (and the threat) helps from the first hit, like the old AIO.</summary>
         public static RotationStep FaerieFireFeral(DruidSettings s, float priority) =>
             Skill.Spell("Faerie Fire (Feral)").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => s.UseFaerieFire.Value && !ctx.Me.HasAura("Prowl")
-                              && !ctx.Target.HasMyAura("Faerie Fire (Feral)"));
+                              && !ctx.Target.HasMyAura("Faerie Fire (Feral)"))
+                 .RecastDelay(DebuffApplyGraceMs);
 
         /// <summary>Growl pull — the bear's ranged opener. A bear has no ranged attack, so until Faerie Fire (Feral)
         /// is learned (or with it toggled off) the bot can only engage in melee. Growl is a ranged taunt: cast on an
@@ -340,7 +424,8 @@ namespace AIO3.Core.Rotations.Druid
             Skill.Spell("Mangle (Cat)").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => InCatForm(ctx) && !ctx.Me.HasAura("Prowl")
                               && ctx.ComboPoints < s.FinisherComboPoints.Value
-                              && !ctx.Target.HasMyAura("Mangle"));
+                              && !ctx.Target.HasMyAura("Mangle"))
+                 .RecastDelay(DebuffApplyGraceMs);
 
         /// <summary>Shred — the highest-damage Cat combo-point builder, but it can ONLY be used from BEHIND the
         /// target (a positional). Gated on <see cref="IGameClient.PlayerIsBehindTarget"/> (the same seam the rogue's
@@ -388,6 +473,7 @@ namespace AIO3.Core.Rotations.Druid
                 {
                     if (InBearForm(ctx)) return false;
                     if (!Fighting(ctx)) return false; // only shift to fight — don't block taxis/mounting while idle
+                    if (WantsShiftHeal(ctx, s)) return false; // hold the re-shift while we shift out to heal
                     // Below the bear ENTRY count AND Cat is available → let the Cat switch handle single-target.
                     // Otherwise (pack at the entry count, or no Cat Form yet) the bear is the form to be in.
                     if (FormDecisionCount(ctx) < s.BearCount.Value && ctx.Game.IsSpellKnown("Cat Form")) return false;
@@ -401,7 +487,8 @@ namespace AIO3.Core.Rotations.Druid
         /// threat. Only in bear form. (The Mangle debuff shows as "Mangle"; the old AIO maintained it the same way.)</summary>
         public static RotationStep MangleBear(DruidSettings s, float priority) =>
             Skill.Spell("Mangle (Bear)").Priority(priority).On(Targets.CurrentEnemy)
-                 .When(ctx => InBearForm(ctx) && !ctx.Target.HasMyAura("Mangle"));
+                 .When(ctx => InBearForm(ctx) && !ctx.Target.HasMyAura("Mangle"))
+                 .RecastDelay(DebuffApplyGraceMs);
 
         /// <summary>Lacerate — the Bear bleed, stacked and maintained (refresh when missing/expiring). Only in bear
         /// form; auto-skips until learned. Routes through MaintainMyDebuff for the shared post-cast grace.</summary>
@@ -432,7 +519,8 @@ namespace AIO3.Core.Rotations.Druid
                  .When(ctx => InBearForm(ctx)
                               && !ctx.Target.HasMyAura("Demoralizing Roar")
                               && !ctx.Target.HasAura("Demoralizing Shout")
-                              && (ctx.Target.IsBoss() || ctx.Target.IsElite || Surrounding(ctx) >= s.BearCount.Value));
+                              && (ctx.Target.IsBoss() || ctx.Target.IsElite || Surrounding(ctx) >= s.BearCount.Value))
+                 .RecastDelay(DebuffApplyGraceMs);
 
         /// <summary>Enrage — an instant Bear rage generator. Pop it to fuel the rotation when not already enraged
         /// and the target isn't about to die. Off the GCD. Only in bear form.</summary>

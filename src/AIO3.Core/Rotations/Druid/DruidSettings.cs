@@ -28,6 +28,11 @@ namespace AIO3.Core.Rotations.Druid
         public readonly ToggleSetting UseThorns =
             new ToggleSetting("thorns", "Keep Thorns up", value: true);
 
+        /// <summary>Use Travel Form as a ground-mount substitute while traveling on foot (no mount configured). Like
+        /// the old shaman FC's Ghost Wolf: +speed during out-of-combat travel until you've learned/chosen a mount.</summary>
+        public readonly ToggleSetting UseTravelForm =
+            new ToggleSetting("travelForm", "Travel Form when no mount", value: true);
+
         // --- Rotation (shared) ---
 
         /// <summary>Combat distance reported to WRobot (ICustomClass.Range). Feral fights in melee once Cat/Bear is
@@ -213,6 +218,8 @@ namespace AIO3.Core.Rotations.Druid
             UseMarkOfTheWild.Description = "Keep Mark of the Wild (or Gift of the Wild in a group) up on yourself out of combat.";
             UseThorns.Category = "Buffs";
             UseThorns.Description = "Keep Thorns up on yourself out of combat (reflects melee damage back at attackers).";
+            UseTravelForm.Category = "Buffs";
+            UseTravelForm.Description = "Use Travel Form as a ground-mount substitute while traveling on foot when no mount is configured (like the old shaman Ghost Wolf). Drops automatically to fight or interact.";
 
             MeleeRange.Category = "Rotation";
             MeleeRange.Description = "Melee combat distance Feral uses once shifted into Cat/Bear form.";
@@ -296,7 +303,7 @@ namespace AIO3.Core.Rotations.Druid
             _all = new Setting[]
             {
                 // Buffs
-                UseMarkOfTheWild, UseThorns,
+                UseMarkOfTheWild, UseThorns, UseTravelForm,
                 // Rotation (general, then the Feral-only and Balance-only knobs that show only in their spec)
                 MeleeRange, CasterRange, UseRacials, UseCooldowns,
                 BearCount, FinisherComboPoints, RipHealth, UseTigersFury, UseSavageRoar, UseFaerieFire, UseGrowlPull, UseProwl, ProwlOpener,

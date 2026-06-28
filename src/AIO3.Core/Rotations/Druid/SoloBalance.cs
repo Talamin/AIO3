@@ -57,20 +57,24 @@ namespace AIO3.Core.Rotations.Druid
                 priority: 0.05f),
             DruidCommon.Barkskin(_settings, priority: 0.1f),
 
-            // --- in-combat self-heal (shift out of Moonkin; mana-gated) ---
+            // --- in-combat self-heal (drop Moonkin once, then stack the two HoTs formless, then re-enter Moonkin) ---
+            DruidCommon.DropFormToHeal(_settings, priority: 0.28f),
             DruidCommon.ShiftOutHeal(_settings, "Regrowth", s => s.UseRegrowthIC.Value, priority: 0.3f),
             DruidCommon.ShiftOutHeal(_settings, "Rejuvenation", s => s.UseRejuvenationIC.Value, priority: 0.31f),
-            DruidCommon.ShiftOutHeal(_settings, "Healing Touch", s => s.UseHealingTouchIC.Value, priority: 0.32f),
             DruidCommon.Innervate(_settings, priority: 0.5f),
 
             // --- out-of-combat buffs ---
             DruidCommon.MarkOfTheWild(_settings, priority: 0.6f),
             DruidCommon.Thorns(_settings, priority: 0.61f),
 
+            // --- travel: Travel Form as a ground-mount substitute when on foot with no mount ---
+            DruidCommon.TravelForm(_settings, priority: 0.7f),
+
             // --- Moonkin Form upkeep (the caster form; auto-skips until learned, so a pre-form druid just nukes).
             // Only shift when engaging a fight (like Cat/Bear) so it doesn't re-shift while idle and block a taxi/mount. ---
             Skill.Spell("Moonkin Form").Priority(0.8f).On(Targets.Self)
-                 .When(ctx => DruidCommon.Fighting(ctx) && !DruidCommon.InMoonkinForm(ctx)),
+                 .When(ctx => DruidCommon.Fighting(ctx) && !DruidCommon.InMoonkinForm(ctx)
+                              && !DruidCommon.WantsShiftHeal(ctx, _settings)),
 
             // --- baseline / interrupt ---
             CombatBlocks.AutoAttack(priority: 1f),

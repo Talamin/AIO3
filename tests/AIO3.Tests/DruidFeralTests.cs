@@ -279,6 +279,84 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Form_capable_druid_shifts_instead_of_casting_Wrath()
+        {
+            // Regression: a druid that has learned a form must NEVER stand and cast the pre-form Wrath/Moonfire filler
+            // while formless mid-engage — it shifts into its form. The bare !InAnyForm gate let Wrath slip in during a
+            // form-held window; now the fallback is gated on !KnowsCombatForm.
+            var g = CatGame();                 // Cat/Bear known (everything known by default), ProductFighting = true
+            g.MeUnit.Auras.Remove("Cat Form"); // formless, single target
+            var fired = Fire(g)?.Name;
+            Assert.NotEqual("Wrath", fired);
+            Assert.NotEqual("Moonfire", fired);
+            Assert.Equal("Cat Form", fired);   // single target → shift to Cat, not nuke
+        }
+
+        // --- Travel Form (ground-mount substitute when on foot with no mount) ---
+
+        [Fact]
+        public void Travel_Form_when_traveling_to_a_far_target()
+        {
+            // Even mid-grind (ProductFighting), if the target is still a run-up away, travel-form toward it like a
+            // mount. The distance gate is what makes this fire during grinding (where ProductIsFighting is ~always on).
+            var g = CatGame();
+            g.InCombatFlag = false;        // not in real combat yet
+            g.Moving = true;
+            g.HasGroundMountFlag = false;  // no mount configured → use Travel Form
+            g.TargetUnit.Distance = 40;    // still far → run-up
+            Assert.Equal("Travel Form", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Travel_Form_dropped_to_engage_a_near_target()
+        {
+            // Within engage range → drop Travel Form for a single clean shift into the combat form (no Travel↔Bear
+            // thrash at the engage). CatGame is ProductFighting by default.
+            var g = CatGame();
+            g.MeUnit.Auras.Remove("Cat Form"); // formless, closing in
+            g.InCombatFlag = false;
+            g.Moving = true;
+            g.HasGroundMountFlag = false;
+            g.TargetUnit.Distance = 10;    // inside the drop range → engage, not travel
+            var fired = Fire(g)?.Name;
+            Assert.NotEqual("Travel Form", fired);
+            Assert.Equal("Cat Form", fired);
+        }
+
+        [Fact]
+        public void Travel_Form_suppressed_when_a_mount_is_configured()
+        {
+            var g = CatGame();
+            g.InCombatFlag = false;
+            g.Moving = true;
+            g.TargetUnit.Distance = 40;
+            g.HasGroundMountFlag = true;   // a mount exists → let WRobot mount, don't fight it
+            Assert.NotEqual("Travel Form", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Travel_Form_dropped_in_real_combat()
+        {
+            var g = CatGame();
+            g.InCombatFlag = true;         // real combat → combat forms take over, no travel form
+            g.Moving = true;
+            g.TargetUnit.Distance = 40;
+            g.HasGroundMountFlag = false;
+            Assert.NotEqual("Travel Form", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Travel_Form_not_used_when_standing_still()
+        {
+            var g = CatGame();
+            g.InCombatFlag = false;
+            g.Moving = false;              // stopped (e.g. to loot/interact) → don't shift
+            g.TargetUnit.Distance = 40;
+            g.HasGroundMountFlag = false;
+            Assert.NotEqual("Travel Form", Fire(g)?.Name);
+        }
+
+        [Fact]
         public void Bear_Form_switch_when_surrounded()
         {
             var g = CatGame();
@@ -397,14 +475,24 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Shift_out_heal_used_when_no_proc_and_mana_allows()
+        public void Shift_out_heal_drops_form_then_stacks_Regrowth_then_Rejuvenation()
         {
             var g = CatGame();
             g.MeUnit.HealthPercent = 30;
             g.SpellsOnCooldown.Add("Barkskin");
             g.SpellsOnCooldown.Add("Survival Instincts");
-            g.MeUnit.PowerPercent = 80; // plenty of mana, no proc → shift-out Regrowth
+            g.MeUnit.PowerPercent = 80; // plenty of mana, no proc
+            // Beat 1: in form → drop it first (a cast-time heal started in form spam-fails).
+            Assert.Equal("Cancel Form (heal)", Fire(g)?.Name);
+            // Beat 2: formless → Regrowth leads (the bigger, front-loaded heal).
+            g.MeUnit.Auras.Remove("Cat Form");
             Assert.Equal("Regrowth", Fire(g)?.Name);
+            // Beat 3: Regrowth up → Rejuvenation follows (two HoTs ticking).
+            g.MeUnit.WithAura("Regrowth");
+            Assert.Equal("Rejuvenation", Fire(g)?.Name);
+            // Beat 4: both HoTs up → re-enter the combat form and keep fighting.
+            g.MeUnit.WithAura("Rejuvenation");
+            Assert.Equal("Cat Form", Fire(g)?.Name);
         }
 
         [Fact]

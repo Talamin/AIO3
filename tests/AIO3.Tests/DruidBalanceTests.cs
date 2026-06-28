@@ -157,6 +157,7 @@ namespace AIO3.Tests
             var g = MoonkinGame();
             g.TargetUnit.WithAura("Insect Swarm", mine: true, timeLeftMs: 12000);
             g.TargetUnit.WithAura("Moonfire", mine: true, timeLeftMs: 12000);
+            g.HasGroundMountFlag = true; // a mount exists → no Travel Form, so this isolates the cast-while-moving hold
             g.Moving = true; // a caster must stand still → nothing casts
             Assert.Null(Fire(g));
         }
@@ -226,13 +227,23 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Shift_out_heal_when_low_with_mana()
+        public void Shift_out_heal_drops_Moonkin_then_stacks_two_HoTs()
         {
             var g = MoonkinGame();
             g.MeUnit.HealthPercent = 30; // below IC-heal threshold
             g.SpellsOnCooldown.Add("Barkskin");
             g.MeUnit.PowerPercent = 80;
+            // Beat 1: in Moonkin → drop it first (the form blocks heals).
+            Assert.Equal("Cancel Form (heal)", Fire(g)?.Name);
+            // Beat 2: formless → Regrowth leads.
+            g.MeUnit.Auras.Remove("Moonkin Form");
             Assert.Equal("Regrowth", Fire(g)?.Name);
+            // Beat 3: Regrowth up → Rejuvenation follows.
+            g.MeUnit.WithAura("Regrowth");
+            Assert.Equal("Rejuvenation", Fire(g)?.Name);
+            // Beat 4: both HoTs up → re-enter Moonkin and resume nuking.
+            g.MeUnit.WithAura("Rejuvenation");
+            Assert.Equal("Moonkin Form", Fire(g)?.Name);
         }
 
         // --- DoT suppression during Eclipse (trash) vs upkeep on bosses ---
