@@ -67,9 +67,10 @@ namespace AIO3.Core.Rotations.Druid
             DruidCommon.MarkOfTheWild(_settings, priority: 0.6f),
             DruidCommon.Thorns(_settings, priority: 0.61f),
 
-            // --- Moonkin Form upkeep (the caster form; auto-skips until learned, so a pre-form druid just nukes) ---
+            // --- Moonkin Form upkeep (the caster form; auto-skips until learned, so a pre-form druid just nukes).
+            // Only shift when engaging a fight (like Cat/Bear) so it doesn't re-shift while idle and block a taxi/mount. ---
             Skill.Spell("Moonkin Form").Priority(0.8f).On(Targets.Self)
-                 .When(ctx => !DruidCommon.InMoonkinForm(ctx)),
+                 .When(ctx => DruidCommon.Fighting(ctx) && !DruidCommon.InMoonkinForm(ctx)),
 
             // --- baseline / interrupt ---
             CombatBlocks.AutoAttack(priority: 1f),

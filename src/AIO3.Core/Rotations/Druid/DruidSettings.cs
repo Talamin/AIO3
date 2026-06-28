@@ -79,6 +79,13 @@ namespace AIO3.Core.Rotations.Druid
         public readonly ToggleSetting UseFaerieFire =
             new ToggleSetting("faerieFire", "Use Faerie Fire (Feral)", value: true);
 
+        /// <summary>Pull with Growl when in Bear Form and no ranged opener is available. A bear has no ranged attack,
+        /// so before Faerie Fire (Feral) is learned (or with it toggled off) the bot can only engage in melee. Growl
+        /// is a ranged taunt that aggros the mob and drags it into melee with an instant threat lead. On by default —
+        /// unlike the Prowl opener it doesn't stealth or reposition, so it won't desync a WRobot product. Feral-only.</summary>
+        public readonly ToggleSetting UseGrowlPull =
+            new ToggleSetting("growlPull", "Pull with Growl (bear, no ranged pull)", value: true);
+
         /// <summary>Open from Prowl (stealth) before the fight — Ravage from behind / Pounce from the front. Off by
         /// default: WRobot products usually own the pull, and a stealthed pull can desync with them. Feral-only.</summary>
         public readonly ToggleSetting UseProwl =
@@ -230,6 +237,8 @@ namespace AIO3.Core.Rotations.Druid
             UseSavageRoar.Description = "Keep Savage Roar up — the cat's Slice and Dice (a melee-damage self-buff finisher). Kept up at a low combo-point threshold.";
             UseFaerieFire.Category = "Rotation";        UseFaerieFire.Spec = "Feral";
             UseFaerieFire.Description = "Keep Faerie Fire (Feral) up on the target for the -armor debuff.";
+            UseGrowlPull.Category = "Rotation";         UseGrowlPull.Spec = "Feral";
+            UseGrowlPull.Description = "Pull with Growl (a ranged taunt) in Bear Form when no ranged opener is available — fills the bear's missing ranged pull until Faerie Fire (Feral) is learned.";
             UseProwl.Category = "Rotation";             UseProwl.Spec = "Feral";
             UseProwl.Description = "Open from Prowl stealth before the fight (off by default, since a stealthed pull can desync with WRobot).";
             ProwlOpener.Category = "Rotation";          ProwlOpener.Spec = "Feral";
@@ -290,7 +299,7 @@ namespace AIO3.Core.Rotations.Druid
                 UseMarkOfTheWild, UseThorns,
                 // Rotation (general, then the Feral-only and Balance-only knobs that show only in their spec)
                 MeleeRange, CasterRange, UseRacials, UseCooldowns,
-                BearCount, FinisherComboPoints, RipHealth, UseTigersFury, UseSavageRoar, UseFaerieFire, UseProwl, ProwlOpener,
+                BearCount, FinisherComboPoints, RipHealth, UseTigersFury, UseSavageRoar, UseFaerieFire, UseGrowlPull, UseProwl, ProwlOpener,
                 MaulRageReserve, InterruptMode, // Feral-only
                 UseMoonfire, UseInsectSwarm, DotHealth, UseAoe, UseStarfall, AoeTargets, UseForceOfNature, // Balance-only
                 // Survival

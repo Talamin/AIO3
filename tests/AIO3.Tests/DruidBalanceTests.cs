@@ -18,7 +18,8 @@ namespace AIO3.Tests
             var g = new FakeGameClient
             {
                 Class = WowClass.Druid,
-                AutoAttacking = true
+                AutoAttacking = true,
+                ProductFightingFlag = true // engaged in a fight (the Moonkin form step requires it); PlayerInCombat stays false
             };
             g.MeUnit.WithAura("Moonkin Form");
             g.MeUnit.WithAura("Mark of the Wild"); // pre-buffed so OOC buffs don't preempt the rotation under test
@@ -51,6 +52,26 @@ namespace AIO3.Tests
             var g = MoonkinGame();
             g.MeUnit.Auras.Remove("Moonkin Form");
             Assert.Equal("Moonkin Form", Fire(g)?.Name);
+        }
+
+        // --- Mark of the Wild upkeep + stack-group suppression ---
+
+        [Fact]
+        public void MarkOfTheWild_cast_when_missing()
+        {
+            var g = MoonkinGame();
+            g.MeUnit.Auras.Remove("Mark of the Wild"); // unbuffed, out of combat → MotW leads (priority 0.6)
+            Assert.Equal("Mark of the Wild", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void MarkOfTheWild_suppressed_by_an_Armor_scroll_buff()
+        {
+            var g = MoonkinGame();
+            g.MeUnit.Auras.Remove("Mark of the Wild");
+            g.MeUnit.WithAura("Armor"); // Scroll of Protection buff shares MotW's stack group → MotW can't land.
+            // Without the guard the druid would re-cast MotW forever; it must instead skip to the rotation.
+            Assert.NotEqual("Mark of the Wild", Fire(g)?.Name);
         }
 
         // --- DoTs (maintain when missing, HP-floored) ---

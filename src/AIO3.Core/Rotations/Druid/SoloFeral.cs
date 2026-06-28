@@ -90,6 +90,9 @@ namespace AIO3.Core.Rotations.Druid
             DruidCommon.ProwlOpener(_settings, "Ravage", priority: 3.6f),
             DruidCommon.ProwlOpener(_settings, "Pounce", priority: 3.6f),
 
+            // --- bear ranged pull: Growl when no ranged opener exists (fills the bear's missing ranged pull) ---
+            DruidCommon.GrowlPull(_settings, priority: 3.9f),
+
             // --- armor debuff (cat or bear) ---
             DruidCommon.FaerieFireFeral(_settings, priority: 4f),
 

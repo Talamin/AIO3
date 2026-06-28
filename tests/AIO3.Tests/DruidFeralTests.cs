@@ -20,7 +20,8 @@ namespace AIO3.Tests
             var g = new FakeGameClient
             {
                 Class = WowClass.Druid,
-                AutoAttacking = true
+                AutoAttacking = true,
+                ProductFightingFlag = true // engaged in a fight (the form steps require it); PlayerInCombat stays false
             };
             g.MeUnit.WithAura("Cat Form"); // in cat form by default
             g.MeUnit.WithAura("Mark of the Wild"); // pre-buffed (OOC buffs are up before the pull) so they don't preempt
@@ -213,7 +214,69 @@ namespace AIO3.Tests
             Assert.Equal("Faerie Fire (Feral)", Fire(g)?.Name);
         }
 
+        // --- Growl pull (bear ranged opener when no Faerie Fire (Feral) is available) ---
+
+        // A low-level bear: in (Dire) Bear Form, Cat Form + Faerie Fire (Feral) not yet learned, out of combat, on a
+        // mob that's at range and hasn't aggroed yet. Mirrors the situation the Growl pull exists for.
+        private static FakeGameClient BearPullGame()
+        {
+            var g = CatGame();
+            g.MeUnit.Auras.Remove("Cat Form");
+            g.MeUnit.WithAura("Dire Bear Form");
+            g.UnknownSpells.Add("Cat Form");            // form steps stay in bear (cat not learned yet)
+            g.UnknownSpells.Add("Faerie Fire (Feral)"); // no ranged opener → Growl fills the gap
+            g.AutoAttacking = true;                     // not the AutoAttack step under test
+            g.TargetUnit.Distance = 20;                 // approaching, past melee
+            g.TargetUnit.IsTargetingMe = false;         // hasn't been pulled yet
+            return g;
+        }
+
+        [Fact]
+        public void Growl_pulls_at_range_when_no_ranged_opener()
+        {
+            var g = BearPullGame();
+            Assert.Equal("Growl", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Growl_pull_suppressed_when_Faerie_Fire_Feral_is_available()
+        {
+            var g = BearPullGame();
+            g.UnknownSpells.Remove("Faerie Fire (Feral)"); // FF (Feral) learned → it's the better pull, Growl stands down
+            Assert.NotEqual("Growl", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Growl_pull_skipped_in_melee_range()
+        {
+            var g = BearPullGame();
+            g.TargetUnit.Distance = 5; // already in melee → just fight, no taunt-pull
+            Assert.NotEqual("Growl", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Growl_pull_skipped_once_in_combat()
+        {
+            var g = BearPullGame();
+            g.InCombatFlag = true;            // already pulled / fighting
+            g.TargetUnit.IsTargetingMe = true;
+            Assert.NotEqual("Growl", Fire(g)?.Name);
+        }
+
         // --- form switching ---
+
+        [Fact]
+        public void Forms_do_not_switch_while_idle_out_of_combat()
+        {
+            // The flight-path bug: walking to a flight master (product not fighting, not in combat) must NOT re-shift
+            // into Cat/Bear, or it blocks boarding the taxi / mounting. A formless druid here stays formless.
+            var g = CatGame();
+            g.MeUnit.Auras.Remove("Cat Form");
+            g.ProductFightingFlag = false; // not engaging a fight
+            var fired = Fire(g)?.Name;
+            Assert.NotEqual("Cat Form", fired);
+            Assert.NotEqual("Bear Form", fired);
+        }
 
         [Fact]
         public void Bear_Form_switch_when_surrounded()

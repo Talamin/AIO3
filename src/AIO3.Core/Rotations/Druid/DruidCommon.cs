@@ -35,7 +35,24 @@ namespace AIO3.Core.Rotations.Druid
         /// stay tight while the form decision sees the whole approaching pack.</summary>
         public const float FormDecisionRadius = 18f;
 
+        /// <summary>Below this distance the target is essentially in melee, so the Growl pull is pointless — just hit
+        /// it. Above it, Growl is worth casting to drag the mob in (WRobot enforces Growl's actual ~30y cap, so an
+        /// out-of-range cast just fails harmlessly and retries as the bot closes).</summary>
+        private const float GrowlPullMinRange = 8f;
+
+        /// <summary>After a Growl pull lands, don't re-taunt for this long (a taunt-immune mob would otherwise be
+        /// spammed while the bot closes the gap). Only set on a successful cast, so an out-of-range miss still retries.</summary>
+        private const int GrowlPullRecastMs = 3000;
+
         // --- form facts (one definition each, so every step agrees) ---
+
+        /// <summary>True only when we're actually engaging a fight — the product has committed (its fight state is
+        /// set during the APPROACH too, before the combat flag) or we're already in combat. The form-entry steps gate
+        /// on this so the druid shapeshifts ONLY to fight: walking to a flight master / vendor / quest NPC it stays in
+        /// caster form instead of re-shifting into Bear/Cat every tick (which blocks mounting, boarding a taxi, and
+        /// NPC gossip). The rotation otherwise ticks every pulse out of combat (for the OOC buffs), so without this
+        /// gate the form steps fire whenever idle — e.g. Cat fires at 0 enemies (<c>0 &lt; BearCount</c>).</summary>
+        public static bool Fighting(CombatContext ctx) => ctx.Game.ProductIsFighting || ctx.Game.PlayerInCombat;
 
         /// <summary>True while in Cat Form (the single-target DPS form: energy + combo points).</summary>
         public static bool InCatForm(CombatContext ctx) => ctx.Me.HasAura("Cat Form");
@@ -65,13 +82,23 @@ namespace AIO3.Core.Rotations.Druid
 
         // --- out-of-combat buffs (CombatBlocks.SelfBuff pattern; Gift of the Wild supersedes Mark of the Wild) ---
 
-        /// <summary>Keep Mark of the Wild up (skipped when the raid-wide Gift of the Wild is already on, e.g. from a
-        /// group). Out-of-combat only — like the old AIO's OOCBuffs addon (RunInCombat=false), we don't break the
-        /// rotation to re-buff mid-fight; the buffs are long and applied before the pull. Opt-out via the toggle.</summary>
+        /// <summary>Single-stat buffs (from scrolls like Scroll of Protection, or another player) that share Mark of
+        /// the Wild's stack group on 3.3.5a cores: MotW can't be applied while one of these is up, so casting it would
+        /// loop forever. Mirrors the old AIO's OOCBuffs gate — skip MotW when any of these (or Gift of the Wild) is on.
+        /// "Armor" in particular is the Scroll of Protection buff that triggered the endless re-cast.</summary>
+        private static readonly string[] MotwSupersedingBuffs =
+            { "Gift of the Wild", "Stamina", "Armor", "Agility", "Strength", "Spirit" };
+
+        /// <summary>Keep Mark of the Wild up. Skipped when MotW/Gift of the Wild is already on, OR when a conflicting
+        /// single-stat buff (<see cref="MotwSupersedingBuffs"/>, e.g. an "Armor" scroll) occupies the same stack group
+        /// — on those cores MotW won't land over them, so re-casting would loop. Out-of-combat only — like the old
+        /// AIO's OOCBuffs addon (RunInCombat=false), we don't break the rotation to re-buff mid-fight; the buffs are
+        /// long and applied before the pull. Opt-out via the toggle.</summary>
         public static RotationStep MarkOfTheWild(DruidSettings s, float priority) =>
             Skill.Spell("Mark of the Wild").Priority(priority).On(Targets.Self)
                  .When(ctx => s.UseMarkOfTheWild.Value && !ctx.Game.PlayerInCombat
-                              && !ctx.Me.HasAura("Mark of the Wild") && !ctx.Me.HasAura("Gift of the Wild"));
+                              && !ctx.Me.HasAura("Mark of the Wild")
+                              && System.Array.TrueForAll(MotwSupersedingBuffs, b => !ctx.Me.HasAura(b)));
 
         /// <summary>Keep Thorns up (reflects melee damage). Out-of-combat only (see <see cref="MarkOfTheWild"/>).
         /// Opt-out via the toggle.</summary>
@@ -163,7 +190,7 @@ namespace AIO3.Core.Rotations.Druid
         /// the form decision is consistent.</summary>
         public static RotationStep CatForm(DruidSettings s, float priority) =>
             Skill.Spell("Cat Form").Priority(priority).On(Targets.Self)
-                 .When(ctx => !InCatForm(ctx)
+                 .When(ctx => Fighting(ctx) && !InCatForm(ctx)
                               && FormDecisionCount(ctx) < (InBearForm(ctx) ? BearReturnCount(s) : s.BearCount.Value));
 
         /// <summary>Prowl — enter stealth out of combat (opt-in) so the spec's positional opener (Ravage/Pounce) can
@@ -236,6 +263,20 @@ namespace AIO3.Core.Rotations.Druid
             Skill.Spell("Faerie Fire (Feral)").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => s.UseFaerieFire.Value && !ctx.Me.HasAura("Prowl")
                               && !ctx.Target.HasMyAura("Faerie Fire (Feral)"));
+
+        /// <summary>Growl pull — the bear's ranged opener. A bear has no ranged attack, so until Faerie Fire (Feral)
+        /// is learned (or with it toggled off) the bot can only engage in melee. Growl is a ranged taunt: cast on an
+        /// out-of-combat target that isn't attacking us yet and is past melee, it aggros the mob and drags it in with
+        /// an instant threat lead. Suppressed when Faerie Fire (Feral) is available and on (it's the better pull —
+        /// damage + armor debuff, no cooldown), so Growl only fills the gap. Bear Form only (Growl needs a form).
+        /// RecastDelay keeps a taunt-immune mob from being re-taunted while the bot closes the distance.</summary>
+        public static RotationStep GrowlPull(DruidSettings s, float priority) =>
+            Skill.Spell("Growl").Priority(priority).On(Targets.CurrentEnemy)
+                 .When(ctx => s.UseGrowlPull.Value && InBearForm(ctx)
+                              && ctx.Game.ProductIsFighting && !ctx.Game.PlayerInCombat // engaging this target, not yet in melee combat
+                              && !ctx.Target.IsTargetingMe && ctx.Target.Distance > GrowlPullMinRange
+                              && !(s.UseFaerieFire.Value && ctx.Game.IsSpellKnown("Faerie Fire (Feral)")))
+                 .RecastDelay(GrowlPullRecastMs);
 
         /// <summary>Savage Roar — the cat's "Slice and Dice": a self-buff finisher that boosts melee (white) damage
         /// by ~30-40% while in Cat Form. Spend combo points to KEEP IT UP whenever it's missing at the low
@@ -346,6 +387,7 @@ namespace AIO3.Core.Rotations.Druid
                 condition: (ctx, t) =>
                 {
                     if (InBearForm(ctx)) return false;
+                    if (!Fighting(ctx)) return false; // only shift to fight — don't block taxis/mounting while idle
                     // Below the bear ENTRY count AND Cat is available → let the Cat switch handle single-target.
                     // Otherwise (pack at the entry count, or no Cat Form yet) the bear is the form to be in.
                     if (FormDecisionCount(ctx) < s.BearCount.Value && ctx.Game.IsSpellKnown("Cat Form")) return false;
