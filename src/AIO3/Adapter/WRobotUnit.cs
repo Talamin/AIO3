@@ -31,6 +31,8 @@ namespace AIO3.Adapter
         public double PowerPercent => _unit.ManaPercentage;
         public int Rage => (int)_unit.Rage;
         public int Energy => (int)_unit.Energy; // WoWUnit.Energy is a UInt32 (absolute energy, 0..100)
+
+        public int RunicPower => (int)_unit.RunicPower; // WoWUnit.RunicPower (UInt32); 0 for non-DK. NOT ManaPercentage.
         public float Distance => _unit.GetDistance;
 
         // 3D distance to another unit, via the Vector3 returned by WoWObject.Position (scout-verified:

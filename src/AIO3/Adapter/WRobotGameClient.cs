@@ -32,6 +32,7 @@ namespace AIO3.Adapter
         // complete list. Wrappers are live, so unit properties (distance/auras) stay current between pulses.
         private volatile IReadOnlyList<IWowUnit> _enemiesCache = Array.Empty<IWowUnit>();
         private volatile IReadOnlyList<IWowUnit> _partyCache = Array.Empty<IWowUnit>();
+        private volatile IReadOnlyList<IWowUnit> _totemsCache = Array.Empty<IWowUnit>();
         private readonly Stopwatch _sinceRebuild = Stopwatch.StartNew();
         private bool _rebuiltOnce;
 
@@ -112,7 +113,11 @@ namespace AIO3.Adapter
 
             try
             {
+                var me = ObjectManager.Me;
+                ulong meGuid = me.Guid;
+
                 var enemies = new List<IWowUnit>();
+                var totems = new List<IWowUnit>();
                 foreach (WoWUnit u in ObjectManager.GetObjectWoWUnit())
                 {
                     if (u.IsValid && u.IsAlive && u.IsAttackable
@@ -121,10 +126,19 @@ namespace AIO3.Adapter
                     {
                         enemies.Add(new WRobotUnit(u));
                     }
+                    // My OWN totems (shaman): flagged as a totem (UnitFlags.Totem = 0x10) and summoned/created by me.
+                    // No distance filter — a left-behind totem must still be seen so the shaman knows the school is
+                    // effectively gone (re-drop) or far enough to recall. Empty for every other class.
+                    else if (u.IsValid && u.IsAlive
+                             && (u.UnitFlags & wManager.Wow.Enums.UnitFlags.Totem) != 0
+                             && (u.SummonedBy == meGuid || u.CreatedBy == meGuid))
+                    {
+                        totems.Add(new WRobotUnit(u));
+                    }
                 }
                 _enemiesCache = enemies;
+                _totemsCache = totems;
 
-                var me = ObjectManager.Me;
                 var party = new List<IWowUnit> { new WRobotUnit(me) };
                 // Raid-aware: GetParty() is 5-man only; use the raid roster when in a raid.
                 List<WoWPlayer> group = wManager.Wow.Helpers.Party.GetRaidMemberCount() > 0
@@ -163,6 +177,48 @@ namespace AIO3.Adapter
                 "local best,bp=0,-1 " +
                 "for i=1,GetNumTalentTabs() do local _,_,p=GetTalentTabInfo(i) if p and p>bp then bp=p best=i end end " +
                 "if bp<=0 then return 0 end return best");
+
+        // Whether a talent has >=1 point. GetTalentInfo's 5th return is the current rank (same call TalentTrainer
+        // reads). Cached per (tab,index) ~10s — talents change only on respec/level-up, so a rotation can gate on a
+        // talent every tick without a per-tick Lua round-trip.
+        private const int TalentTtlMs = 10000;
+        private readonly Dictionary<(int, int), (bool has, int at)> _talentCache = new Dictionary<(int, int), (bool, int)>();
+
+        public bool HasTalent(int talentTab, int talentIndex)
+        {
+            (int, int) key = (talentTab, talentIndex);
+            if (_talentCache.TryGetValue(key, out (bool has, int at) c) && unchecked(Now - c.at) < TalentTtlMs)
+                return c.has;
+            bool has = false;
+            try
+            {
+                string s = Lua.LuaDoString<string>(
+                    $"local _,_,_,_,cur = GetTalentInfo({talentTab},{talentIndex}); return tostring(cur or 0)");
+                has = int.TryParse(s, out int cur) && cur > 0;
+            }
+            catch { }
+            _talentCache[key] = (has, Now);
+            return has;
+        }
+
+        // Native WRobot rune API (Lua-backed wrapper) — counts READY runes of a kind. Maps the game-agnostic Core
+        // RuneType to wManager's own RuneTypes enum (Blood=1/Unholy=2/Frost=3/Death=4). 0 for non-DK / on error.
+        public int RunesReady(AIO3.Core.Game.RuneType type)
+        {
+            try
+            {
+                wManager.Wow.Enums.RuneTypes mapped;
+                switch (type)
+                {
+                    case AIO3.Core.Game.RuneType.Blood: mapped = wManager.Wow.Enums.RuneTypes.Blood; break;
+                    case AIO3.Core.Game.RuneType.Frost: mapped = wManager.Wow.Enums.RuneTypes.Frost; break;
+                    case AIO3.Core.Game.RuneType.Unholy: mapped = wManager.Wow.Enums.RuneTypes.Unholy; break;
+                    default: mapped = wManager.Wow.Enums.RuneTypes.Death; break;
+                }
+                return ObjectManager.Me.RunesReadyCount(mapped);
+            }
+            catch { return 0; }
+        }
 
         public string ActiveStanceName
         {
@@ -210,6 +266,9 @@ namespace AIO3.Adapter
 
         public IReadOnlyList<IWowUnit> Party => _partyCache;
 
+        // Rebuilt on the object-manager pulse (same loop as Enemies). My own totems, with Name + GetDistance.
+        public IReadOnlyList<IWowUnit> Totems => _totemsCache;
+
         public bool IsSpellKnown(string spell) => GetSpell(spell).KnownSpell;
 
         public float SpellRange(string spell) => GetSpell(spell).MaxRange;
@@ -239,6 +298,9 @@ namespace AIO3.Adapter
         public bool PlayerIsMoving => ObjectManager.Me.GetMove;
 
         public bool PlayerIsMounted => ObjectManager.Me.IsMounted;
+
+        // A ground mount is configured iff WRobot's GroundMountName is non-empty (same field the old AIO checked).
+        public bool HasGroundMount => !string.IsNullOrWhiteSpace(wManager.wManagerSetting.CurrentSetting.GroundMountName);
 
         public bool PlayerInCombat => ObjectManager.Me.InCombat;
 

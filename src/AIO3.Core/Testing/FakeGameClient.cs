@@ -82,13 +82,26 @@ namespace AIO3.Core.Testing
         public IWowUnit Me => MeUnit;
         public IWowUnit Target => TargetUnit;
         public IWowUnit Pet => PetUnit;
+        /// <summary>Talents the fake player has, as (tab, index), for <see cref="HasTalent"/>.</summary>
+        public readonly HashSet<(int, int)> Talents = new HashSet<(int, int)>();
+
         public WowClass PlayerClass => Class;
         public int HighestTalentTab => TalentTab;
+        public bool HasTalent(int talentTab, int talentIndex) => Talents.Contains((talentTab, talentIndex));
+
+        /// <summary>Ready-rune counts per kind (Death Knight), for <see cref="RunesReady"/>. Empty → 0 of every kind.</summary>
+        public readonly Dictionary<RuneType, int> RunesReadyByType = new Dictionary<RuneType, int>();
+        public int RunesReady(RuneType type) => RunesReadyByType.TryGetValue(type, out int n) ? n : 0;
         public string ActiveStanceName => StanceName;
         public int ComboPoints => ComboPointCount;
         public bool PlayerIsStealthed => Stealthed;
         public IReadOnlyList<IWowUnit> Enemies => EnemyList;
         public IReadOnlyList<IWowUnit> Party => PartyList;
+
+        /// <summary>The player's own active totems (shaman). Each FakeUnit's Name + Distance drive the totem upkeep
+        /// tests; empty by default (every non-shaman test).</summary>
+        public readonly List<IWowUnit> TotemList = new List<IWowUnit>();
+        public IReadOnlyList<IWowUnit> Totems => TotemList;
 
         public bool IsSpellKnown(string spell) => !UnknownSpells.Contains(spell) && (KnownSpells.Count == 0 || KnownSpells.Contains(spell));
         public bool IsSpellReady(string spell) => !SpellsOnCooldown.Contains(spell);
@@ -98,6 +111,8 @@ namespace AIO3.Core.Testing
         public bool PlayerIsCasting => Casting;
         public bool PlayerIsMoving => Moving;
         public bool PlayerIsMounted => Mounted;
+        public bool HasGroundMountFlag;
+        public bool HasGroundMount => HasGroundMountFlag;
         public bool PlayerInCombat => InCombatFlag;
         public bool PlayerIsDeadOrGhost => DeadOrGhostFlag;
         public bool PlayerIsSwimming => SwimmingFlag;

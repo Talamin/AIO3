@@ -27,6 +27,11 @@ namespace AIO3.Core.Combat
         public IReadOnlyList<IWowUnit> Enemies { get; }
         public IReadOnlyList<IWowUnit> Party { get; }
 
+        /// <summary>The local player's own active totems (shaman), each carrying its Name and Distance. Empty for
+        /// every other class. Drives the totem upkeep: a totem is "down" for a school when none of its totems is in
+        /// the list, and "left behind" when its only totem is past the re-drop / recall range.</summary>
+        public IReadOnlyList<IWowUnit> Totems { get; }
+
         /// <summary>Shared interrupt learner (lives across ticks; supplied by the host).</summary>
         public InterruptTracker Interrupts { get; }
 
@@ -42,7 +47,8 @@ namespace AIO3.Core.Combat
             IReadOnlyList<IWowUnit> party,
             InterruptTracker interrupts = null,
             DamageTracker damage = null,
-            IWowUnit pet = null)
+            IWowUnit pet = null,
+            IReadOnlyList<IWowUnit> totems = null)
         {
             Game = game;
             Me = me;
@@ -50,6 +56,7 @@ namespace AIO3.Core.Combat
             Enemies = enemies;
             Party = party;
             Pet = pet;
+            Totems = totems ?? System.Array.Empty<IWowUnit>();
             Interrupts = interrupts ?? new InterruptTracker();
             Damage = damage ?? new DamageTracker();
         }
@@ -63,7 +70,8 @@ namespace AIO3.Core.Combat
             game.Party.ToArray(),
             interrupts,
             damage,
-            game.Pet);
+            game.Pet,
+            game.Totems.ToArray());
 
         // --- shared, computed-once world facts ---
 

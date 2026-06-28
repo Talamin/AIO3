@@ -73,6 +73,20 @@ namespace AIO3.Core.Game
         /// <summary>Index of the talent tab with the most points (1-based), or 0 if none spent yet.</summary>
         int HighestTalentTab { get; }
 
+        /// <summary>True if the player has at least one point in the talent at (<paramref name="talentTab"/>,
+        /// <paramref name="talentIndex"/>) — the 1-based tree (1 = first tab) and the 1-based talent index within it
+        /// (GetTalentInfo order). Lets a rotation gate a talent-only refinement (e.g. only wait for Shadow Weaving
+        /// stacks when the talent is taken, or only maintain the Improved Scorch debuff when it's talented). Cached —
+        /// talents change only on respec / level-up.</summary>
+        bool HasTalent(int talentTab, int talentIndex);
+
+        /// <summary>How many runes of the given kind are currently READY (off cooldown), 0..2 for a specific type and
+        /// 0..6 conceptually for <see cref="RuneType.Death"/>. Death Knight only (0 otherwise). A Death rune pays for
+        /// any cost, so an ability's affordability check counts the specific type PLUS the Death pool. WRobot has a
+        /// native rune API behind this; AIO3's IsSpellReady does NOT reflect runes, so rune-costed steps must gate on
+        /// this or they would be picked and silently fail (the engine fires one step per tick — no fall-through).</summary>
+        int RunesReady(RuneType type);
+
         /// <summary>Name of the player's active stance/shapeshift form (e.g. "Berserker Stance"), or "".</summary>
         string ActiveStanceName { get; }
 
@@ -91,6 +105,11 @@ namespace AIO3.Core.Game
         /// <summary>Party/raid members (including the player).</summary>
         IReadOnlyList<IWowUnit> Party { get; }
 
+        /// <summary>The local player's OWN active totems (shaman). Each unit carries its Name (e.g. "Searing Totem")
+        /// and Distance, so the shaman can tell which school is up and whether a totem has been left behind / is out
+        /// of range. Empty for every other class. Adapter filters by the totem unit-flag + summoner GUID.</summary>
+        IReadOnlyList<IWowUnit> Totems { get; }
+
         bool IsSpellKnown(string spell);
         bool IsSpellReady(string spell);
 
@@ -106,6 +125,12 @@ namespace AIO3.Core.Game
         bool PlayerIsCasting { get; }
         bool PlayerIsMoving { get; }
         bool PlayerIsMounted { get; }
+
+        /// <summary>True when a ground mount is configured in WRobot (its GroundMountName is set). When FALSE the bot
+        /// travels on foot (no mount learned / none chosen), which is when a druid should use Travel Form (or a shaman
+        /// Ghost Wolf) as a speed substitute. Gating on this avoids fighting WRobot's own mount cast when a mount
+        /// exists.</summary>
+        bool HasGroundMount { get; }
         bool PlayerInCombat { get; }
 
         /// <summary>True while the player is dead OR a ghost (corpse-running). The host skips the whole rotation

@@ -15,6 +15,7 @@ namespace AIO3.Core.Testing
         public double PowerPercent { get; set; } = 100;
         public int Rage { get; set; }
         public int Energy { get; set; }
+        public int RunicPower { get; set; }
         public float Distance { get; set; }
 
         // 2D position for DistanceTo tests. The player is conceptually at the origin; a unit's Distance is its

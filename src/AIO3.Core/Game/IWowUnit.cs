@@ -31,6 +31,10 @@ namespace AIO3.Core.Game
         /// rogue builder gating (e.g. Sinister Strike costs ~40 energy); PowerPercent already covers % gating.</summary>
         int Energy { get; }
 
+        /// <summary>Current Runic Power (0..~130, absolute). Death Knight; 0 for other classes. PowerPercent reads
+        /// MANA for a DK (wrong), so RP-dump gates (Death Coil / Frost Strike at ≥40) read this directly.</summary>
+        int RunicPower { get; }
+
         /// <summary>Distance to the local player ("Me"), in yards.</summary>
         float Distance { get; }
 
