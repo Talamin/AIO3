@@ -745,23 +745,26 @@ namespace AIO3.Tests
 
         // --- bear-switch: wider form radius + enter/return hysteresis ---
 
-        // A pack clustered around the TARGET (target-anchored, wider radius) — n enemies all at the target's
-        // position so EnemiesNearTarget(18) == n. The current target counts too, so pass the EXTRA adds.
+        // A pack ATTACKING US (IsTargetingMe) within the wider form-decision radius (18y) — the count that now drives
+        // the Cat/Bear form switch (attackers-on-me, not mobs merely near the target). The extra attackers sit at 12y:
+        // BEYOND the tight 8y melee radius (so they don't count toward Surrounding()) but INSIDE the 18y form radius,
+        // proving the decision uses the wider radius. The current target (IsTargetingMe, ~5y) counts too, so pass the
+        // EXTRA attackers.
         private static void PackAroundTarget(FakeGameClient g, int extraAdds)
         {
             g.TargetUnit.IsTargetingMe = true;
             for (int i = 0; i < extraAdds; i++)
-                g.EnemyList.Add(new FakeUnit { Guid = (ulong)(100 + i), Reaction = Reaction.Hostile, Distance = 30, IsAttackable = true });
+                g.EnemyList.Add(new FakeUnit { Guid = (ulong)(100 + i), Reaction = Reaction.Hostile, Distance = 12, IsTargetingMe = true, IsAttackable = true });
         }
 
         [Fact]
-        public void Form_decision_uses_the_wider_target_anchored_radius()
+        public void Form_decision_counts_attackers_on_me_at_the_wider_radius()
         {
-            // Two enemies clustered on the target but 30y from the PLAYER (outside the tight 8y melee radius). The
-            // OLD player-relative 8y count would see zero and stay in cat; the wider target-anchored radius sees the
-            // pack → bear.
+            // Two enemies ATTACKING US, one at 12y — outside the tight 8y melee radius but inside the 18y form radius.
+            // The form decision keys on attackers-on-me at the wider radius, so it sees both → bear. (A tight-melee-only
+            // count would miss the 12y attacker; the OLD target-anchored count would have wrongly counted non-attackers.)
             var g = CatGame();
-            PackAroundTarget(g, extraAdds: 1); // target + 1 add = 2 around the target (default BearCount 2)
+            PackAroundTarget(g, extraAdds: 1); // target (5y) + 1 attacker (12y) = 2 attackers on me (default BearCount 2)
             Assert.Equal("Bear Form", Fire(g)?.Name);
             Assert.Contains("Dire Bear Form", g.CastLog);
         }
@@ -802,6 +805,19 @@ namespace AIO3.Tests
             g.MeUnit.Rage = 100;
             PackAroundTarget(g, extraAdds: 0); // 1 around the target < return floor (3) → back to cat
             Assert.Equal("Cat Form", Fire(g, new SoloFeral(s))?.Name);
+        }
+
+        [Fact]
+        public void Single_target_fight_stays_in_cat_despite_an_ambient_mob_near_the_target()
+        {
+            // The mana-bleed fix: in a mob-dense area an ambient mob the bot ISN'T fighting (not targeting us) sits
+            // near the target. The OLD target-anchored count flipped us Cat<->Bear on it — burning a feral's scarce
+            // mana on every shift. Now the decision counts only attackers ON US, so a single-target fight stays in Cat.
+            var g = CatGame();
+            g.TargetUnit.IsTargetingMe = true; // the one mob we're actually fighting
+            // An ambient hostile next to the target but NOT attacking us (e.g. a path mob the Quester hasn't pulled).
+            g.EnemyList.Add(new FakeUnit { Guid = 200, Reaction = Reaction.Hostile, Distance = 10, IsTargetingMe = false, IsAttackable = true });
+            Assert.NotEqual("Bear Form", Fire(g)?.Name); // did NOT flip to bear on an ambient, non-attacking mob
         }
     }
 }

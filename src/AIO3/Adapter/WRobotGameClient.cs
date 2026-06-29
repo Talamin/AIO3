@@ -399,7 +399,23 @@ namespace AIO3.Adapter
 
         // ~150° rear cone (full cone width) — a generous "behind" with margin, so a positional ability (Garrote/
         // Shred) is only chosen when we're comfortably behind, not at the very edge where the cast would fail.
-        private const float BehindArcRadians = 2.618f; // 150° rear cone (full width)
+        // The rear cone (full width) that counts as "behind" for positional abilities (Shred / Ravage / Garrote).
+        // TIGHTENED 150°->80° after the feral Shred-spam bug. The geometry itself is correct (scout-verified: the
+        // TargetFacingToRadian heading is start->faceTarget, and WoWUnit.Rotation is a LIVE memory read), but a WRobot
+        // bot fights FACE-ON and is repositioned by the product mid-fight, so the mob's facing sweeps past the player.
+        // The old 150° cone tripped at |offset| > 105° — a mob only ~75° off-facing counted as "behind" — so transient
+        // turns produced false "behind=true" -> Shred fired and the SERVER rejected it (the client cast "succeeds", so
+        // it never fell through to Claw = a dead GCD). 80° trips at |offset| > 140° (within 40° of dead-behind), a ~50°
+        // margin over WoW's own ~90° behind-line, so we only commit when CONFIDENTLY, squarely behind. In normal
+        // face-on combat this never trips -> the builder correctly falls through to Mangle/Claw. Tune here.
+        private const float BehindArcRadians = 1.40f; // ~80° rear cone (full width)
+
+        // Anti-transient + anti-latency debounce: the raw "behind" geometry must hold CONTINUOUSLY this long before
+        // PlayerIsBehindTarget commits. One tick caught while the mob spins past isn't enough, and the window outlasts
+        // the client/server facing-sync latency, so a Shred we commit actually lands. A genuine behind position (stealth
+        // approach, pet-tanked mob) clears it easily; an incidental melee turn does not.
+        private const int BehindStableMs = 300;
+        private int _behindRawFalseAt; // last Now the raw geometry said NOT behind (the debounce anchor)
 
         // Signed offset (radians, [-π,π]) between the target's facing and the direction TO the player: ~0 = player
         // in FRONT of the target, ~±π = directly BEHIND it. NaN if there's no target. robotManager.Helpful.Math.
@@ -421,7 +437,10 @@ namespace AIO3.Adapter
         public bool PlayerIsBehindTarget()
         {
             double diff = TargetFacingOffset();
-            return !double.IsNaN(diff) && System.Math.Abs(diff) > System.Math.PI - BehindArcRadians / 2.0;
+            bool rawBehind = !double.IsNaN(diff)
+                             && System.Math.Abs(diff) > System.Math.PI - BehindArcRadians / 2.0;
+            if (!rawBehind) { _behindRawFalseAt = Now; return false; }
+            return unchecked(Now - _behindRawFalseAt) >= BehindStableMs; // stably behind long enough to commit
         }
 
         // WRobot's own fight state — true throughout a fight including the approach. Mirrors how the old

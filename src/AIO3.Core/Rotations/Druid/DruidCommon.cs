@@ -82,11 +82,18 @@ namespace AIO3.Core.Rotations.Druid
         public static int Surrounding(CombatContext ctx) =>
             ctx.Enemies.Count(e => e.IsTargetingMe && e.Distance <= SurroundRadius);
 
-        /// <summary>Number of enemies clustered around the TARGET within the wider <see cref="FormDecisionRadius"/>
-        /// — the count that drives the Cat/Bear FORM switch (so the bear decision sees the whole approaching pack,
-        /// not just what's already in tight melee). Target-anchored via <see cref="CombatContext.EnemiesNearTarget"/>,
-        /// the same seam the Balance AoE uses.</summary>
-        public static int FormDecisionCount(CombatContext ctx) => ctx.EnemiesNearTarget(FormDecisionRadius);
+        /// <summary>Number of enemies ACTUALLY ATTACKING US (targeting the player) within the wider
+        /// <see cref="FormDecisionRadius"/> — the count that drives the Cat/Bear FORM switch. Requiring
+        /// <c>IsTargetingMe</c> (not merely "near the target") is what matches the <see cref="DruidSettings.BearCount"/>
+        /// setting's documented meaning ("min attackers meleeing you") AND stops the mana-bleeding form thrash: in a
+        /// mob-dense grind/quest area the old target-anchored count (<c>EnemiesNearTarget</c>) counted UNRELATED ambient
+        /// mobs near the target, so a single-target fight saw >= BearCount and flip-flopped Cat&lt;-&gt;Bear every time the
+        /// ambient count crossed the threshold — and every shift costs a feral mana it can't regen in combat. The radius
+        /// stays wide (18y) so a pack that has AGGROED us and is running in still counts proactively (switch a beat before
+        /// they all land), but a mob the bot isn't fighting no longer drags us into Bear. Same shape as
+        /// <see cref="Surrounding"/>, at the wider form-decision radius.</summary>
+        public static int FormDecisionCount(CombatContext ctx) =>
+            ctx.Enemies.Count(e => e.IsTargetingMe && e.Distance <= FormDecisionRadius);
 
         // --- out-of-combat buffs (CombatBlocks.SelfBuff pattern; Gift of the Wild supersedes Mark of the Wild) ---
 
