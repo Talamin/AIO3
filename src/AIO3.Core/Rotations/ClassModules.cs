@@ -19,6 +19,9 @@ namespace AIO3.Core.Rotations
                 case WowClass.Rogue: return new RogueModule();
                 case WowClass.Mage: return new MageModule();
                 case WowClass.Warlock: return new WarlockModule();
+                case WowClass.Priest: return new PriestModule();
+                case WowClass.Shaman: return new ShamanModule();
+                case WowClass.DeathKnight: return new DeathKnightModule();
                 // Druid takes the game client so its Range can switch caster↔melee on whether a form is learned.
                 case WowClass.Druid: return new DruidModule(game);
                 default: return null;
