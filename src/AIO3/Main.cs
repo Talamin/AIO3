@@ -62,6 +62,7 @@ public class Main : ICustomClass
         _damageTracker = new DamageTracker();
         _damageLearner = new DamageLearner(_damageTracker);
         EventsLuaWithArgs.OnEventsLuaStringWithArgs += _damageLearner.OnCombatLog;
+        _game.AttachDamageTracker(_damageTracker); // lets the client judge whether positionals (Shred) actually land
 
         _class = ClassModules.For(_game.PlayerClass, _game);
         if (_class != null)

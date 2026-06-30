@@ -668,6 +668,21 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Shred_backs_off_to_the_front_builder_when_it_keeps_being_rejected()
+        {
+            // The behind-geometry can false-positive on a stale mob facing, so the server rejects Shred for position
+            // and it deals no damage (observed: 31 casts, 0 damage). The outcome guard reports that as
+            // PositionalFailing → Shred is held even though "behind" reads true, and Mangle takes the GCD instead.
+            var g = CatGame();
+            g.ComboPointCount = 0;
+            g.BehindTargetFlag = true;          // geometry says behind (the false positive)…
+            g.PositionalFailingFlag = true;     // …but Shred has been getting rejected → back off
+            g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
+            g.TargetUnit.WithAura("Mangle", mine: true);
+            Assert.Equal("Mangle (Cat)", Fire(g)?.Name);
+        }
+
+        [Fact]
         public void Mangle_Cat_is_the_front_fallback_when_not_behind()
         {
             var g = CatGame();

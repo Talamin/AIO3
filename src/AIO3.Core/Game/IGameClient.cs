@@ -172,6 +172,17 @@ namespace AIO3.Core.Game
         /// and a front alternative otherwise. False when there's no target. Class-agnostic — reuse it anywhere.</summary>
         bool PlayerIsBehindTarget();
 
+        /// <summary>Wire the host's shared <see cref="Combat.DamageTracker"/> into the client so it can judge whether a
+        /// positional ability actually LANDED (drives <see cref="PositionalFailing"/>). Called once at startup.</summary>
+        void AttachDamageTracker(Combat.DamageTracker damage);
+
+        /// <summary>True while a POSITIONAL ability (behind-only: Shred / Backstab / …) is being backed off because its
+        /// recent casts dealt no damage — i.e. the server kept rejecting them ("must be behind") even though the
+        /// behind-geometry said otherwise (a stale-facing false positive). A spec gates its positional builder on
+        /// <c>!PositionalFailing("Shred")</c> so the wasted-GCD spam self-corrects to the front fallback (Mangle/Claw).
+        /// See <see cref="Combat.PositionalGuard"/> for the outcome logic.</summary>
+        bool PositionalFailing(string spell);
+
         /// <summary>True when the WRobot product is engaged in a fight (its own fight state, set during
         /// the approach too). The rotation only runs while this (or actual combat) holds, so the FC
         /// never acts — or moves (Charge) — while the product is merely navigating.</summary>

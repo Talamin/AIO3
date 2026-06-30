@@ -122,6 +122,13 @@ namespace AIO3.Core.Testing
         public bool PlayerIsResting => RestingFlag;
         public bool PlayerHasHarmfulAura() => HarmfulAuraFlag;
         public bool PlayerIsBehindTarget() => BehindTargetFlag;
+
+        /// <summary>Drives <see cref="PositionalFailing"/>: set true to simulate a positional (Shred) being backed off
+        /// after server-rejected casts, so a test can prove the builder falls through to the front fallback.</summary>
+        public bool PositionalFailingFlag;
+        public void AttachDamageTracker(Combat.DamageTracker damage) { } // tests drive PositionalFailingFlag directly
+        public bool PositionalFailing(string spell) => PositionalFailingFlag;
+
         public bool ProductIsFighting => ProductFightingFlag;
         public bool PlayerIsAutoAttacking => AutoAttacking;
 

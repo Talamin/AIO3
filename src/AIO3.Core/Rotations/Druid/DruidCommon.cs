@@ -463,12 +463,16 @@ namespace AIO3.Core.Rotations.Druid
         /// target (a positional). Gated on <see cref="IGameClient.PlayerIsBehindTarget"/> (the same seam the rogue's
         /// Garrote opener uses), so it's chosen when behind and the front-fallback builder (Mangle/Claw) takes over
         /// otherwise. Build below the finisher threshold so we don't overbuild past a finisher-worthy bar. Not while
-        /// prowling. Auto-skips until learned (a low-level cat builds with Mangle/Claw until Shred is trained).</summary>
+        /// prowling. Auto-skips until learned (a low-level cat builds with Mangle/Claw until Shred is trained). Also
+        /// gated on <see cref="IGameClient.PositionalFailing"/>: if the behind-geometry false-positives (stale mob
+        /// facing) and the server keeps rejecting Shred for position, it backs off so we don't spam dead GCDs — the
+        /// front fallback (Mangle/Claw) takes over until a Shred actually lands again.</summary>
         public static RotationStep Shred(DruidSettings s, float priority) =>
             Skill.Spell("Shred").Priority(priority).On(Targets.CurrentEnemy)
                  .When(ctx => InCatForm(ctx) && !ctx.Me.HasAura("Prowl")
                               && ctx.ComboPoints < s.FinisherComboPoints.Value
-                              && ctx.Game.PlayerIsBehindTarget());
+                              && ctx.Game.PlayerIsBehindTarget()
+                              && !ctx.Game.PositionalFailing("Shred"));
 
         /// <summary>Mangle (Cat) — the primary front-fallback combo-point builder (also applies the bleed-damage
         /// debuff). Used when Shred can't land (we're in front) or as the steady builder. Build below the finisher

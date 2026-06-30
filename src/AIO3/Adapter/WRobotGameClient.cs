@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
+using AIO3.Core.Combat;
 using AIO3.Core.Game;
 using robotManager.Helpful;
 using wManager.Events;
@@ -417,6 +418,13 @@ namespace AIO3.Adapter
         private const int BehindStableMs = 300;
         private int _behindRawFalseAt; // last Now the raw geometry said NOT behind (the debounce anchor)
 
+        // Outcome-based positional guard: the behind GEOMETRY can false-positive on a stale mob facing, so we also
+        // judge whether a positional ability (Shred/…) actually LANDED, and back it off when the server keeps
+        // rejecting it. Fed by the shared DamageTracker (wired at startup); read by PositionalFailing().
+        private static readonly HashSet<string> Positionals = new HashSet<string> { "Shred", "Backstab", "Ambush", "Garrote" };
+        private readonly PositionalGuard _posGuard = new PositionalGuard();
+        private DamageTracker _damage;
+
         // Signed offset (radians, [-π,π]) between the target's facing and the direction TO the player: ~0 = player
         // in FRONT of the target, ~±π = directly BEHIND it. NaN if there's no target. robotManager.Helpful.Math.
         // TargetFacingToRadian is atan2 in WRobot's Rotation convention (0=east, CCW — scout-verified live), so
@@ -442,6 +450,13 @@ namespace AIO3.Adapter
             if (!rawBehind) { _behindRawFalseAt = Now; return false; }
             return unchecked(Now - _behindRawFalseAt) >= BehindStableMs; // stably behind long enough to commit
         }
+
+        public void AttachDamageTracker(DamageTracker damage) => _damage = damage;
+
+        // A positional is "failing" when its recent casts dealt no damage (the server rejected them despite the
+        // behind-geometry saying go). No tracker wired (or never cast) → false, so the gate is a no-op by default.
+        public bool PositionalFailing(string spell) =>
+            _damage != null && _posGuard.Suppressed(spell, _damage.HitCount(spell), Now);
 
         // WRobot's own fight state — true throughout a fight including the approach. Mirrors how the old
         // AIO gated its combat rotation, so we only act when the product has committed to a target.
@@ -523,6 +538,9 @@ namespace AIO3.Adapter
             if (spell == "Auto Attack") { _autoAttacking = true; _autoAttackingKnown = true; _autoAttackingAt = Now; }
             if (spell.EndsWith("Stance")) { _stance = null; _usableCache.Clear(); } // stance affects usability
             if (spell.StartsWith("Conjure")) _itemCountCache.Clear(); // we just changed a bag count
+            // Positional outcome: the client cast "succeeds" even when the server will reject it for position, so note
+            // it here and let the DamageTracker tell us (later) whether it actually landed — see PositionalFailing().
+            if (_damage != null && Positionals.Contains(spell)) _posGuard.OnCast(spell, _damage.HitCount(spell), Now);
             return CastResult.Success;
         }
 
@@ -739,7 +757,11 @@ namespace AIO3.Adapter
                         pwr = $"energy={meUnit.Energy} cp={ObjectManager.Me.ComboPoint} stealth={(meUnit.HaveBuff("Stealth") ? "Y" : "N")} behind={(PlayerIsBehindTarget() ? "Y" : "N")}@{System.Math.Abs(TargetFacingOffset()) * 57.2958:0}deg";
                         break;
                     case "Druid":
-                        pwr = $"mp={meUnit.ManaPercentage:0}% energy={meUnit.Energy} rage={meUnit.Rage} cp={ObjectManager.Me.ComboPoint}";
+                        // behind@deg + shredFail = the positional readout: confirms whether the behind-geometry is
+                        // false-positiving (says behind while we're visibly in front) and whether the Shred outcome
+                        // guard has backed off. Lets us nail the Shred-spam root cause live.
+                        pwr = $"mp={meUnit.ManaPercentage:0}% energy={meUnit.Energy} rage={meUnit.Rage} cp={ObjectManager.Me.ComboPoint}"
+                            + $" behind={(PlayerIsBehindTarget() ? "Y" : "N")}@{System.Math.Abs(TargetFacingOffset()) * 57.2958:0}deg shredFail={(PositionalFailing("Shred") ? "Y" : "N")}";
                         break;
                     case "Warrior":
                         pwr = $"rage={meUnit.Rage}";
