@@ -230,9 +230,14 @@ namespace AIO3.Core.Rotations.Druid
             // A bear heals with rage (Frenzied Regeneration), never by shifting out to a mana heal — see summary.
             if (InBearForm(ctx)) return false;
             if (ctx.Me.HealthPercent >= s.InCombatHealHealthPercent.Value) return false;
-            // Need enough mana for the SHIFT + the heal, not just the bare floor — otherwise dropping form pushes mana
-            // below the floor, ShiftOutHeal can't fire, and we reform with nothing healed (the mana-burning form blink).
-            if (ctx.Me.PowerPercent <= s.HealManaPercent.Value + ShiftHealManaHeadroom) return false;
+            // Mana gate, form-aware. While IN cat we need the shift's mana PLUS the heal (floor + headroom) before we
+            // drop — don't leave cat unless the heal is affordable. But once we're ALREADY formless (mid-heal) the shift
+            // is paid: re-applying the headroom here would flip this false the instant the shift drained mana and RELEASE
+            // the reform (CatForm keys on !WantsShiftHeal) BEFORE the heal lands — the "blink out and back" with nothing
+            // healed. Out of form, gate on the bare floor (== ShiftOutHeal's own gate) so we stay out and actually heal
+            // while mana > floor, then reform once the HoTs are up.
+            int manaGate = InAnyForm(ctx) ? s.HealManaPercent.Value + ShiftHealManaHeadroom : s.HealManaPercent.Value;
+            if (ctx.Me.PowerPercent <= manaGate) return false;
             if (HasInstantHealProc(ctx)) return false; // the instant proc heal keeps form — no shift-out needed
             bool wantRegrowth = s.UseRegrowthIC.Value && !ctx.Me.HasAura("Regrowth");
             bool wantRejuv = s.UseRejuvenationIC.Value && !ctx.Me.HasAura("Rejuvenation");

@@ -542,6 +542,23 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Shift_out_heal_continues_formless_when_mana_dipped_below_the_drop_headroom()
+        {
+            // The blink fix: the headroom gate is for the DROP decision ONLY. Once we're already formless (the shift
+            // is paid), mana sitting between the floor (30) and floor+headroom (45) must NOT release us back to Cat —
+            // the heal is still affordable (> floor), so we stay out and cast it. Re-applying the headroom out of form
+            // is what flipped WantsShiftHeal false the instant the shift drained mana and reformed us with nothing
+            // healed (the "blink out and back" in Daniel's log: Cancel Form -> Tiger's Fury -> Cancel Form, no heal).
+            var g = CatGame();
+            g.MeUnit.HealthPercent = 30;
+            g.SpellsOnCooldown.Add("Barkskin");
+            g.SpellsOnCooldown.Add("Survival Instincts");
+            g.MeUnit.Auras.Remove("Cat Form"); // already formless — DropFormToHeal got us here last tick
+            g.MeUnit.PowerPercent = 38;        // post-shift dip band: > floor (30), < floor + headroom (45)
+            Assert.Equal("Regrowth", Fire(g)?.Name); // heal lands, NOT a premature Cat Form reform
+        }
+
+        [Fact]
         public void A_bear_never_shifts_out_to_mana_heal_but_a_cat_does()
         {
             var s = new DruidSettings();
