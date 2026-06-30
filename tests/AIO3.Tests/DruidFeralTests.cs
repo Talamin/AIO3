@@ -357,6 +357,20 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Travel_Form_suppressed_when_mana_is_below_the_floor()
+        {
+            // Mana economy: each shift costs a feral mana it can't regen in combat, so below the mana floor the bot
+            // runs on foot instead of burning mana to travel a short hop (the OOM-from-form-thrash fix). Default 80.
+            var g = CatGame();
+            g.InCombatFlag = false;
+            g.Moving = true;
+            g.HasGroundMountFlag = false;
+            g.TargetUnit.Distance = 40;
+            g.MeUnit.PowerPercent = 20;   // mana below the 80 floor → conserve, run on foot
+            Assert.NotEqual("Travel Form", Fire(g)?.Name);
+        }
+
+        [Fact]
         public void Bear_Form_switch_when_surrounded()
         {
             var g = CatGame();
@@ -508,6 +522,41 @@ namespace AIO3.Tests
             g.ComboPointCount = 0;
             g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
             Assert.Equal("Mangle (Cat)", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Shift_out_heal_held_when_mana_only_just_above_the_floor_cannot_cover_the_shift()
+        {
+            // Mana is ABOVE the bare heal floor (30) but not by the shift headroom — dropping form here would push
+            // mana below the floor, the heal couldn't fire, and we'd reform with nothing healed (the mana-burning
+            // "blink out of cat and back" Daniel saw). So we must NOT drop: keep fighting instead.
+            var g = CatGame();
+            g.MeUnit.HealthPercent = 30;
+            g.SpellsOnCooldown.Add("Barkskin");
+            g.SpellsOnCooldown.Add("Survival Instincts");
+            g.MeUnit.PowerPercent = 38; // > floor (30) but < floor + headroom (45)
+            g.ComboPointCount = 0;
+            g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
+            Assert.NotEqual("Cancel Form (heal)", Fire(g)?.Name);
+            Assert.Equal("Mangle (Cat)", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void A_bear_never_shifts_out_to_mana_heal_but_a_cat_does()
+        {
+            var s = new DruidSettings();
+            // The exact shift-heal trigger: hurt below the IC-heal threshold (35), mana above the gate (30), no proc.
+            var cat = CatGame();
+            cat.MeUnit.HealthPercent = 30;
+            cat.MeUnit.PowerPercent = 80;
+            Assert.True(DruidCommon.WantsShiftHeal(CombatContext.Capture(cat), s)); // a cat shifts out to heal
+
+            // Same hurt + mana in BEAR form: a bear heals with rage (Frenzied Regeneration), so it must NEVER drop
+            // form to cast a mana heal — the shift + heal mana is exactly the feral's grind bottleneck.
+            var bear = BearGame();
+            bear.MeUnit.HealthPercent = 30;
+            bear.MeUnit.PowerPercent = 80;
+            Assert.False(DruidCommon.WantsShiftHeal(CombatContext.Capture(bear), s)); // a bear does NOT
         }
 
         [Fact]

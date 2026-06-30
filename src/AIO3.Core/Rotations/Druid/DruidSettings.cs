@@ -33,6 +33,13 @@ namespace AIO3.Core.Rotations.Druid
         public readonly ToggleSetting UseTravelForm =
             new ToggleSetting("travelForm", "Travel Form when no mount", value: true);
 
+        /// <summary>Only shift into Travel Form when mana is at or above this % (pool-mana, form-independent). Each
+        /// shapeshift costs a feral mana it can't regen in combat, so the Travel Form *convenience* yields to the
+        /// essential combat shifts (Cat/Bear) + heals: below this floor the druid just runs on foot instead of burning
+        /// mana to travel a short hop. 0 = always travel-form (no mana gate).</summary>
+        public readonly IntSetting TravelFormMinMana =
+            new IntSetting("travelFormMinMana", "Travel Form: only above mana %", value: 80, min: 0, max: 90, step: 5);
+
         // --- Rotation (shared) ---
 
         /// <summary>Combat distance reported to WRobot (ICustomClass.Range). Feral fights in melee once Cat/Bear is
@@ -60,7 +67,7 @@ namespace AIO3.Core.Rotations.Druid
         /// <summary>Shift to (Dire) Bear Form when at least this many enemies are meleeing us — bear is the tank/AoE
         /// form when surrounded. Below it, stay in Cat Form for single-target DPS. Feral-only.</summary>
         public readonly IntSetting BearCount =
-            new IntSetting("bearCount", "Bear form: min attackers", value: 2, min: 2, max: 6, step: 1);
+            new IntSetting("bearCount", "Switch to Bear at N+ attackers", value: 2, min: 1, max: 6, step: 1);
 
         /// <summary>Combo points required before a Cat finisher (Rip / Ferocious Bite) is spent. Feral-only.</summary>
         public readonly IntSetting FinisherComboPoints =
@@ -220,6 +227,8 @@ namespace AIO3.Core.Rotations.Druid
             UseThorns.Description = "Keep Thorns up on yourself out of combat (reflects melee damage back at attackers).";
             UseTravelForm.Category = "Buffs";
             UseTravelForm.Description = "Use Travel Form as a ground-mount substitute while traveling on foot when no mount is configured (like the old shaman Ghost Wolf). Drops automatically to fight or interact.";
+            TravelFormMinMana.Category = "Buffs";
+            TravelFormMinMana.Description = "Only shift into Travel Form when mana is at/above this %. Each shapeshift costs mana a feral can't regen in combat, so below this floor the druid runs on foot instead of burning mana on a short travel hop — keeping mana for the combat form shifts (Cat/Bear) and heals. 0 = always travel-form.";
 
             MeleeRange.Category = "Rotation";
             MeleeRange.Description = "Melee combat distance Feral uses once shifted into Cat/Bear form.";
@@ -233,7 +242,7 @@ namespace AIO3.Core.Rotations.Druid
             // Feral-only knobs live in the Rotation tab but tag their spec, so the overlay shows them ONLY while
             // Feral is active (Spec strings match DruidSpec.ToString()).
             BearCount.Category = "Rotation";            BearCount.Spec = "Feral";
-            BearCount.Description = "Shift to (Dire) Bear Form when at least this many enemies are meleeing you; below it, stay in Cat.";
+            BearCount.Description = "Switch to (Dire) Bear Form when at least this many enemies are actually attacking you; below it, stay in Cat for DPS. 1 = go Bear as soon as anything hits you; raise it (3-4) to power through 1-2 adds in Cat and save the mana you'd spend shifting forms.";
             FinisherComboPoints.Category = "Rotation";  FinisherComboPoints.Spec = "Feral";
             FinisherComboPoints.Description = "Combo points required before spending a Cat finisher (Rip / Ferocious Bite).";
             RipHealth.Category = "Rotation";            RipHealth.Spec = "Feral";
@@ -303,7 +312,7 @@ namespace AIO3.Core.Rotations.Druid
             _all = new Setting[]
             {
                 // Buffs
-                UseMarkOfTheWild, UseThorns, UseTravelForm,
+                UseMarkOfTheWild, UseThorns, UseTravelForm, TravelFormMinMana,
                 // Rotation (general, then the Feral-only and Balance-only knobs that show only in their spec)
                 MeleeRange, CasterRange, UseRacials, UseCooldowns,
                 BearCount, FinisherComboPoints, RipHealth, UseTigersFury, UseSavageRoar, UseFaerieFire, UseGrowlPull, UseProwl, ProwlOpener,

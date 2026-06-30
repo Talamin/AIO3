@@ -141,6 +141,11 @@ namespace AIO3.Core.Rotations.Druid
                               && ctx.Game.PlayerIsMoving && !ctx.Game.PlayerInCombat
                               && !ctx.Game.PlayerIsMounted && !ctx.Game.HasGroundMount
                               && !ctx.Game.PlayerIsResting
+                              // Conserve mana: a shift costs a feral mana it can't regen in combat, so below the floor
+                              // we run on foot rather than burn it on a short travel hop. PowerPercent is pool-MANA %
+                              // for a druid in ANY form (adapter -> WoWUnit.ManaPercentage, scout-verified form-
+                              // independent; energy/rage use ctx.Me.Energy/Rage). 0 = gate off.
+                              && ctx.Me.PowerPercent >= s.TravelFormMinMana.Value
                               && (ctx.Target == null || ctx.Target.Distance > TravelFormDropRange)
                               && !ctx.Me.HasAura("Travel Form"));
 
@@ -203,16 +208,31 @@ namespace AIO3.Core.Rotations.Druid
         /// as "missing" and casts it 2-3× in a row (the in-game triple-Regrowth). Same idea as the DoT apply-grace.</summary>
         private const int ShiftHealApplyGraceMs = 3000;
 
+        /// <summary>Mana headroom (% of max) required ON TOP of <see cref="DruidSettings.HealManaPercent"/> before we
+        /// DROP form to heal. The form-shift itself costs mana, so a bare "mana &gt; floor" check let the druid drop at,
+        /// say, 32% (floor 30) → the shift then pushed mana BELOW the floor → <see cref="ShiftOutHeal"/> couldn't fire
+        /// → it reformed with NOTHING healed: a pure-waste "blink out of cat and back" that burned two shifts' mana at
+        /// low HP for no heal (Daniel: "switch ganz kurz aus der Katze, viel Mana weg, kein Grund im Log"). Requiring
+        /// floor + this headroom means once we commit to dropping, there's still enough left to actually land the heal.</summary>
+        private const int ShiftHealManaHeadroom = 15;
+
         /// <summary>True while an in-combat shift-out heal is WANTED this tick: hurt below the IC-heal threshold, with
         /// the mana to afford it, no instant proc up (that heals in-form instead), AND a chosen HoT (Regrowth /
         /// Rejuvenation) still missing. The last clause is what lets us REFORM once both HoTs are up — we only leave
         /// form to APPLY the missing HoTs, then return to fighting with them ticking. Drives the form-drop step AND
-        /// holds the form re-entry, so they don't fight over the GCD (mirrors the priest's WantsHardHeal interlock).</summary>
+        /// holds the form re-entry, so they don't fight over the GCD (mirrors the priest's WantsHardHeal interlock).
+        /// CAT-ONLY: a bear is excluded — a bear heals with RAGE (Frenzied Regeneration: off-GCD, no mana, no shift),
+        /// so it must never drop form for a mana heal. The shift-out + heal mana is exactly the feral's grind
+        /// bottleneck, and a bear has a full mana-free heal kit, so shifting a bear out to heal is pure waste.</summary>
         public static bool WantsShiftHeal(CombatContext ctx, DruidSettings s)
         {
             if (s.InCombatHealHealthPercent.Value <= 0) return false;
+            // A bear heals with rage (Frenzied Regeneration), never by shifting out to a mana heal — see summary.
+            if (InBearForm(ctx)) return false;
             if (ctx.Me.HealthPercent >= s.InCombatHealHealthPercent.Value) return false;
-            if (ctx.Me.PowerPercent <= s.HealManaPercent.Value) return false;
+            // Need enough mana for the SHIFT + the heal, not just the bare floor — otherwise dropping form pushes mana
+            // below the floor, ShiftOutHeal can't fire, and we reform with nothing healed (the mana-burning form blink).
+            if (ctx.Me.PowerPercent <= s.HealManaPercent.Value + ShiftHealManaHeadroom) return false;
             if (HasInstantHealProc(ctx)) return false; // the instant proc heal keeps form — no shift-out needed
             bool wantRegrowth = s.UseRegrowthIC.Value && !ctx.Me.HasAura("Regrowth");
             bool wantRejuv = s.UseRejuvenationIC.Value && !ctx.Me.HasAura("Rejuvenation");
