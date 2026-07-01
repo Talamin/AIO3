@@ -122,10 +122,20 @@ namespace AIO3.Core.Rotations.Paladin
             Skill.Spell("Hand of Freedom").Priority(priority).On(Targets.Self)
                  .When(ctx => ctx.Game.PlayerIsRooted).OffGcd();
 
-        /// <summary>Hard-cast Holy Light on yourself below the self-heal threshold (0 disables it).</summary>
+        /// <summary>Grace after a Holy Light cast before its step may re-issue. Holy Light is a ~2.5s cast whose heal
+        /// lands only at cast END + server latency, so without this the self-heal check still reads HP as low for a
+        /// beat after the cast completes and casts a SECOND Holy Light (the in-game double-cast Daniel saw: two casts
+        /// ~2.7-2.9s apart = one cast time + the post-cast HP-update latency). The timer is set at cast START, so the
+        /// grace must exceed the cast time; 3500ms covers a 2.5s cast + ~1s latency. A genuine second heal (HP still
+        /// low after the first) fires once the grace elapses; the emergency Lay on Hands step is separate and ungated.</summary>
+        private const int HolyLightRecastGraceMs = 3500;
+
+        /// <summary>Hard-cast Holy Light on yourself below the self-heal threshold (0 disables it). RecastDelay-graced
+        /// so the cast→HP-update latency can't double-cast it (see <see cref="HolyLightRecastGraceMs"/>).</summary>
         public static RotationStep HolyLightSelf(PaladinSettings s, float priority) =>
             Skill.Spell("Holy Light").Priority(priority).On(Targets.Self)
-                 .When(ctx => s.SelfHealPercent.Value > 0 && ctx.Me.HealthPercent <= s.SelfHealPercent.Value);
+                 .When(ctx => s.SelfHealPercent.Value > 0 && ctx.Me.HealthPercent <= s.SelfHealPercent.Value)
+                 .RecastDelay(HolyLightRecastGraceMs);
 
         /// <summary>Free instant Flash of Light from a "The Art of War" proc, below its threshold (0 disables).</summary>
         public static RotationStep ArtOfWarFlash(PaladinSettings s, float priority) =>
