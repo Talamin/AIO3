@@ -208,39 +208,57 @@ namespace AIO3.Core.Rotations.Druid
         /// as "missing" and casts it 2-3× in a row (the in-game triple-Regrowth). Same idea as the DoT apply-grace.</summary>
         private const int ShiftHealApplyGraceMs = 3000;
 
-        /// <summary>Mana headroom (% of max) required ON TOP of <see cref="DruidSettings.HealManaPercent"/> before we
-        /// DROP form to heal. The form-shift itself costs mana, so a bare "mana &gt; floor" check let the druid drop at,
-        /// say, 32% (floor 30) → the shift then pushed mana BELOW the floor → <see cref="ShiftOutHeal"/> couldn't fire
-        /// → it reformed with NOTHING healed: a pure-waste "blink out of cat and back" that burned two shifts' mana at
-        /// low HP for no heal (Daniel: "switch ganz kurz aus der Katze, viel Mana weg, kein Grund im Log"). Requiring
-        /// floor + this headroom means once we commit to dropping, there's still enough left to actually land the heal.</summary>
-        private const int ShiftHealManaHeadroom = 15;
+        /// <summary>Mana to (re)enter the combat form after a shift-out heal — the current form's cost while in one,
+        /// else the form we'll return to (<see cref="IntendedCombatForm"/>). Read at eval time (rank/cost rise on
+        /// level-up). Reserving this on TOP of the heal cost is what stops the "blink out and back" waste.</summary>
+        private static int ReformCost(CombatContext ctx)
+        {
+            string form = ActiveFormSpell(ctx) ?? IntendedCombatForm(ctx);
+            return form == null ? 0 : ctx.Game.SpellManaCost(form);
+        }
 
-        /// <summary>True while an in-combat shift-out heal is WANTED this tick: hurt below the IC-heal threshold, with
-        /// the mana to afford it, no instant proc up (that heals in-form instead), AND a chosen HoT (Regrowth /
-        /// Rejuvenation) still missing. The last clause is what lets us REFORM once both HoTs are up — we only leave
-        /// form to APPLY the missing HoTs, then return to fighting with them ticking. Drives the form-drop step AND
-        /// holds the form re-entry, so they don't fight over the GCD (mirrors the priest's WantsHardHeal interlock).
-        /// CAT-ONLY: a bear is excluded — a bear heals with RAGE (Frenzied Regeneration: off-GCD, no mana, no shift),
-        /// so it must never drop form for a mana heal. The shift-out + heal mana is exactly the feral's grind
-        /// bottleneck, and a bear has a full mana-free heal kit, so shifting a bear out to heal is pure waste.</summary>
+        /// <summary>The combat form a FORMLESS druid mid-heal will shift back into (to size the reform reserve).
+        /// Prefers the DPS forms; bear is a fallback. Only consulted while formless (in a form, the current form's own
+        /// spell is used).</summary>
+        private static string IntendedCombatForm(CombatContext ctx)
+        {
+            if (ctx.Game.IsSpellKnown("Cat Form")) return "Cat Form";
+            if (ctx.Game.IsSpellKnown("Moonkin Form")) return "Moonkin Form";
+            if (ctx.Game.IsSpellKnown("Dire Bear Form")) return "Dire Bear Form";
+            if (ctx.Game.IsSpellKnown("Bear Form")) return "Bear Form";
+            return null;
+        }
+
+        /// <summary>True when we have the mana to shift back into form AND land <paramref name="healSpell"/> — the
+        /// PRECISE gate that replaces the old flat % headroom (which under-shot at low level, where one shapeshift costs
+        /// far more than 15% of a small pool → dropped cat, mana gone, heal unaffordable, reformed with nothing healed:
+        /// Daniel's "switch ganz kurz aus der Katze, viel Mana weg, kein Grund im Log"). Mirrors the old AIO's
+        /// <c>Me.Mana &gt; TransformValue + HealValue</c> (absolute cost, read via <see cref="IGameClient.SpellManaCost"/>).
+        /// Free/unknown costs read 0, so with nothing configured this is trivially affordable (offline tests opt in).</summary>
+        public static bool CanAffordShiftHeal(CombatContext ctx, string healSpell)
+            => ctx.Me.Mana >= ReformCost(ctx) + ctx.Game.SpellManaCost(healSpell);
+
+        /// <summary>True while an in-combat shift-out heal is WANTED this tick: hurt below the IC-heal threshold, above
+        /// the user's mana-% floor, no instant proc up (that heals in-form instead), AND a chosen HoT (Regrowth /
+        /// Rejuvenation) that is still missing AND actually AFFORDABLE (shift-back + heal mana — see
+        /// <see cref="CanAffordShiftHeal"/>). The missing-HoT clause lets us REFORM once both HoTs are up — we only
+        /// leave form to APPLY the missing HoTs, then return to fighting with them ticking. The affordability clause is
+        /// what stops the wasted "drop form → mana gone → heal unaffordable → reform" cycle: if we can't pay for the
+        /// re-shift + heal we never drop in the first place. Drives the form-drop step AND holds the form re-entry, so
+        /// they don't fight over the GCD (mirrors the priest's WantsHardHeal interlock). Symmetric in-form/formless: the
+        /// absolute-cost gate is honest either way, so there's no headroom asymmetry to get wrong. CAT-ONLY: a bear is
+        /// excluded — it heals with RAGE (Frenzied Regeneration: off-GCD, no mana, no shift), so it must never drop form
+        /// for a mana heal (the shift-out + heal mana is exactly the feral's grind bottleneck).</summary>
         public static bool WantsShiftHeal(CombatContext ctx, DruidSettings s)
         {
             if (s.InCombatHealHealthPercent.Value <= 0) return false;
             // A bear heals with rage (Frenzied Regeneration), never by shifting out to a mana heal — see summary.
             if (InBearForm(ctx)) return false;
             if (ctx.Me.HealthPercent >= s.InCombatHealHealthPercent.Value) return false;
-            // Mana gate, form-aware. While IN cat we need the shift's mana PLUS the heal (floor + headroom) before we
-            // drop — don't leave cat unless the heal is affordable. But once we're ALREADY formless (mid-heal) the shift
-            // is paid: re-applying the headroom here would flip this false the instant the shift drained mana and RELEASE
-            // the reform (CatForm keys on !WantsShiftHeal) BEFORE the heal lands — the "blink out and back" with nothing
-            // healed. Out of form, gate on the bare floor (== ShiftOutHeal's own gate) so we stay out and actually heal
-            // while mana > floor, then reform once the HoTs are up.
-            int manaGate = InAnyForm(ctx) ? s.HealManaPercent.Value + ShiftHealManaHeadroom : s.HealManaPercent.Value;
-            if (ctx.Me.PowerPercent <= manaGate) return false;
+            if (ctx.Me.PowerPercent <= s.HealManaPercent.Value) return false; // user's mana-% floor (extra, on top of cost)
             if (HasInstantHealProc(ctx)) return false; // the instant proc heal keeps form — no shift-out needed
-            bool wantRegrowth = s.UseRegrowthIC.Value && !ctx.Me.HasAura("Regrowth");
-            bool wantRejuv = s.UseRejuvenationIC.Value && !ctx.Me.HasAura("Rejuvenation");
+            bool wantRegrowth = s.UseRegrowthIC.Value && !ctx.Me.HasAura("Regrowth") && CanAffordShiftHeal(ctx, "Regrowth");
+            bool wantRejuv = s.UseRejuvenationIC.Value && !ctx.Me.HasAura("Rejuvenation") && CanAffordShiftHeal(ctx, "Rejuvenation");
             return wantRegrowth || wantRejuv;
         }
 
@@ -269,16 +287,18 @@ namespace AIO3.Core.Rotations.Druid
                 action: (ctx, t) => ctx.Game.Cast(ActiveFormSpell(ctx), ctx.Me));
 
         /// <summary>A shift-out in-combat heal, cast ONLY while formless (the <see cref="DropFormToHeal"/> step drops
-        /// the form first — a cast-time heal started in form spam-fails). Fires below the IC-heal threshold, gated on
-        /// a SIMPLE mana % floor (we deliberately drop the old GetSpellCost arithmetic), and skipped while the
-        /// Predator's Swiftness proc is up (the instant version keeps form). Not re-stacked if already on us (a HoT),
-        /// and RecastDelay-graced so the cast→aura latency can't double-cast it.</summary>
+        /// the form first — a cast-time heal started in form spam-fails). Fires below the IC-heal threshold, above the
+        /// user's mana-% floor AND only when the re-shift + heal is actually AFFORDABLE (<see cref="CanAffordShiftHeal"/>
+        /// — the precise cost gate that replaced the old flat % headroom), and skipped while the Predator's Swiftness
+        /// proc is up (the instant version keeps form). Not re-stacked if already on us (a HoT), and RecastDelay-graced
+        /// so the cast→aura latency can't double-cast it.</summary>
         public static RotationStep ShiftOutHeal(DruidSettings s, string spell, System.Func<DruidSettings, bool> enabled, float priority) =>
             Skill.Spell(spell).Priority(priority).On(Targets.Self)
                  .When(ctx => enabled(s)
                               && !InAnyForm(ctx)            // formless only — DropFormToHeal got us here
                               && ctx.Me.HealthPercent < s.InCombatHealHealthPercent.Value
                               && ctx.Me.PowerPercent > s.HealManaPercent.Value
+                              && CanAffordShiftHeal(ctx, spell) // enough mana to reform AND land the heal
                               && !HasInstantHealProc(ctx)   // prefer the instant proc heal when it's available
                               && !ctx.Me.HasAura(spell))
                  .RecastDelay(ShiftHealApplyGraceMs);
@@ -460,16 +480,20 @@ namespace AIO3.Core.Rotations.Druid
                  .RecastDelay(DebuffApplyGraceMs);
 
         /// <summary>Shred — the highest-damage Cat combo-point builder, but it can ONLY be used from BEHIND the
-        /// target (a positional). Gated on <see cref="IGameClient.PlayerIsBehindTarget"/> (the same seam the rogue's
-        /// Garrote opener uses), so it's chosen when behind and the front-fallback builder (Mangle/Claw) takes over
-        /// otherwise. Build below the finisher threshold so we don't overbuild past a finisher-worthy bar. Not while
-        /// prowling. Auto-skips until learned (a low-level cat builds with Mangle/Claw until Shred is trained). Also
-        /// gated on <see cref="IGameClient.PositionalFailing"/>: if the behind-geometry false-positives (stale mob
-        /// facing) and the server keeps rejecting Shred for position, it backs off so we don't spam dead GCDs — the
-        /// front fallback (Mangle/Claw) takes over until a Shred actually lands again.</summary>
+        /// target (a positional). OFF by default via <see cref="DruidSettings.UseShred"/>: the behind-check is
+        /// client-side and unreliable on some servers, so Shred can be cast into the front and rejected, spamming
+        /// dead GCDs — with the toggle off the cat builds with the front-safe Mangle/Claw only. When ENABLED it's
+        /// gated on <see cref="IGameClient.PlayerIsBehindTarget"/> (the same seam the rogue's Garrote opener uses),
+        /// so it's chosen when behind and the front-fallback builder (Mangle/Claw) takes over otherwise. Build below
+        /// the finisher threshold so we don't overbuild past a finisher-worthy bar. Not while prowling. Auto-skips
+        /// until learned (a low-level cat builds with Mangle/Claw until Shred is trained). Also gated on
+        /// <see cref="IGameClient.PositionalFailing"/>: if the behind-geometry false-positives (stale mob facing) and
+        /// the server keeps rejecting Shred for position, it backs off so we don't spam dead GCDs — the front
+        /// fallback (Mangle/Claw) takes over until a Shred actually lands again.</summary>
         public static RotationStep Shred(DruidSettings s, float priority) =>
             Skill.Spell("Shred").Priority(priority).On(Targets.CurrentEnemy)
-                 .When(ctx => InCatForm(ctx) && !ctx.Me.HasAura("Prowl")
+                 .When(ctx => s.UseShred.Value
+                              && InCatForm(ctx) && !ctx.Me.HasAura("Prowl")
                               && ctx.ComboPoints < s.FinisherComboPoints.Value
                               && ctx.Game.PlayerIsBehindTarget()
                               && !ctx.Game.PositionalFailing("Shred"));

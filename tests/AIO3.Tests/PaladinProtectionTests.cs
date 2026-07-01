@@ -166,6 +166,15 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Hand_of_Freedom_held_when_not_rooted()
+        {
+            FakeGameClient game = BuffsUp(ProtGame());
+            // Not rooted → HoF must NOT fire (the regression: it was casting on cooldown, even out of combat).
+            Assert.DoesNotContain("Hand of Freedom", game.CastLog);
+            Assert.NotEqual("Hand of Freedom", Fire(game)?.Name);
+        }
+
+        [Fact]
         public void Lay_on_Hands_does_not_fire_while_Forbearance_is_up()
         {
             // LoH applies (and is blocked by) Forbearance — at low HP with Forbearance up it must NOT keep taking the

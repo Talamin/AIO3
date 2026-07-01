@@ -33,6 +33,10 @@ namespace AIO3.Adapter
         public int Energy => (int)_unit.Energy; // WoWUnit.Energy is a UInt32 (absolute energy, 0..100)
 
         public int RunicPower => (int)_unit.RunicPower; // WoWUnit.RunicPower (UInt32); 0 for non-DK. NOT ManaPercentage.
+        // Absolute current mana pool (UInt32). Reads the real mana pool even while shapeshifted (Cat/Bear show
+        // energy/rage on the power bar but keep a hidden mana pool) — the same pool ManaPercentage/MaxMana read
+        // (scout-verified). Used by the druid to gate a shift-out heal on real shift + heal cost.
+        public int Mana => (int)_unit.Mana;
         public float Distance => _unit.GetDistance;
 
         // 3D distance to another unit, via the Vector3 returned by WoWObject.Position (scout-verified:

@@ -25,6 +25,11 @@ namespace AIO3.Adapter
         private const float ScanRange = 50f;
 
         private readonly Dictionary<string, Spell> _spellCache = new Dictionary<string, Spell>();
+
+        // Absolute spell mana cost by name, from Lua GetSpellInfo (4th return = cost at the highest known rank).
+        // Cost rises on level-up, so cache with a TTL rather than forever (a rotation may gate on it every tick).
+        private readonly Dictionary<string, (int cost, int at)> _spellCostCache = new Dictionary<string, (int, int)>();
+        private const int SpellCostTtlMs = 30000;
         private readonly WRobotCooldowns _cooldowns = new WRobotCooldowns();
 
         // Enemy/party lists are rebuilt on WRobot's ObjectManager pulse (~100ms) rather than every tick:
@@ -274,6 +279,24 @@ namespace AIO3.Adapter
 
         public float SpellRange(string spell) => GetSpell(spell).MaxRange;
 
+        // No managed WRobot API exposes a spell's mana cost (scout-verified), so read it via Lua GetSpellInfo — its
+        // 4th return is the cost at the character's HIGHEST KNOWN rank, so it tracks level-ups automatically; nil → 0
+        // for an unknown/free spell. Cached ~30s so a per-tick gate (the druid shift-heal affordability check) doesn't
+        // spam a Lua round-trip. Mirrors the old AIO's RotationSpell.GetSpellCost, but re-queried instead of once-at-init.
+        public int SpellManaCost(string spell)
+        {
+            if (_spellCostCache.TryGetValue(spell, out var c) && unchecked(Now - c.at) < SpellCostTtlMs) return c.cost;
+            int cost = 0;
+            try
+            {
+                cost = Lua.LuaDoString<int>(
+                    "local _,_,_,c = GetSpellInfo('" + spell.Replace("'", "\\'") + "'); return c or 0");
+            }
+            catch { }
+            _spellCostCache[spell] = (cost, Now);
+            return cost;
+        }
+
         public bool IsCurrentSpell(string spell)
         {
             if (_currentSpellCache.TryGetValue(spell, out var c) && unchecked(Now - c.at) < LuaCacheMs) return c.value;
@@ -337,10 +360,13 @@ namespace AIO3.Adapter
             }
         }
 
-        // True movement-root bit. GetMovementFlag reads the MovementInfo block (scout-verified: flags field at
-        // +0x38, MOVEMENTFLAG_ROOT = 0x800). NOT WoWUnit.Rooted — that aliases UnitFlags.Influenced (0x4), which
-        // does NOT flip for Frost Nova / Entangling Roots / a net, so it's useless here. Cheap memory read, no Lua.
-        public bool PlayerIsRooted => ObjectManager.Me.GetMovementFlag(0x38, 0x800);
+        // True movement-root bit. GetMovementFlag dereferences the MovementInfo block at [BaseAddress+0xD8] and reads
+        // the flags DWORD at +0x44 (scout-verified from WRobot's own WoWUnit.IsFlying = +0x44 & 0x2000000). The earlier
+        // +0x38 was WRONG — it landed in the positional area of the block, so `& 0x800` flipped true spuriously, which
+        // made Hand of Freedom (and the Gnome Escape Artist racial) fire on cooldown. MOVEMENTFLAG_ROOT = 0x800. NOT
+        // WoWUnit.Rooted — that aliases UnitFlags.Influenced (0x4), which does NOT flip for Frost Nova / Entangling
+        // Roots / a net, so it under-reports. Cheap memory read, no Lua.
+        public bool PlayerIsRooted => ObjectManager.Me.GetMovementFlag(0x44, 0x800);
 
         private HashSet<string> _debuffTypes = new HashSet<string>();
         private int _debuffTypesAt;

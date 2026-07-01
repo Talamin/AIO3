@@ -78,6 +78,15 @@ namespace AIO3.Core.Rotations.Druid
         public readonly IntSetting RipHealth =
             new IntSetting("ripHealth", "Rip only above enemy HP%", value: 30, min: 0, max: 90, step: 5);
 
+        /// <summary>Use Shred — the cat's highest-damage combo builder, but BEHIND-only (a positional). OFF by
+        /// default: whether we're "behind" the target is derived from client-side facing/position memory and is
+        /// unreliable on some servers (facing desync), so Shred gets cast into the FRONT and the server rejects it,
+        /// burning GCDs — the classic "Shred spam". With this off the cat builds with Mangle/Claw only (front-safe,
+        /// always lands); turn it on only if your server's positioning is reliable enough for Shred to connect.
+        /// Feral-only.</summary>
+        public readonly ToggleSetting UseShred =
+            new ToggleSetting("shred", "Use Shred (behind-only)", value: false);
+
         /// <summary>Use Tiger's Fury (an instant energy + damage cooldown) on cooldown while in Cat Form. Feral-only.</summary>
         public readonly ToggleSetting UseTigersFury =
             new ToggleSetting("tigersFury", "Use Tiger's Fury on cooldown", value: true);
@@ -247,6 +256,8 @@ namespace AIO3.Core.Rotations.Druid
             FinisherComboPoints.Description = "Combo points required before spending a Cat finisher (Rip / Ferocious Bite).";
             RipHealth.Category = "Rotation";            RipHealth.Spec = "Feral";
             RipHealth.Description = "Only apply/refresh Rip above this enemy HP%; below it, spend combo points on Ferocious Bite instead.";
+            UseShred.Category = "Rotation";             UseShred.Spec = "Feral";
+            UseShred.Description = "Use Shred, the cat's highest-damage combo builder — but it can only be used from BEHIND the target. The 'am I behind?' check is client-side and unreliable on some servers, so Shred can be cast into the front and rejected, wasting GCDs (the 'Shred spam'). OFF (default) = build with Mangle/Claw only, which land from any angle. Turn on only if your server's facing/positioning is reliable.";
             UseTigersFury.Category = "Rotation";        UseTigersFury.Spec = "Feral";
             UseTigersFury.Description = "Use Tiger's Fury (instant energy + damage cooldown) on cooldown while in Cat Form.";
             UseSavageRoar.Category = "Rotation";        UseSavageRoar.Spec = "Feral";
@@ -315,7 +326,7 @@ namespace AIO3.Core.Rotations.Druid
                 UseMarkOfTheWild, UseThorns, UseTravelForm, TravelFormMinMana,
                 // Rotation (general, then the Feral-only and Balance-only knobs that show only in their spec)
                 MeleeRange, CasterRange, UseRacials, UseCooldowns,
-                BearCount, FinisherComboPoints, RipHealth, UseTigersFury, UseSavageRoar, UseFaerieFire, UseGrowlPull, UseProwl, ProwlOpener,
+                BearCount, FinisherComboPoints, RipHealth, UseShred, UseTigersFury, UseSavageRoar, UseFaerieFire, UseGrowlPull, UseProwl, ProwlOpener,
                 MaulRageReserve, InterruptMode, // Feral-only
                 UseMoonfire, UseInsectSwarm, DotHealth, UseAoe, UseStarfall, AoeTargets, UseForceOfNature, // Balance-only
                 // Survival

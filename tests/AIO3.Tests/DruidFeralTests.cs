@@ -495,7 +495,11 @@ namespace AIO3.Tests
             g.MeUnit.HealthPercent = 30;
             g.SpellsOnCooldown.Add("Barkskin");
             g.SpellsOnCooldown.Add("Survival Instincts");
-            g.MeUnit.PowerPercent = 80; // plenty of mana, no proc
+            g.MeUnit.PowerPercent = 80;         // above the mana-% floor, no proc
+            g.MeUnit.Mana = 5000;               // absolute mana comfortably covers the re-shift + heal
+            g.SpellManaCosts["Cat Form"] = 300; // reform reserve
+            g.SpellManaCosts["Regrowth"] = 400;
+            g.SpellManaCosts["Rejuvenation"] = 200;
             // Beat 1: in form → drop it first (a cast-time heal started in form spam-fails).
             Assert.Equal("Cancel Form (heal)", Fire(g)?.Name);
             // Beat 2: formless → Regrowth leads (the bigger, front-loaded heal).
@@ -525,16 +529,21 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Shift_out_heal_held_when_mana_only_just_above_the_floor_cannot_cover_the_shift()
+        public void Does_not_drop_form_when_the_reshift_plus_heal_is_unaffordable()
         {
-            // Mana is ABOVE the bare heal floor (30) but not by the shift headroom — dropping form here would push
-            // mana below the floor, the heal couldn't fire, and we'd reform with nothing healed (the mana-burning
-            // "blink out of cat and back" Daniel saw). So we must NOT drop: keep fighting instead.
+            // The precise-cost gate (replaces the old flat % headroom). Mana% is ABOVE the user floor (30), so the old
+            // %-only check would have dropped form — but the ABSOLUTE mana can't even cover the re-shift, so dropping
+            // would burn a shift and reform with NOTHING healed (Daniel's low-level "viel Mana weg, kein Grund im Log").
+            // So we must NOT drop: keep fighting instead.
             var g = CatGame();
             g.MeUnit.HealthPercent = 30;
             g.SpellsOnCooldown.Add("Barkskin");
             g.SpellsOnCooldown.Add("Survival Instincts");
-            g.MeUnit.PowerPercent = 38; // > floor (30) but < floor + headroom (45)
+            g.MeUnit.PowerPercent = 60;          // above the mana-% floor → the old %-only gate would have dropped
+            g.MeUnit.Mana = 250;                 // …but too little in absolute terms:
+            g.SpellManaCosts["Cat Form"] = 300;  // can't even afford the re-shift (300 > 250)
+            g.SpellManaCosts["Regrowth"] = 400;
+            g.SpellManaCosts["Rejuvenation"] = 200;
             g.ComboPointCount = 0;
             g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
             Assert.NotEqual("Cancel Form (heal)", Fire(g)?.Name);
@@ -542,19 +551,20 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Shift_out_heal_continues_formless_when_mana_dipped_below_the_drop_headroom()
+        public void Shift_out_heal_fires_formless_when_the_reshift_plus_heal_is_affordable()
         {
-            // The blink fix: the headroom gate is for the DROP decision ONLY. Once we're already formless (the shift
-            // is paid), mana sitting between the floor (30) and floor+headroom (45) must NOT release us back to Cat —
-            // the heal is still affordable (> floor), so we stay out and cast it. Re-applying the headroom out of form
-            // is what flipped WantsShiftHeal false the instant the shift drained mana and reformed us with nothing
-            // healed (the "blink out and back" in Daniel's log: Cancel Form -> Tiger's Fury -> Cancel Form, no heal).
+            // Once formless (the shift is paid) with a hurt bar and enough mana to reform AND land the heal, the heal
+            // fires — we don't prematurely reform with nothing healed. The gate is the SAME absolute-cost check in or
+            // out of form, so there's no headroom asymmetry to get wrong.
             var g = CatGame();
             g.MeUnit.HealthPercent = 30;
             g.SpellsOnCooldown.Add("Barkskin");
             g.SpellsOnCooldown.Add("Survival Instincts");
             g.MeUnit.Auras.Remove("Cat Form"); // already formless — DropFormToHeal got us here last tick
-            g.MeUnit.PowerPercent = 38;        // post-shift dip band: > floor (30), < floor + headroom (45)
+            g.MeUnit.PowerPercent = 60;
+            g.MeUnit.Mana = 700;                 // covers Cat Form reform (300) + Regrowth (400)
+            g.SpellManaCosts["Cat Form"] = 300;
+            g.SpellManaCosts["Regrowth"] = 400;
             Assert.Equal("Regrowth", Fire(g)?.Name); // heal lands, NOT a premature Cat Form reform
         }
 
@@ -657,14 +667,30 @@ namespace AIO3.Tests
         // --- Shred (best cat builder, behind-only) ---
 
         [Fact]
-        public void Shred_is_the_builder_when_behind_the_target()
+        public void Shred_is_off_by_default_so_the_cat_builds_with_the_front_safe_Mangle()
         {
+            // Shred is a behind-only positional whose "am I behind?" check is unreliable on some servers (the
+            // Shred-spam bug), so it ships OFF: even behind, with the toggle default-off the builder is the
+            // front-safe Mangle (Cat), never Shred.
+            var g = CatGame();
+            g.ComboPointCount = 0;
+            g.BehindTargetFlag = true; // behind, yet Shred stays off
+            g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
+            g.TargetUnit.WithAura("Mangle", mine: true); // +30% debuff up → the debuff-maintain stays quiet
+            Assert.Equal("Mangle (Cat)", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Shred_is_the_builder_when_behind_the_target_and_the_toggle_is_on()
+        {
+            var s = new DruidSettings();
+            s.UseShred.Value = true; // opt in (default is off)
             var g = CatGame();
             g.ComboPointCount = 0;
             g.BehindTargetFlag = true; // behind → Shred is usable and outranks Mangle/Claw
             g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000); // Rake up
             g.TargetUnit.WithAura("Mangle", mine: true); // +30% debuff up → the Mangle debuff-maintain stays quiet
-            Assert.Equal("Shred", Fire(g)?.Name);
+            Assert.Equal("Shred", Fire(g, new SoloFeral(s))?.Name);
         }
 
         [Fact]
@@ -673,13 +699,15 @@ namespace AIO3.Tests
             // The behind-geometry can false-positive on a stale mob facing, so the server rejects Shred for position
             // and it deals no damage (observed: 31 casts, 0 damage). The outcome guard reports that as
             // PositionalFailing → Shred is held even though "behind" reads true, and Mangle takes the GCD instead.
+            var s = new DruidSettings();
+            s.UseShred.Value = true; // opt in, so this exercises the outcome back-off (not the default-off gate)
             var g = CatGame();
             g.ComboPointCount = 0;
             g.BehindTargetFlag = true;          // geometry says behind (the false positive)…
             g.PositionalFailingFlag = true;     // …but Shred has been getting rejected → back off
             g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
             g.TargetUnit.WithAura("Mangle", mine: true);
-            Assert.Equal("Mangle (Cat)", Fire(g)?.Name);
+            Assert.Equal("Mangle (Cat)", Fire(g, new SoloFeral(s))?.Name);
         }
 
         [Fact]
@@ -768,12 +796,14 @@ namespace AIO3.Tests
         {
             // Mangle "+30%" debuff missing → the debuff-maintain Mangle fires even from BEHIND (where Shred would
             // otherwise be the builder), so the bleeds stay amplified.
+            var s = new DruidSettings();
+            s.UseShred.Value = true; // Shred on, so this proves the debuff-maintain outranks Shred (not the off-gate)
             var g = CatGame();
             g.ComboPointCount = 0;
             g.BehindTargetFlag = true; // behind, so this proves the debuff-maintain outranks Shred
             g.TargetUnit.WithAura("Rake", mine: true, timeLeftMs: 9000);
             // Mangle debuff is NOT on the target → maintain it.
-            Assert.Equal("Mangle (Cat)", Fire(g)?.Name);
+            Assert.Equal("Mangle (Cat)", Fire(g, new SoloFeral(s))?.Name);
             Assert.Contains("Mangle (Cat)", g.CastLog);
         }
 

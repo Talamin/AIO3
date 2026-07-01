@@ -112,9 +112,12 @@ namespace AIO3.Core.Rotations.Paladin
                               && ctx.Me.HealthPercent < s.LayOnHandsPercent.Value
                               && !ctx.Me.HasAura("Forbearance"));
 
-        /// <summary>Hand of Freedom: break a root/snare so a rooted paladin doesn't just stand there. Off the GCD, so
-        /// it fires even mid-rotation. Gated on the real movement-flag bit via <c>ctx.Game.PlayerIsRooted</c> (old AIO:
-        /// <c>Me.Rooted</c>, SoloRetribution.cs:30 / SoloProtection.cs:37). IsSpellKnown auto-skips until learned.</summary>
+        /// <summary>Hand of Freedom: break a root so the paladin isn't stuck in place. Off the GCD, so it fires even
+        /// mid-rotation. Gated on <c>ctx.Game.PlayerIsRooted</c> — the REAL movement-root flag (adapter offset fixed
+        /// 0x38→0x44; the wrong 0x38 false-positived → HoF fired on cooldown, even out of combat). So it fires ONLY
+        /// on an actual root. NOTE: snares are deliberately NOT covered — WoW's <c>GetUnitSpeed</c> returns current
+        /// VELOCITY (0 while standing), so it can't reliably gate a snare; breaking a hard root is HoF's main use.
+        /// IsSpellKnown auto-skips until learned.</summary>
         public static RotationStep HandOfFreedom(float priority) =>
             Skill.Spell("Hand of Freedom").Priority(priority).On(Targets.Self)
                  .When(ctx => ctx.Game.PlayerIsRooted).OffGcd();

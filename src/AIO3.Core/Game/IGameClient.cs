@@ -119,6 +119,12 @@ namespace AIO3.Core.Game
         /// <summary>Max cast range of a spell in yards (0 or less = no range gate / self/melee-handled).</summary>
         float SpellRange(string spell);
 
+        /// <summary>Absolute MANA cost of a spell by name, at its currently-known rank (rank/cost rise on level-up),
+        /// or 0 if unknown/free. Lets the druid gate a shift-out heal on real cost — only drop form to heal when mana
+        /// covers the re-shift AND the heal (the old AIO's <c>Me.Mana &gt; TransformValue + HealValue</c>), instead of
+        /// a flat % headroom that under-shoots at low level. The adapter caches it (cheap, static per rank).</summary>
+        int SpellManaCost(string spell);
+
         /// <summary>Remaining global cooldown in ms (0 = off the GCD).</summary>
         int GlobalCooldownRemainingMs { get; }
 
@@ -142,9 +148,11 @@ namespace AIO3.Core.Game
         /// and the mobs aren't held by Frost Nova's ground root, so a caster just stands and nukes instead.</summary>
         bool PlayerIsSwimming { get; }
 
-        /// <summary>True while the player is rooted/snared in place (Frost Nova / Entangling Roots / a net). Read
-        /// from the real movement-flag bit (not the misleading WoWUnit.Rooted, which is a different unit flag).
-        /// Lets the Gnome racial Escape Artist break a root.</summary>
+        /// <summary>True while the player is ROOTED in place (Frost Nova / Entangling Roots / a net). Read from the
+        /// real movement-flag bit (MOVEMENTFLAG_ROOT at the MovementInfo flags DWORD +0x44 — NOT the misleading
+        /// WoWUnit.Rooted, which is a different unit flag). Gates the Gnome racial Escape Artist and the Paladin's
+        /// Hand of Freedom, so they only fire on an actual root. (Snares aren't detectable via a clean API — WoW's
+        /// GetUnitSpeed is current velocity, 0 while standing — so this is root-only by design.)</summary>
         bool PlayerIsRooted { get; }
 
         /// <summary>True if the player has any debuff of the given dispel type ("Poison" / "Disease" / "Magic" /

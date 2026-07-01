@@ -35,6 +35,12 @@ namespace AIO3.Core.Game
         /// MANA for a DK (wrong), so RP-dump gates (Death Coil / Frost Strike at ≥40) read this directly.</summary>
         int RunicPower { get; }
 
+        /// <summary>Current ABSOLUTE mana (0 for units without a mana pool). Reads the real mana pool even while a
+        /// druid is shapeshifted (Cat/Bear show energy/rage on the power bar but keep a hidden mana pool), so a feral
+        /// can gate a shift-out heal on whether it can actually afford the re-shift + the heal — see
+        /// <see cref="IGameClient.SpellManaCost"/>. PowerPercent covers % gating; this is for absolute-cost math.</summary>
+        int Mana { get; }
+
         /// <summary>Distance to the local player ("Me"), in yards.</summary>
         float Distance { get; }
 

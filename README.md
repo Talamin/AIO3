@@ -63,7 +63,7 @@ below (interrupts, racials, target switching, performance).
 - **Upkeep (resolved live):** seal / aura / blessing / judgement — `Auto` picks a spec-appropriate default and falls back as you learn better options.
 - **Retribution:** Judgement → Exorcism (on an Art-of-War proc) → Divine Storm → Crusader Strike · Hammer of Wrath < 20% · Consecration / Holy Wrath on packs.
 - **Protection:** Righteous Fury + Holy Shield upkeep · Shield of Righteousness → Hammer of the Righteous · Avenger's Shield gated so it never pulls (the product owns the opener).
-- **Survival:** self-sustained while leveling (Art-of-War Flash of Light / Lay on Hands / Divine Plea).
+- **Survival / utility:** self-sustained while leveling (Art-of-War Flash of Light / Lay on Hands / Divine Plea) · **Hand of Freedom** breaks a root (fires only on an actual movement-root, off the GCD).
 
 ### Hunter — Beast Mastery / Marksmanship / Survival
 
@@ -111,9 +111,9 @@ below (interrupts, racials, target switching, performance).
 
 *Hybrid: a melee combo-point form, a rage tank form, and an eclipse caster — one spec list that shifts between them. Restoration is intentionally absent (a healer).*
 
-- **Feral (cat + bear, with form management):** **Cat** for single targets (**Shred** from behind — behind-detection backed by an *outcome guard*: if a Shred keeps being server-rejected for position (a stale-facing false positive), it backs off so it cleanly defers to the **Mangle / Claw** front builders instead of spamming dead GCDs · Rake bleed · Rip / Ferocious Bite finishers · Tiger's Fury), shifting to **Bear** only when **two or more enemies are actually attacking you** (Mangle / Lacerate / Swipe / Maul · Demoralizing Roar · Frenzied Regeneration) — mana-conscious form switching that won't thrash on unrelated mobs nearby. A **positional stealth opener** — **Ravage** from behind (the same behind-detection the rogue's Garrote uses), else **Pounce** from the front — and a caster fallback (Wrath / Moonfire) before the forms are learned.
+- **Feral (cat + bear, with form management):** **Cat** for single targets — the **Mangle / Claw** builders that land from any angle, with **Shred** as an *opt-in* behind-only builder (**off by default**, since the behind-detection is unreliable on some servers; enable it in the overlay when positioning is reliable, and an *outcome guard* still backs it off if the server keeps rejecting it for position) · Rake bleed · Rip / Ferocious Bite finishers · Tiger's Fury — shifting to **Bear** only when **two or more enemies are actually attacking you** (Mangle / Lacerate / Swipe / Maul · Demoralizing Roar · Frenzied Regeneration) — mana-conscious form switching that won't thrash on unrelated mobs nearby. A **positional stealth opener** — **Ravage** from behind (the same behind-detection the rogue's Garrote uses), else **Pounce** from the front — and a caster fallback (Wrath / Moonfire) before the forms are learned.
 - **Balance (eclipse caster):** Moonkin Form · Insect Swarm / Moonfire DoTs · **Eclipse-aware** nukes (Starfire under a Lunar proc, Wrath under Solar) · Starfall / Hurricane / Typhoon AoE · Force of Nature.
-- **Survival (the hybrid's edge):** in-combat self-heal — an instant Regrowth / Healing Touch off a **Predator's Swiftness** proc, else a mana-gated shift out to heal · Barkskin · Innervate · Mark of the Wild / Thorns.
+- **Survival (the hybrid's edge):** in-combat self-heal — an instant Regrowth / Healing Touch off a **Predator's Swiftness** proc, else a shift out to heal **only when the mana covers the re-shift + the heal** (no more blinking out of cat for a heal it can't afford) · Barkskin · Innervate · Mark of the Wild / Thorns.
 
 ## Shared systems
 

@@ -107,6 +107,11 @@ namespace AIO3.Core.Testing
         public bool IsSpellReady(string spell) => !SpellsOnCooldown.Contains(spell);
         public bool IsCurrentSpell(string spell) => CurrentSpells.Contains(spell);
         public float SpellRange(string spell) => SpellRanges.TryGetValue(spell, out float r) ? r : DefaultSpellRange;
+
+        /// <summary>Per-spell mana cost for <see cref="SpellManaCost"/> (default 0 = free/unknown). Set alongside
+        /// <see cref="FakeUnit.Mana"/> to exercise the druid shift-heal affordability gate.</summary>
+        public readonly Dictionary<string, int> SpellManaCosts = new Dictionary<string, int>();
+        public int SpellManaCost(string spell) => SpellManaCosts.TryGetValue(spell, out int c) ? c : 0;
         public int GlobalCooldownRemainingMs => Gcd;
         public bool PlayerIsCasting => Casting;
         public bool PlayerIsMoving => Moving;

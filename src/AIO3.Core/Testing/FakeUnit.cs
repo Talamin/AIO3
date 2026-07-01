@@ -16,6 +16,7 @@ namespace AIO3.Core.Testing
         public int Rage { get; set; }
         public int Energy { get; set; }
         public int RunicPower { get; set; }
+        public int Mana { get; set; } // absolute mana; 0 default → tests opt in to exercise shift-heal affordability
         public float Distance { get; set; }
 
         // 2D position for DistanceTo tests. The player is conceptually at the origin; a unit's Distance is its
