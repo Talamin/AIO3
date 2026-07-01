@@ -23,6 +23,7 @@ namespace AIO3.Tests
             g.MeUnit.PowerPercent = 100;
             g.InCombatFlag = true;
             g.ProductFightingFlag = true;
+            g.AutoAttacking = true; // already swinging → the off-GCD AutoAttack step stays inert so tests isolate the rotation
             g.MeUnit.WithAura("Water Shield");
             g.MeUnit.WithAura("Lightning Shield");
             g.WeaponEnchantState = new WeaponEnchant(true, 600000, true, 600000); // both hands imbued
@@ -51,6 +52,71 @@ namespace AIO3.Tests
         {
             // Nothing special up → Stormstrike (prio 4.0) is the highest melee strike.
             Assert.Equal("Stormstrike", Fire(Game())?.Name);
+        }
+
+        [Fact]
+        public void Enhancement_auto_attacks_off_the_gcd()
+        {
+            // Every melee spec must ensure the melee swing is on — Enhancement was missing the step, so a low-level
+            // shaman with no strikes just stood there. When not yet swinging, the off-GCD AutoAttack step fires.
+            FakeGameClient g = Game();
+            g.AutoAttacking = false; // not yet swinging
+            Assert.Equal("Auto Attack", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Low_level_casts_Lightning_Bolt_out_of_melee_before_Stormstrike_exists()
+        {
+            // Pre-40 Enhancement, OUT of melee (target > 8yd) → the Lightning Bolt filler pulls / pokes.
+            FakeGameClient g = Game();
+            g.TargetUnit.Distance = 20; // out of melee → the pull/poke Lightning Bolt is allowed
+            g.UnknownSpells.Add("Stormstrike");
+            g.UnknownSpells.Add("Lava Lash");
+            g.UnknownSpells.Add("Flame Shock");
+            g.UnknownSpells.Add("Earth Shock"); // strip the low-level shocks so the Lightning Bolt filler is isolated
+            Assert.Equal("Lightning Bolt", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Low_level_holds_Lightning_Bolt_in_melee_to_avoid_going_oom()
+        {
+            // Same, but IN melee (target <= 8yd) → NO Lightning Bolt (it finishes in melee: auto-attack + shocks),
+            // so it doesn't cast itself OOM at range against a caster.
+            FakeGameClient g = Game();
+            g.TargetUnit.Distance = 5; // in melee
+            g.UnknownSpells.Add("Stormstrike");
+            g.UnknownSpells.Add("Lava Lash");
+            g.UnknownSpells.Add("Flame Shock");
+            g.UnknownSpells.Add("Earth Shock");
+            Assert.NotEqual("Lightning Bolt", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Low_level_Lightning_Bolt_is_inert_once_Stormstrike_is_learned()
+        {
+            // Once the melee strike exists, the hard-cast filler stops (the Maelstrom-proc instant LB owns high level).
+            FakeGameClient g = Game(); // Stormstrike known → the strike wins, not the filler
+            Assert.Equal("Stormstrike", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void No_off_hand_imbue_loop_on_a_shield_user()
+        {
+            // Main imbued, off-hand slot filled by a SHIELD (no weapon, 0ms enchant) → the off-hand imbue must NOT
+            // fire (a weapon imbue can't enchant a shield → the Rockbiter-spam loop). The strike fires instead.
+            FakeGameClient g = Game();
+            g.WeaponEnchantState = new WeaponEnchant(true, 600000, true, 0); // main imbued; off-hand present, unenchanted
+            g.OffHandHasWeaponFlag = false;                                  // …but it's a shield
+            Assert.NotEqual("Weapon imbue", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Main_hand_imbue_fires_when_the_main_hand_is_unenchanted()
+        {
+            // Regression: the main-hand imbue still fires when the main hand has a weapon and no enchant.
+            FakeGameClient g = Game();
+            g.WeaponEnchantState = new WeaponEnchant(true, 0, false, 0); // main equipped + unenchanted; no off-hand
+            Assert.Equal("Weapon imbue", Fire(g)?.Name);
         }
 
         [Fact]
@@ -169,8 +235,9 @@ namespace AIO3.Tests
         public void Reapplies_a_missing_off_hand_imbue()
         {
             FakeGameClient g = Game();
-            // main hand imbued; off hand has a weapon but NO temp-enchant
+            // main hand imbued; off hand has a WEAPON but NO temp-enchant
             g.WeaponEnchantState = new WeaponEnchant(true, 600000, true, 0);
+            g.OffHandHasWeaponFlag = true; // a weapon (not a shield) → the off-hand imbue is due
             Assert.Equal("Weapon imbue", Fire(g)?.Name);
             Assert.Contains("Flametongue Weapon", g.CastLog); // Enhancement off = Flametongue
         }

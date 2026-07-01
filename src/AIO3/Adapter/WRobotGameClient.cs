@@ -38,7 +38,10 @@ namespace AIO3.Adapter
         // complete list. Wrappers are live, so unit properties (distance/auras) stay current between pulses.
         private volatile IReadOnlyList<IWowUnit> _enemiesCache = Array.Empty<IWowUnit>();
         private volatile IReadOnlyList<IWowUnit> _partyCache = Array.Empty<IWowUnit>();
-        private volatile IReadOnlyList<IWowUnit> _totemsCache = Array.Empty<IWowUnit>();
+        // Totems are read live via Lua GetTotemInfo in the Totems getter (cached), NOT the object-manager pulse — the
+        // object scan (UnitFlags.Totem + owner GUID) is unreliable on servers where the totem is the "pet".
+        private IReadOnlyList<IWowUnit> _totemsCache = Array.Empty<IWowUnit>();
+        private int _totemsAt;
         private readonly Stopwatch _sinceRebuild = Stopwatch.StartNew();
         private bool _rebuiltOnce;
 
@@ -120,10 +123,8 @@ namespace AIO3.Adapter
             try
             {
                 var me = ObjectManager.Me;
-                ulong meGuid = me.Guid;
 
                 var enemies = new List<IWowUnit>();
-                var totems = new List<IWowUnit>();
                 foreach (WoWUnit u in ObjectManager.GetObjectWoWUnit())
                 {
                     if (u.IsValid && u.IsAlive && u.IsAttackable
@@ -132,18 +133,9 @@ namespace AIO3.Adapter
                     {
                         enemies.Add(new WRobotUnit(u));
                     }
-                    // My OWN totems (shaman): flagged as a totem (UnitFlags.Totem = 0x10) and summoned/created by me.
-                    // No distance filter — a left-behind totem must still be seen so the shaman knows the school is
-                    // effectively gone (re-drop) or far enough to recall. Empty for every other class.
-                    else if (u.IsValid && u.IsAlive
-                             && (u.UnitFlags & wManager.Wow.Enums.UnitFlags.Totem) != 0
-                             && (u.SummonedBy == meGuid || u.CreatedBy == meGuid))
-                    {
-                        totems.Add(new WRobotUnit(u));
-                    }
                 }
                 _enemiesCache = enemies;
-                _totemsCache = totems;
+                // Totems are read live via GetTotemInfo in the Totems getter (the object scan was unreliable — see there).
 
                 var party = new List<IWowUnit> { new WRobotUnit(me) };
                 // Raid-aware: GetParty() is 5-man only; use the raid roster when in a raid.
@@ -272,8 +264,83 @@ namespace AIO3.Adapter
 
         public IReadOnlyList<IWowUnit> Party => _partyCache;
 
-        // Rebuilt on the object-manager pulse (same loop as Enemies). My own totems, with Name + GetDistance.
-        public IReadOnlyList<IWowUnit> Totems => _totemsCache;
+        // Own active totems via Lua GetTotemInfo(1..4) — reliable across servers. The object-manager scan (UnitFlags.
+        // Totem + owner GUID) FAILS where the dropped totem is the "pet" and carries no totem flag (verified in GREZ's
+        // log: no totem-flagged units, totem shows as ObjectManager.Pet, tiny char GUID=3). GetTotemInfo reads the four
+        // totem slots' names directly. No position is exposed, so an active totem is treated as at-our-feet (Distance
+        // 0) → the school reads "up", which also ends the re-drop-on-move churn (a totem is re-dropped only when it
+        // actually leaves its slot / expires). Cached 250ms so the Lua read isn't per-tick.
+        public IReadOnlyList<IWowUnit> Totems
+        {
+            get
+            {
+                if (unchecked(Now - _totemsAt) < 250) return _totemsCache;
+                _totemsAt = Now;
+                var list = new List<IWowUnit>();
+                try
+                {
+                    string raw = Lua.LuaDoString<string>(
+                        "local r='' for i=1,4 do local h,n=GetTotemInfo(i) if h and n and n~='' then r=r..n..'|' end end return r") ?? "";
+                    var names = raw.Split('|').Where(n => n.Length > 0).ToList();
+                    if (names.Count > 0)
+                    {
+                        // Real distance per active totem: GetTotemInfo says a slot is active but not WHERE. Without the
+                        // distance the school reads "up" forever and we never re-drop after walking away from the totem —
+                        // it stays active in the slot but its buff is out of range (Daniel: totem up, no buff, no re-cast).
+                        // The totem is a unit (the "pet" and/or a summoned unit), so match it by name for GetDistance.
+                        var dist = new Dictionary<string, float>();
+                        foreach (WoWUnit u in ObjectManager.GetObjectWoWUnit())
+                            if (u != null && u.IsValid && u.Name != null && names.Contains(u.Name)
+                                && (!dist.TryGetValue(u.Name, out float cur) || u.GetDistance < cur))
+                                dist[u.Name] = u.GetDistance;
+                        WoWUnit pet = ObjectManager.Pet;
+                        if (pet != null && pet.IsValid && pet.Name != null && names.Contains(pet.Name))
+                            dist[pet.Name] = pet.GetDistance; // the pet is authoritative for its own totem
+                        foreach (string name in names)
+                            list.Add(new TotemUnit(name, dist.TryGetValue(name, out float d) ? d : 0f));
+                    }
+                }
+                catch { }
+                _totemsCache = list;
+                return _totemsCache;
+            }
+        }
+
+        // A minimal own-totem unit for the Totems list: a name + its real distance. GetTotemInfo gives the name; the
+        // distance comes from the matching totem unit (see the getter). The school-upkeep only reads Name + Distance,
+        // so the rest are inert defaults.
+        private sealed class TotemUnit : IWowUnit
+        {
+            public TotemUnit(string name, float distance) { Name = name; Distance = distance; }
+            public string Name { get; }
+            public float Distance { get; }
+            public ulong Guid => 0;
+            public int Entry => 0;
+            public bool IsAlive => true;
+            public int Level => 0;
+            public double HealthPercent => 100;
+            public double PowerPercent => 0;
+            public int Rage => 0;
+            public int Energy => 0;
+            public int RunicPower => 0;
+            public int Mana => 0;
+            public float DistanceTo(IWowUnit other) => 0f;
+            public bool IsCasting => false;
+            public int CastingSpellId => 0;
+            public AIO3.Core.Game.Reaction Reaction => AIO3.Core.Game.Reaction.Friendly;
+            public bool IsTargetingMe => false;
+            public bool IsTargetingMyPet => false;
+            public ulong TargetGuid => 0;
+            public ulong PetOwnerGuid => 0;
+            public bool IsAttackable => false;
+            public bool IsElite => false;
+            public bool IsCaster => false;
+            public string CreatureType => "";
+            public bool HasAura(string name) => false;
+            public int AuraStacks(string name) => 0;
+            public bool HasMyAura(string name) => false;
+            public long MyAuraTimeLeftMs(string name) => 0;
+        }
 
         public bool IsSpellKnown(string spell) => GetSpell(spell).KnownSpell;
 
@@ -796,11 +863,27 @@ namespace AIO3.Adapter
                         pwr = $"mp={meUnit.ManaPercentage:0}%";
                         break;
                 }
+                // Shaman totem diagnostic: WHY a totem gets re-cast. Shows what the own-totem detection (_totemsCache,
+                // = ctx.Totems) actually sees, then EVERY totem-flagged unit nearby with its owner GUIDs + coords — so a
+                // re-drop loop reveals whether the totem is simply undetected (owner-GUID mismatch / flag / not-alive)
+                // rather than out of range. me= is our GUID to compare against each totem's sum(SummonedBy)/cre(CreatedBy).
+                string totemDump = "";
+                if (meUnit.WowClass.ToString() == "Shaman")
+                {
+                    string detected = string.Join(", ", Totems.Select(x => $"{x.Name}@{x.Distance:0.#}"));
+                    string flagged = string.Join(", ", ObjectManager.GetObjectWoWUnit()
+                        .Where(o => o != null && o.IsValid
+                                    && (o.UnitFlags & wManager.Wow.Enums.UnitFlags.Totem) != 0 && o.GetDistance <= 60)
+                        .Select(o => $"{o.Name}@{o.GetDistance:0.#}({o.Position.X:0.#},{o.Position.Y:0.#},{o.Position.Z:0.#})"
+                                     + $" alive={o.IsAlive} sum={o.SummonedBy} cre={o.CreatedBy} mine={(o.SummonedBy == me || o.CreatedBy == me ? "Y" : "N")}"));
+                    totemDump = $" | TOTEMS detected=[{detected}] | flagged nearby (me={me}): [{flagged}]";
+                }
                 DebugLog.Write($"pos me=({mp.X:0.#},{mp.Y:0.#},{mp.Z:0.#}) hp={meUnit.HealthPercent:0}% {pwr} "
                     + $"| tgt {unit.Name}@{unit.GetDistance:0.#} hp={unit.HealthPercent:0}% onMe={unit.IsTargetingMe} ({tp.X:0.#},{tp.Y:0.#},{tp.Z:0.#}) "
                     + $"| auras: {auras}{petStr}"
                     + (self.Length > 0 ? $" | self: {self}" : "")
-                    + (others.Length > 0 ? $" | others: {others}" : ""));
+                    + (others.Length > 0 ? $" | others: {others}" : "")
+                    + totemDump);
             }
             catch { }
         }
@@ -953,6 +1036,42 @@ namespace AIO3.Adapter
         }
 
         private static int ParseIntSafe(string s) => int.TryParse(s, out int v) ? v : 0;
+
+        private bool _offhandWeapon;
+        private int _offhandWeaponAt;
+        // OffhandHasWeapon() = 1/true when a WEAPON (not a shield/held item) is in the off-hand. Cached ~1s (it only
+        // changes on an equip). Lets the shaman off-hand imbue skip a shield instead of re-casting Rockbiter forever.
+        public bool OffHandHasWeapon
+        {
+            get
+            {
+                if (unchecked(Now - _offhandWeaponAt) < WeaponEnchantTtlMs) return _offhandWeapon;
+                _offhandWeaponAt = Now;
+                try { _offhandWeapon = Lua.LuaDoString<bool>("return (OffhandHasWeapon() or 0) ~= 0"); }
+                catch { _offhandWeapon = false; }
+                return _offhandWeapon;
+            }
+        }
+
+        // Cast a shaman weapon imbue AND confirm the "replace your weapon enchant" popup WoW raises — without that the
+        // enchant never lands and WeaponImbue re-casts forever (Daniel's Rockbiter spam). The popup appears async, so
+        // click it ~100ms later off the tick thread (mirrors the old AIO ApplyEnchant). Guarded on IsVisible so we only
+        // click when a popup is actually up.
+        public CastResult ImbueWeapon(string spell)
+        {
+            CastResult r = Cast(spell, Me);
+            if (r == CastResult.Success)
+                System.Threading.Tasks.Task.Run(async () =>
+                {
+                    try
+                    {
+                        await System.Threading.Tasks.Task.Delay(100);
+                        Lua.LuaDoString("if StaticPopup1Button1 and StaticPopup1Button1:IsVisible() then StaticPopup1Button1:Click() end");
+                    }
+                    catch { }
+                });
+            return r;
+        }
 
         public bool HasItemById(uint itemId) => ItemsManager.HasItemById(itemId);
 

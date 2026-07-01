@@ -351,16 +351,19 @@ namespace AIO3.Core.Rotations.Shaman
                 action: (ctx, t) =>
                 {
                     string imbue = NextImbue(ctx, spec);
-                    return imbue != null ? ctx.Game.Cast(imbue, ctx.Me) : CastResult.Failed;
+                    // ImbueWeapon (not Cast): it also confirms the "replace weapon enchant" popup — without that the
+                    // imbue never lands and this step re-casts forever (the Rockbiter-spam bug).
+                    return imbue != null ? ctx.Game.ImbueWeapon(imbue) : CastResult.Failed;
                 },
                 recastDelayMs: TotemDropGraceMs);
 
         /// <summary>The imbue to (re-)apply this tick, or null when both needed hands are imbued. Main-hand first
-        /// (the priority hand), then the Enhancement off-hand. Reads the GetWeaponEnchant seam the SAME way the
-        /// rogue's poison upkeep does: <c>MainHandEquipped</c> means a weapon is in that slot, and
-        /// <c>MainHandRemainingMs == 0</c> means that hand carries NO temp-enchant — so a hand needs the imbue when
-        /// it holds a weapon whose imbue has lapsed. Mirrors the old EnchantStep: Enhancement = Windfury main
-        /// (Rockbiter fallback) + Flametongue off; Elemental = Flametongue main only.</summary>
+        /// (the priority hand), then the Enhancement off-hand. Main-hand needs the imbue when it holds a weapon
+        /// (<c>MainHandEquipped</c>) whose enchant has lapsed (<c>MainHandRemainingMs == 0</c>). The OFF-hand is gated
+        /// on <see cref="IGameClient.OffHandHasWeapon"/> (a real weapon, NOT a shield) — a weapon imbue can't enchant a
+        /// shield, so a shield off-hand would read "unenchanted" forever and re-cast the imbue in a loop. Mirrors the
+        /// old EnchantStep: Enhancement = Windfury main (Rockbiter fallback) + Flametongue off; Elemental = Flametongue
+        /// main only.</summary>
         private static string NextImbue(CombatContext ctx, ShamanSpec spec)
         {
             WeaponEnchant w = ctx.Game.GetWeaponEnchant();
@@ -370,7 +373,9 @@ namespace AIO3.Core.Rotations.Shaman
                 string main = MainImbue(ctx, spec);
                 if (main != null && ctx.Game.IsSpellKnown(main)) return main;
             }
-            if (spec == ShamanSpec.Enhancement && w.OffHandEquipped && w.OffHandRemainingMs == 0)
+            // Off-hand: only imbue an actual WEAPON (OffHandHasWeapon) — never a shield / held item, else the off-hand
+            // reads "unenchanted" forever and we re-cast the imbue in a loop (the Rockbiter-spam bug on a shield user).
+            if (spec == ShamanSpec.Enhancement && ctx.Game.OffHandHasWeapon && w.OffHandRemainingMs == 0)
             {
                 string off = OffImbue(ctx);
                 if (off != null && ctx.Game.IsSpellKnown(off)) return off;

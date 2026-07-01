@@ -7,10 +7,10 @@ but rebuilds the foundation to be **layered, testable, and configurable in-game*
 > **Status — functional and in active use.** **Warrior** (Fury / Arms / Protection), **Paladin**
 > (Retribution / Protection), **Hunter** (Beast Mastery / Marksmanship / Survival), **Mage**
 > (Frost / Fire / Arcane) and **Warlock** (Affliction / Demonology / Destruction) run end-to-end
-> in-game as solo leveling APLs (10–80). **Rogue** (Combat / Assassination) and **Druid** (Feral / Balance)
-> are built and unit-tested, with in-game verification ongoing. Each class is a self-contained **module**
+> in-game as solo leveling APLs (10–80). **Rogue** (Combat / Assassination), **Druid** (Feral / Balance) and
+> **Shaman** (Elemental / Enhancement) are built and unit-tested, with in-game verification ongoing; **Priest**
+> and **Death Knight** are built on the same foundation. Each class is a self-contained **module**
 > (`IClassModule`), so the entry point is class-agnostic and adding the next class is dropping in a module.
-> Remaining classes (Priest, Death Knight, Shaman) are not implemented yet — the foundation is built to add them.
 
 ## Why AIO3 (vs. the original AIO-Public)
 
@@ -114,6 +114,15 @@ below (interrupts, racials, target switching, performance).
 - **Feral (cat + bear, with form management):** **Cat** for single targets — the **Mangle / Claw** builders that land from any angle, with **Shred** as an *opt-in* behind-only builder (**off by default**, since the behind-detection is unreliable on some servers; enable it in the overlay when positioning is reliable, and an *outcome guard* still backs it off if the server keeps rejecting it for position) · Rake bleed · Rip / Ferocious Bite finishers · Tiger's Fury — shifting to **Bear** only when **two or more enemies are actually attacking you** (Mangle / Lacerate / Swipe / Maul · Demoralizing Roar · Frenzied Regeneration) — mana-conscious form switching that won't thrash on unrelated mobs nearby. A **positional stealth opener** — **Ravage** from behind (the same behind-detection the rogue's Garrote uses), else **Pounce** from the front — and a caster fallback (Wrath / Moonfire) before the forms are learned.
 - **Balance (eclipse caster):** Moonkin Form · Insect Swarm / Moonfire DoTs · **Eclipse-aware** nukes (Starfire under a Lunar proc, Wrath under Solar) · Starfall / Hurricane / Typhoon AoE · Force of Nature.
 - **Survival (the hybrid's edge):** in-combat self-heal — an instant Regrowth / Healing Touch off a **Predator's Swiftness** proc, else a shift out to heal **only when the mana covers the re-shift + the heal** (no more blinking out of cat for a heal it can't afford) · Barkskin · Innervate · Mark of the Wild / Thorns.
+
+### Shaman — Elemental / Enhancement
+
+*Totem-dropping hybrid. Restoration is intentionally absent (a healer). Enhancement is the leveling default.*
+
+- **Enhancement (melee):** weapon imbues (Windfury main / Flametongue off, Rockbiter as the pre-30 fallback — and it never loops on a shield off-hand) · Stormstrike / Lava Lash / Earth Shock / Flame Shock · the **Maelstrom Weapon** proc (an instant Lightning Bolt, or Chain Lightning on a pack) · Fire Nova off a fire totem · Feral Spirit · Shamanistic Rage. **Low-level (pre-Stormstrike):** it opens with **Lightning Bolt from range**, then closes to **melee** to finish (auto-attack + Earth Shock) — a dynamic range that pulls at caster distance and melees once engaged, so it doesn't cast itself out of mana against a caster.
+- **Elemental (caster):** Flame Shock → Lava Burst synergy · Chain Lightning on a pack (else Lightning Bolt) · Elemental Mastery.
+- **Totems (the class's signature):** four-school upkeep that **auto-picks per spec + level** (so it scales as you learn better totems), plus the situational totems (Stoneclaw / Earth Elemental / Mana Tide / Grounding). Active totems are read via the game's own **`GetTotemInfo`** (reliable across servers), and re-dropped only when you've actually moved out of their range.
+- **Survival:** in-combat **Healing Wave** · self-shield (Lightning / Water Shield) · **Wind Shear** interrupt · Bloodlust / Heroism.
 
 ## Shared systems
 

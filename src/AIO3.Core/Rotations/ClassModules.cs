@@ -20,9 +20,10 @@ namespace AIO3.Core.Rotations
                 case WowClass.Mage: return new MageModule();
                 case WowClass.Warlock: return new WarlockModule();
                 case WowClass.Priest: return new PriestModule();
-                case WowClass.Shaman: return new ShamanModule();
+                // Shaman + Druid take the game client so their Range can switch caster↔melee on whether the melee
+                // strike / form is learned (a pre-Stormstrike shaman / pre-form druid levels at caster range).
+                case WowClass.Shaman: return new ShamanModule(game);
                 case WowClass.DeathKnight: return new DeathKnightModule();
-                // Druid takes the game client so its Range can switch caster↔melee on whether a form is learned.
                 case WowClass.Druid: return new DruidModule(game);
                 default: return null;
             }

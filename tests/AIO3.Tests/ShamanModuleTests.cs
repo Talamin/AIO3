@@ -1,6 +1,7 @@
 using AIO3.Core.Game;
 using AIO3.Core.Rotations;
 using AIO3.Core.Rotations.Shaman;
+using AIO3.Core.Testing;
 using Xunit;
 
 namespace AIO3.Tests
@@ -24,6 +25,27 @@ namespace AIO3.Tests
 
             m.ResolveRotation(highestTalentTab: 1); // Elemental
             Assert.True(m.Range >= 20, $"Elemental should report caster range, got {m.Range}");
+        }
+
+        [Fact]
+        public void Low_level_enhancement_pulls_at_caster_range_then_closes_in_combat()
+        {
+            // Pre-Stormstrike (L40) Enhancement opens with a spell then melees: caster range OUT of combat (pull with
+            // Lightning Bolt), melee range IN combat (close + finish) — so it doesn't stand at range and go OOM.
+            var g = new FakeGameClient { Class = WowClass.Shaman };
+            g.UnknownSpells.Add("Stormstrike");
+            var m = new ShamanModule(g);
+            m.ResolveRotation(highestTalentTab: 2); // Enhancement
+
+            g.InCombatFlag = false;
+            Assert.True(m.Range >= 20, $"pre-Stormstrike out of combat should pull at caster range, got {m.Range}");
+
+            g.InCombatFlag = true;
+            Assert.True(m.Range <= 10, $"pre-Stormstrike in combat should close to melee range, got {m.Range}");
+
+            g.UnknownSpells.Remove("Stormstrike"); // learned the melee strike → melee regardless
+            g.InCombatFlag = false;
+            Assert.True(m.Range <= 10, $"with Stormstrike should be melee range, got {m.Range}");
         }
 
         [Fact]

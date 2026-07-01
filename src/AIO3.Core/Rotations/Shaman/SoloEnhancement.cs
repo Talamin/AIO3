@@ -54,6 +54,10 @@ namespace AIO3.Core.Rotations.Shaman
                 ShamanCommon.Shield(s, ShamanSpec.Enhancement, priority: 0.5f),
                 ShamanCommon.WeaponImbue(s, ShamanSpec.Enhancement, priority: 0.6f),
 
+                // --- melee auto-attack: ensure we're actually swinging (off the GCD). Every other melee spec has
+                // this; Enhancement was missing it, so a low-level shaman with no strikes yet just stood there. ---
+                CombatBlocks.AutoAttack(priority: 0.7f),
+
                 // --- interrupt ---
                 ShamanCommon.WindShear(s, priority: 1.0f),
 
@@ -101,6 +105,16 @@ namespace AIO3.Core.Rotations.Shaman
                 // Lava Lash: off-hand fire strike (auto-skips until learned).
                 Skill.Spell("Lava Lash").Priority(5.5f).On(Targets.CurrentEnemy)
                      .When(ctx => ShamanCommon.ManaForOffense(ctx, s)),
+                // Low-level filler: hard-cast Lightning Bolt only while OUT of melee (target > ~8yd) — a pull / a poke
+                // while the mob closes — so a pre-40 shaman OPENS with a spell then goes melee, instead of standing at
+                // range trading Lightning Bolt and casting itself OOM against a caster (Daniel). It STOPS the moment
+                // it's in melee → auto-attack + Earth Shock finish it. Paired with the module's dynamic Range (caster
+                // to pull, melee once engaged). Inert once Stormstrike (L40) is learned (the Maelstrom-proc instant LB
+                // owns high level). Stands still to cast.
+                Skill.Spell("Lightning Bolt").Priority(6.0f).On(Targets.CurrentEnemy)
+                     .When(ctx => !ctx.Game.IsSpellKnown("Stormstrike") && ShamanCommon.Fighting(ctx)
+                                  && ShamanCommon.ManaForOffense(ctx, s) && !ctx.Game.PlayerIsMoving
+                                  && ctx.HasEnemyTarget && ctx.Target.Distance > 8f),
             });
 
             // Racials append at the 2.5-band default; keep the band below the school totems so survival wins.

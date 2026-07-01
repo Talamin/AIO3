@@ -27,6 +27,7 @@ namespace AIO3.Tests
             g.EnemyList.Add(g.TargetUnit);
             g.MeUnit.PowerPercent = 100;
             g.ProductFightingFlag = true; // engaging a fight (Fighting(ctx) true) but not yet "in combat"
+            g.AutoAttacking = true; // already swinging → the off-GCD Enhancement AutoAttack step stays inert
             // Buffs up so they don't preempt the totem band.
             g.MeUnit.WithAura("Water Shield");
             g.MeUnit.WithAura("Lightning Shield");

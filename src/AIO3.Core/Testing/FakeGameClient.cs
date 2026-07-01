@@ -264,6 +264,14 @@ namespace AIO3.Core.Testing
         public WeaponEnchant WeaponEnchantState;
         public WeaponEnchant GetWeaponEnchant() => WeaponEnchantState;
 
+        /// <summary>Whether the off-hand holds a WEAPON (not a shield), for <see cref="OffHandHasWeapon"/> — the shaman
+        /// off-hand imbue gate. Default false (a shield/2H user); a dual-wield test opts in.</summary>
+        public bool OffHandHasWeaponFlag;
+        public bool OffHandHasWeapon => OffHandHasWeaponFlag;
+
+        /// <summary>Weapon imbues route through here (real game = cast + popup confirm); the fake just logs the cast.</summary>
+        public CastResult ImbueWeapon(string spell) => Cast(spell, Me);
+
         /// <summary>Item ids considered present in the bags, for <see cref="HasItemById"/> (e.g. poison ranks).</summary>
         public readonly HashSet<uint> ItemIdsInBags = new HashSet<uint>();
         public bool HasItemById(uint itemId) => ItemIdsInBags.Contains(itemId);

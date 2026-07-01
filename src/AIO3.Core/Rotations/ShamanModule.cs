@@ -23,13 +23,15 @@ namespace AIO3.Core.Rotations
         private readonly ChoiceSetting _spec =
             new ChoiceSetting("spec", "Spec", ShamanSpecs.Auto, ShamanSpecs.Choices) { Category = "Spec" };
         private readonly List<Setting> _all;
+        private readonly IGameClient _game; // reads whether the enhancement melee strike is learned (drives dynamic Range)
 
         private ShamanSpec? _activeSpec;
         private string _activeMode;
         private IRotation _rotation;
 
-        public ShamanModule()
+        public ShamanModule(IGameClient game = null)
         {
+            _game = game;
             // The Spec selector sits first; the shared shaman tunables follow.
             _all = new List<Setting> { _spec };
             _all.AddRange(_settings.All);
@@ -39,10 +41,26 @@ namespace AIO3.Core.Rotations
         public string DisplayName => "Shaman";
         public IReadOnlyList<Setting> Settings => _all;
 
-        /// <summary>Combat distance reported to WRobot. Enhancement is melee (~5); Elemental — and the
-        /// Restoration→Elemental fallback — is a caster (~27). Re-read live so it switches with the resolved spec.</summary>
-        public float Range =>
-            _activeSpec == ShamanSpec.Enhancement ? _settings.EnhancementRange.Value : _settings.ElementalRange.Value;
+        /// <summary>Combat distance reported to WRobot. Elemental — and the Restoration→Elemental fallback — is a
+        /// caster (~27). Enhancement is melee (~5) once it has a melee strike (Stormstrike, L40). PRE-Stormstrike it
+        /// has none, so it opens with a spell then melees: report the CASTER range while OUT of combat (the product
+        /// stops at range → we pull with Lightning Bolt), then MELEE range once IN combat (the product closes → we
+        /// finish in melee with auto-attack + Earth Shock). This stops the low-level shaman from standing at range
+        /// trading LB and going OOM against casters. Re-read live.</summary>
+        public float Range
+        {
+            get
+            {
+                if (_activeSpec != ShamanSpec.Enhancement)
+                    return _settings.ElementalRange.Value;
+                bool hasMeleeStrike = _game == null || _game.IsSpellKnown("Stormstrike");
+                if (hasMeleeStrike)
+                    return _settings.EnhancementRange.Value; // melee once the strike is learned (L40+)
+                // Pre-Stormstrike: caster range to PULL (out of combat), melee to CLOSE + finish (in combat).
+                bool inCombat = _game != null && _game.PlayerInCombat;
+                return inCombat ? _settings.EnhancementRange.Value : _settings.ElementalRange.Value;
+            }
+        }
 
         public string ActiveLabel { get; private set; } = "Solo Enhancement";
         public string ActiveSpec => _activeSpec?.ToString();

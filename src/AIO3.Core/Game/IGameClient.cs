@@ -244,6 +244,18 @@ namespace AIO3.Core.Game
         /// (which hand's poison is about to fall off).</summary>
         WeaponEnchant GetWeaponEnchant();
 
+        /// <summary>True when the OFF-HAND holds an actual WEAPON (WoW's <c>OffhandHasWeapon()</c>), not a shield /
+        /// held-off-hand / nothing. A shaman weapon imbue can only enchant a weapon, so the off-hand imbue must gate on
+        /// this — otherwise a shield-user's off-hand reads "unenchanted" forever and the FC re-casts the imbue in a
+        /// loop (the Rockbiter-spam bug).</summary>
+        bool OffHandHasWeapon { get; }
+
+        /// <summary>Apply a shaman weapon imbue (Rockbiter / Flametongue / Windfury / Frostbrand). Casts the spell AND
+        /// confirms the "replace weapon enchant" popup that WoW raises (clicks StaticPopup1Button1 shortly after, off
+        /// the tick thread) — without that the enchant never lands and the upkeep step re-casts forever. Mirrors the
+        /// old AIO's ApplyEnchant.</summary>
+        CastResult ImbueWeapon(string spell);
+
         /// <summary>True if the player's bags hold at least one of the given item id. By ID (not name) so it's
         /// locale-independent — poison item names differ per client language, the ids don't.</summary>
         bool HasItemById(uint itemId);
