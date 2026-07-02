@@ -56,9 +56,15 @@ namespace AIO3.Core.Rotations
                 bool hasMeleeStrike = _game == null || _game.IsSpellKnown("Stormstrike");
                 if (hasMeleeStrike)
                     return _settings.EnhancementRange.Value; // melee once the strike is learned (L40+)
-                // Pre-Stormstrike: caster range to PULL (out of combat), melee to CLOSE + finish (in combat).
+                // Pre-Stormstrike: caster range to PULL (out of combat) — but ONLY if we can afford the opener;
+                // otherwise MELEE range so we walk straight in instead of standing at caster range waiting for a
+                // Lightning Bolt we can't cast (Daniel). Melee to CLOSE + finish once in combat.
                 bool inCombat = _game != null && _game.PlayerInCombat;
-                return inCombat ? _settings.EnhancementRange.Value : _settings.ElementalRange.Value;
+                if (inCombat)
+                    return _settings.EnhancementRange.Value;
+                return ShamanCommon.CanAffordLowLevelOpener(_game, _settings)
+                    ? _settings.ElementalRange.Value
+                    : _settings.EnhancementRange.Value;
             }
         }
 

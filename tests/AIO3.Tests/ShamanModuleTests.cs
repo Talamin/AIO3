@@ -49,6 +49,21 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Low_level_enhancement_goes_melee_when_it_cant_afford_the_opener()
+        {
+            // No mana for the Lightning Bolt opener → don't stand at caster range waiting for a spell we can't cast;
+            // report MELEE range so the bot walks straight in (Daniel).
+            var g = new FakeGameClient { Class = WowClass.Shaman };
+            g.UnknownSpells.Add("Stormstrike");     // pre-Stormstrike
+            g.SpellManaCosts["Lightning Bolt"] = 100;
+            g.MeUnit.Mana = 50;                     // can't afford one Lightning Bolt
+            var m = new ShamanModule(g);
+            m.ResolveRotation(highestTalentTab: 2); // Enhancement
+            g.InCombatFlag = false;
+            Assert.True(m.Range <= 10, $"can't afford opener out of combat → melee range, got {m.Range}");
+        }
+
+        [Fact]
         public void Enhancement_resolves_to_the_enhancement_rotation()
         {
             var m = new ShamanModule();

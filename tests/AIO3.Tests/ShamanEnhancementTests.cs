@@ -65,29 +65,64 @@ namespace AIO3.Tests
         }
 
         [Fact]
-        public void Low_level_casts_Lightning_Bolt_out_of_melee_before_Stormstrike_exists()
+        public void Low_level_opener_pulls_with_Lightning_Bolt_out_of_combat()
         {
-            // Pre-40 Enhancement, OUT of melee (target > 8yd) → the Lightning Bolt filler pulls / pokes.
+            // Pre-40 Enhancement, OUT OF COMBAT and out of melee (target > 8yd) → open with a single Lightning Bolt pull.
             FakeGameClient g = Game();
-            g.TargetUnit.Distance = 20; // out of melee → the pull/poke Lightning Bolt is allowed
+            g.InCombatFlag = false;         // opener: not engaged yet
+            g.ProductFightingFlag = false;
+            g.TargetUnit.Distance = 20;     // out of melee
             g.UnknownSpells.Add("Stormstrike");
             g.UnknownSpells.Add("Lava Lash");
             g.UnknownSpells.Add("Flame Shock");
-            g.UnknownSpells.Add("Earth Shock"); // strip the low-level shocks so the Lightning Bolt filler is isolated
+            g.UnknownSpells.Add("Earth Shock"); // strip the shocks so the Lightning Bolt opener is isolated
             Assert.Equal("Lightning Bolt", Fire(g)?.Name);
         }
 
         [Fact]
-        public void Low_level_holds_Lightning_Bolt_in_melee_to_avoid_going_oom()
+        public void Low_level_stops_Lightning_Bolt_once_in_combat_and_goes_melee()
         {
-            // Same, but IN melee (target <= 8yd) → NO Lightning Bolt (it finishes in melee: auto-attack + shocks),
-            // so it doesn't cast itself OOM at range against a caster.
-            FakeGameClient g = Game();
-            g.TargetUnit.Distance = 5; // in melee
+            // The bug Daniel hit at lvl 15: in combat at range it kept spamming Lightning Bolt instead of closing.
+            // The opener is out-of-combat ONLY → once engaged, NO more Lightning Bolt (it closes + finishes in melee).
+            FakeGameClient g = Game();      // Game() is already in combat
+            g.TargetUnit.Distance = 20;     // still at range, but already engaged
             g.UnknownSpells.Add("Stormstrike");
             g.UnknownSpells.Add("Lava Lash");
             g.UnknownSpells.Add("Flame Shock");
             g.UnknownSpells.Add("Earth Shock");
+            Assert.NotEqual("Lightning Bolt", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Low_level_no_Lightning_Bolt_opener_when_already_in_melee()
+        {
+            // Out of combat but the target is already in melee (<= 8yd) → no ranged opener, just walk in and swing.
+            FakeGameClient g = Game();
+            g.InCombatFlag = false;
+            g.ProductFightingFlag = false;
+            g.TargetUnit.Distance = 5;      // already in melee
+            g.UnknownSpells.Add("Stormstrike");
+            g.UnknownSpells.Add("Lava Lash");
+            g.UnknownSpells.Add("Flame Shock");
+            g.UnknownSpells.Add("Earth Shock");
+            Assert.NotEqual("Lightning Bolt", Fire(g)?.Name);
+        }
+
+        [Fact]
+        public void Low_level_opener_holds_when_it_cant_afford_the_lightning_bolt()
+        {
+            // Daniel: if there isn't enough mana, DON'T wait on the opener — no Lightning Bolt. (The module range also
+            // drops to melee so the bot walks straight in; see ShamanModuleTests.)
+            FakeGameClient g = Game();
+            g.InCombatFlag = false;
+            g.ProductFightingFlag = false;
+            g.TargetUnit.Distance = 20;
+            g.UnknownSpells.Add("Stormstrike");
+            g.UnknownSpells.Add("Lava Lash");
+            g.UnknownSpells.Add("Flame Shock");
+            g.UnknownSpells.Add("Earth Shock");
+            g.SpellManaCosts["Lightning Bolt"] = 100; // costs 100...
+            g.MeUnit.Mana = 50;                        // ...but we only have 50 → can't afford the opener
             Assert.NotEqual("Lightning Bolt", Fire(g)?.Name);
         }
 

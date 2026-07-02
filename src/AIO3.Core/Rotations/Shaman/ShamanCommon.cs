@@ -42,6 +42,12 @@ namespace AIO3.Core.Rotations.Shaman
         /// the target is within this range — there's no point planting a stationary damage totem if the mob is far.</summary>
         public const float FireTotemTargetRange = 15f;
 
+        /// <summary>Enhancement (melee) only plants its school totems once it's THIS close to the target — i.e. at the
+        /// fight spot, not mid-run. Dropping while still sprinting in plants the totem far from where the melee
+        /// happens; by the time we reach the mob it's out of <see cref="TotemUsefulRange"/> → a wasteful re-drop and
+        /// mana loss (Daniel). Wide enough to fire as we arrive, close enough that the totem stays useful at melee.</summary>
+        public const float MeleeTotemDropRange = 15f;
+
         /// <summary>Radius around the player that counts as "an enemy is on me" for the defensive totems
         /// (Earth Elemental / Stoneclaw) and the surrounded count. Also the radius the Enhancement Feral-Spirit
         /// attacker count uses (the old FC counted enemies within 20y of the target).</summary>
@@ -104,6 +110,20 @@ namespace AIO3.Core.Rotations.Shaman
         /// every offensive step on SoloEnhancementManaSavedForHeals).</summary>
         public static bool ManaForOffense(CombatContext ctx, ShamanSettings s) =>
             s.ManaSavedForHeals.Value <= 0 || ctx.Me.PowerPercent >= s.ManaSavedForHeals.Value;
+
+        /// <summary>Can a pre-Stormstrike Enhancement shaman afford its Lightning Bolt OPENER right now? True when the
+        /// mana reserve (if any) is respected AND there is enough mana for one Lightning Bolt. Drives BOTH the opener
+        /// step and the module's out-of-combat pull range: if we can't afford it we walk straight into melee instead
+        /// of standing at caster range waiting for a spell we can't cast (Daniel). The absolute cost matters because
+        /// the reserve defaults to 0 (never reserve), so the reserve check alone never trips.</summary>
+        public static bool CanAffordLowLevelOpener(IGameClient game, ShamanSettings s)
+        {
+            if (game?.Me == null) return false;
+            bool reserveOk = s.ManaSavedForHeals.Value <= 0 || game.Me.PowerPercent >= s.ManaSavedForHeals.Value;
+            int cost = game.SpellManaCost("Lightning Bolt");
+            bool canPay = cost <= 0 || game.Me.Mana >= cost;
+            return reserveOk && canPay;
+        }
 
         /// <summary>True when at least <see cref="MaelstromFullStacks"/> Maelstrom Weapon stacks are up — the instant
         /// Lightning Bolt / Chain Lightning window for Enhancement.</summary>
@@ -176,6 +196,11 @@ namespace AIO3.Core.Rotations.Shaman
                 condition: (ctx, t) =>
                 {
                     if (!Fighting(ctx) || ctx.Game.PlayerIsMoving || ctx.Game.PlayerIsMounted) return false;
+                    // Melee (Enhancement): only plant once we're at the fight — near the target — so the totem isn't
+                    // dropped mid-run far from the mob and then re-dropped (mana loss) once we reach melee (Daniel).
+                    // Caster specs plant at their casting spot (the !PlayerIsMoving gate already covers that).
+                    if (spec == ShamanSpec.Enhancement
+                        && (!ctx.HasEnemyTarget || ctx.Target.Distance > MeleeTotemDropRange)) return false;
                     string totem = ResolveSchoolTotem(ctx, s, spec, school);
                     if (totem == null) return false;
                     if (!ctx.Game.IsSpellKnown(totem) || !ctx.Game.IsSpellReady(totem)) return false;
