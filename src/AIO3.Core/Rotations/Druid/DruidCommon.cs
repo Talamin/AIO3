@@ -232,7 +232,7 @@ namespace AIO3.Core.Rotations.Druid
         /// <summary>True when we have the mana to shift back into form AND land <paramref name="healSpell"/> — the
         /// PRECISE gate that replaces the old flat % headroom (which under-shot at low level, where one shapeshift costs
         /// far more than 15% of a small pool → dropped cat, mana gone, heal unaffordable, reformed with nothing healed:
-        /// Daniel's "switch ganz kurz aus der Katze, viel Mana weg, kein Grund im Log"). Mirrors the old AIO's
+        /// Talamin's "switch ganz kurz aus der Katze, viel Mana weg, kein Grund im Log"). Mirrors the old AIO's
         /// <c>Me.Mana &gt; TransformValue + HealValue</c> (absolute cost, read via <see cref="IGameClient.SpellManaCost"/>).
         /// Free/unknown costs read 0, so with nothing configured this is trivially affordable (offline tests opt in).</summary>
         public static bool CanAffordShiftHeal(CombatContext ctx, string healSpell)

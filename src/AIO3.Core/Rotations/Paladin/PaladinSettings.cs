@@ -83,7 +83,7 @@ namespace AIO3.Core.Rotations.Paladin
             new ChoiceSetting("interrupt", "Interrupt", InterruptModes.Smart, InterruptModes.All);
 
         /// <summary>Auto target switching among attackers (never pulls — only re-targets when several enemies
-        /// are already attacking, with hysteresis). On by default for the paladin per Daniel's preference.
+        /// are already attacking, with hysteresis). On by default for the paladin per Talamin's preference.
         /// Turn it off if a WRobot product owns targeting and the two start fighting over the target.</summary>
         public readonly ToggleSetting AutoSwitchTarget =
             new ToggleSetting("targetSelect", "Auto target switching", value: true);

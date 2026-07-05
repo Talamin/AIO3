@@ -97,18 +97,50 @@ namespace AIO3.Tests
             Assert.NotEqual("Pestilence", Fire(g, Defaults())?.Name);
         }
 
-        // --- ghoul (PetControl reuse) ---
+        // --- ghoul (PetControl reuse; UNHOLY only, and the summon needs a raisable corpse OR Corpse Dust) ---
+
+        // The ghoul band lives ONLY on Unholy now (Blood/Frost dropped it — the temp minion isn't worth it), so the
+        // ghoul tests host through the Unholy spec. Blood is proven ghoul-free below.
+        private static RotationStep FireUnholy(FakeGameClient g, DeathKnightSettings s) =>
+            new RotationEngine(new SoloUnholy(s).BuildSteps()).Tick(CombatContext.Capture(g));
 
         [Fact]
-        public void Raise_dead_summons_the_ghoul_out_of_combat_when_petless()
+        public void Unholy_raises_the_ghoul_with_corpse_dust_when_petless()
         {
             FakeGameClient g = Game();
             g.InCombatFlag = false; // summon fires out of combat
             g.PetUnit = null;       // petless
+            g.ItemIdsInBags.Add(DeathKnightCommon.CorpseDustItemId); // reagent present → Raise Dead is castable
             var s = Defaults();
             s.UseRaiseDead.Value = true;
-            Assert.Equal("Pet summon", Fire(g, s)?.Name);
+            Assert.Equal("Pet summon", FireUnholy(g, s)?.Name);
             Assert.Contains("Raise Dead", g.CastLog);
+        }
+
+        [Fact]
+        public void Unholy_raises_the_ghoul_off_a_nearby_corpse_without_corpse_dust()
+        {
+            FakeGameClient g = Game();
+            g.InCombatFlag = false;
+            g.PetUnit = null;
+            g.RaiseableCorpseFlag = true; // a raisable humanoid corpse → no reagent needed
+            var s = Defaults();
+            s.UseRaiseDead.Value = true;
+            Assert.Equal("Pet summon", FireUnholy(g, s)?.Name);
+            Assert.Contains("Raise Dead", g.CastLog);
+        }
+
+        [Fact]
+        public void Raise_dead_is_held_when_neither_a_corpse_nor_corpse_dust_is_available()
+        {
+            FakeGameClient g = Game();
+            g.InCombatFlag = false;
+            g.PetUnit = null;
+            // no RaiseableCorpseFlag, no Corpse Dust in bags → the cast would just fail, so it must NOT fire
+            var s = Defaults();
+            s.UseRaiseDead.Value = true;
+            Assert.NotEqual("Pet summon", FireUnholy(g, s)?.Name);
+            Assert.DoesNotContain("Raise Dead", g.CastLog);
         }
 
         [Fact]
@@ -118,7 +150,7 @@ namespace AIO3.Tests
             g.PetUnit = new FakeUnit { Guid = 50, Name = "Ghoul", IsAlive = true, TargetGuid = 0 };
             var s = Defaults();
             s.UseRaiseDead.Value = true;
-            Fire(g, s);
+            FireUnholy(g, s);
             Assert.Contains(g.TargetUnit.Guid, g.PetAttackLog); // the pet was told to attack our target
         }
 
@@ -132,7 +164,7 @@ namespace AIO3.Tests
             var s = Defaults();
             s.UseRaiseDead.Value = true;
             s.InterruptCasts.Value = false; // silence Mind Freeze so the ghoul's Gnaw is the interrupt seen
-            Fire(g, s);
+            FireUnholy(g, s);
             Assert.Contains("Gnaw", g.PetCastLog);
         }
 
@@ -144,7 +176,7 @@ namespace AIO3.Tests
             g.PetAbilities.Add("Leap");
             var s = Defaults();
             s.UseRaiseDead.Value = true;
-            Fire(g, s);
+            FireUnholy(g, s);
             Assert.Contains("Leap", g.PetCastLog);
         }
 
@@ -154,9 +186,41 @@ namespace AIO3.Tests
             FakeGameClient g = Game();
             g.InCombatFlag = false;
             g.PetUnit = null;
+            g.ItemIdsInBags.Add(DeathKnightCommon.CorpseDustItemId); // reagent present, but the toggle is off
             var s = Defaults();
             s.UseRaiseDead.Value = false;
-            Assert.NotEqual("Pet summon", Fire(g, s)?.Name);
+            Assert.NotEqual("Pet summon", FireUnholy(g, s)?.Name);
+            Assert.DoesNotContain("Raise Dead", g.CastLog);
+        }
+
+        [Fact]
+        public void Blood_never_summons_the_ghoul_even_with_reagent_and_corpse()
+        {
+            // Rule 2: only Unholy runs the ghoul band. Blood must be ghoul-free even opted in, with a corpse AND dust.
+            FakeGameClient g = Game();
+            g.InCombatFlag = false;
+            g.PetUnit = null;
+            g.ItemIdsInBags.Add(DeathKnightCommon.CorpseDustItemId);
+            g.RaiseableCorpseFlag = true;
+            var s = Defaults();
+            s.UseRaiseDead.Value = true;
+            RotationStep fired = Fire(g, s); // Fire hosts through the Blood spec
+            Assert.NotEqual("Pet summon", fired?.Name);
+            Assert.DoesNotContain("Raise Dead", g.CastLog);
+        }
+
+        [Fact]
+        public void Frost_never_summons_the_ghoul_even_with_reagent_and_corpse()
+        {
+            FakeGameClient g = Game();
+            g.InCombatFlag = false;
+            g.PetUnit = null;
+            g.ItemIdsInBags.Add(DeathKnightCommon.CorpseDustItemId);
+            g.RaiseableCorpseFlag = true;
+            var s = Defaults();
+            s.UseRaiseDead.Value = true;
+            RotationStep fired = new RotationEngine(new SoloFrost(s).BuildSteps()).Tick(CombatContext.Capture(g));
+            Assert.NotEqual("Pet summon", fired?.Name);
             Assert.DoesNotContain("Raise Dead", g.CastLog);
         }
     }

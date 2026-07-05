@@ -12,7 +12,8 @@ namespace AIO3.Core.Rotations.DeathKnight
     /// <summary>
     /// Solo Blood Death Knight (melee, range ~5; leveling/grinding). The survival-heavy tree: composes the shared
     /// <see cref="DeathKnightCommon"/> baseline (the rune-affordability gate, disease upkeep, Presence + Horn of
-    /// Winter, Mind Freeze / Death Grip, the ghoul) and adds the Blood survival cooldowns + strike priority. Thin:
+    /// Winter, Mind Freeze / Death Grip) and adds the Blood survival cooldowns + strike priority. No ghoul band —
+    /// Raise Dead's ghoul is permanent only for Unholy (Master of Ghouls); a 60s temp minion isn't worth it here. Thin:
     /// the step list is built ONCE in the ctor; unknown spells auto-skip so the same list scales by level (a low
     /// DK without Heart Strike just uses Blood Strike). EVERY rune-costed step gates on CanAffordRunes via the
     /// DeathKnightCommon helpers, so a rune-starved step never jams the rotation.
@@ -60,8 +61,7 @@ namespace AIO3.Core.Rotations.DeathKnight
                     ctx => s.RuneTapPercent.Value > 0 && ctx.Me.HealthPercent <= s.RuneTapPercent.Value),
             };
 
-            // --- ghoul (optional temp pet for Blood; skips when petless / toggled off) ---
-            DeathKnightCommon.WithGhoul(s, core);
+            // No ghoul band: Raise Dead's ghoul is permanent only for Unholy (Master of Ghouls). See SoloUnholy.
 
             core.AddRange(new[]
             {

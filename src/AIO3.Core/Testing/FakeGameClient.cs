@@ -54,6 +54,7 @@ namespace AIO3.Core.Testing
         public bool SwimmingFlag;
         public bool RootedFlag;
         public bool CannibalizeCorpseFlag;
+        public bool RaiseableCorpseFlag; // a nearby humanoid corpse Raise Dead can reanimate without Corpse Dust
         public bool RestingFlag;     // sitting/eating to recover, for PlayerIsResting
         public bool HarmfulAuraFlag; // a debuff/DoT on the player, for PlayerHasHarmfulAura
         public bool BehindTargetFlag; // player is in the target's rear arc, for PlayerIsBehindTarget
@@ -124,6 +125,7 @@ namespace AIO3.Core.Testing
         public bool PlayerIsRooted => RootedFlag;
         public bool PlayerHasDebuffType(string dispelType) => DebuffTypes.Contains(dispelType);
         public bool HasCannibalizeCorpseNearby() => CannibalizeCorpseFlag;
+        public bool HasRaiseableCorpseNearby() => RaiseableCorpseFlag;
         public bool PlayerIsResting => RestingFlag;
         public bool PlayerHasHarmfulAura() => HarmfulAuraFlag;
         public bool PlayerIsBehindTarget() => BehindTargetFlag;

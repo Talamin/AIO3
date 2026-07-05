@@ -71,10 +71,11 @@ namespace AIO3.Core.Rotations.DeathKnight
 
         // --- Ghoul (Unholy permanent; Blood/Frost optional temp) ---
 
-        /// <summary>Summon + manage the ghoul (Raise Dead). Unholy keeps it permanently (Master of Ghouls); Blood /
-        /// Frost get a temporary one. Off lets a product own the pet (or play petless).</summary>
+        /// <summary>Summon + manage the ghoul (Raise Dead) — UNHOLY only, where Master of Ghouls makes it permanent.
+        /// Blood/Frost never run the ghoul band (the 60s temp minion isn't worth a GCD + reagent). Off lets a product
+        /// own the pet (or play petless). The summon also needs a raisable corpse nearby OR Corpse Dust in the bags.</summary>
         public readonly ToggleSetting UseRaiseDead =
-            new ToggleSetting("raiseDead", "Raise Dead (ghoul)", value: true);
+            new ToggleSetting("raiseDead", "Raise Dead (ghoul, Unholy)", value: true);
 
         /// <summary>Use major cooldowns (Dancing Rune Weapon, Summon Gargoyle, Empower Rune Weapon, Mark of Blood)
         /// on elites / bosses / packs.</summary>
@@ -217,8 +218,8 @@ namespace AIO3.Core.Rotations.DeathKnight
             UseDeathGripPull.Description = "Use Death Grip as the ranged pull — yank the engaged mob into melee (like a bear's Growl pull).";
             UseDeathGripInterrupt.Category = "Rotation";
             UseDeathGripInterrupt.Description = "Also Death Grip a casting enemy in (a pull-interrupt backup to Mind Freeze). Needs the interrupt toggle too.";
-            UseRaiseDead.Category = "Rotation";
-            UseRaiseDead.Description = "Summon + control the ghoul (Raise Dead). Unholy keeps it permanently; Blood/Frost get a temporary one.";
+            UseRaiseDead.Category = "Rotation"; UseRaiseDead.Spec = "Unholy";
+            UseRaiseDead.Description = "Summon + control the ghoul (Raise Dead). Unholy only (Master of Ghouls keeps it permanent). Needs a raisable corpse nearby or Corpse Dust.";
             UseCooldowns.Category = "Rotation";
             UseCooldowns.Description = "Use major cooldowns (Dancing Rune Weapon / Summon Gargoyle / Empower Rune Weapon / Mark of Blood) on elites/bosses/packs.";
             UseRacials.Category = "Rotation";

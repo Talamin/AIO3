@@ -163,6 +163,15 @@ namespace AIO3.Core.Game
         /// can feed on (an out-of-combat heal). Creature type comes from the per-entry cache (mobs we fought).</summary>
         bool HasCannibalizeCorpseNearby();
 
+        /// <summary>True if a nearby HUMANOID corpse is close enough for the Death Knight's Raise Dead to reanimate
+        /// WITHOUT its Corpse Dust reagent (3.3.5a: Raise Dead consumes a nearby humanoid corpse, else the reagent).
+        /// Creature type comes from the same per-entry cache as <see cref="HasCannibalizeCorpseNearby"/> — a mob we
+        /// just killed is in it, which is the common case (raise a ghoul off the last kill). Conservative range/type
+        /// so a false positive can't make the summon fire when it would actually fail; when this is false the caller
+        /// falls back to the reagent gate (<see cref="HasItemById"/> on Corpse Dust). 0 matches for non-DK / unfought
+        /// corpses, so it's a harmless no-op elsewhere.</summary>
+        bool HasRaiseableCorpseNearby();
+
         /// <summary>True while the player is in the rest/regeneration phase — eating/drinking to recover. WRobot
         /// exposes no readable "am I regenerating" engine state to a FightClass, so this reads the Food/Drink
         /// auras (the clear, reliable signal). Lets the rogue's stealth opener stay out of the rest phase.</summary>

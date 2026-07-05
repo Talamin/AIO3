@@ -172,7 +172,7 @@ namespace AIO3.Tests
         [Fact]
         public void Enhancement_holds_school_totems_until_near_the_target()
         {
-            // Daniel: don't plant totems mid-run. In combat but still far from the target (>15y) → NO school totem
+            // Talamin: don't plant totems mid-run. In combat but still far from the target (>15y) → NO school totem
             // (else it plants far, then re-drops at melee = mana loss); once near the target it plants.
             FakeGameClient g = Game();
             g.InCombatFlag = true;

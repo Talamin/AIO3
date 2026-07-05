@@ -83,7 +83,7 @@ namespace AIO3.Core.Rotations.Rogue
         /// <summary>Slice and Dice — the rogue's core attack-speed buff. Refresh it when it's down, but spend only
         /// CHEAP combo points on it: at least <paramref name="minComboPoints"/> (1 is enough) and BELOW the finisher
         /// threshold, so a finisher-worthy bar goes to Eviscerate instead of being wasted on a buff refresh (the
-        /// thing Daniel saw — 3 CP burned re-applying SnD). Also skip a dying target (HP below
+        /// thing Talamin saw — 3 CP burned re-applying SnD). Also skip a dying target (HP below
         /// <see cref="SliceAndDiceMinTargetHealth"/>): it'll be dead before the buff matters, so dump the points into
         /// the finisher. So SnD stays up by refreshing early at 1-2 CP while building, and never eats a full bar.</summary>
         public static RotationStep SliceAndDice(RogueSettings s, int minComboPoints, float priority) =>

@@ -11,11 +11,12 @@ namespace AIO3.Core.Rotations.DeathKnight
 {
     /// <summary>
     /// Solo Frost Death Knight (melee, range ~5; leveling/grinding). Composes the shared <see cref="DeathKnightCommon"/>
-    /// baseline (rune gate, diseases, Presence + Horn of Winter, Mind Freeze / Death Grip, the ghoul) and adds the
+    /// baseline (rune gate, diseases, Presence + Horn of Winter, Mind Freeze / Death Grip) and adds the
     /// Frost core: Howling Blast on the Rime/Freezing Fog or Killing Machine proc, Obliterate as the main strike
     /// (needs both diseases up; 1F+1U), Frost Strike as the RP dump (0-rune), then the Blood-rune fillers + the AoE.
     /// Thin: the step list is built ONCE in the ctor; unknown spells auto-skip so it scales by level. EVERY
-    /// rune-costed step gates on CanAffordRunes via the DeathKnightCommon helpers.
+    /// rune-costed step gates on CanAffordRunes via the DeathKnightCommon helpers. No ghoul band — the temp Raise
+    /// Dead minion (permanent only for Unholy via Master of Ghouls) isn't worth a GCD + reagent here.
     /// </summary>
     public sealed class SoloFrost : IRotation
     {
@@ -52,8 +53,7 @@ namespace AIO3.Core.Rotations.DeathKnight
                 DeathKnightCommon.IceboundFortitude(s, priority: 0.3f),
             };
 
-            // --- ghoul (optional temp pet for Frost) ---
-            DeathKnightCommon.WithGhoul(s, core);
+            // No ghoul band: Raise Dead's ghoul is permanent only for Unholy (Master of Ghouls). See SoloUnholy.
 
             core.AddRange(new[]
             {

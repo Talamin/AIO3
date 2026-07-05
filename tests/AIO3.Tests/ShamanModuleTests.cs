@@ -52,7 +52,7 @@ namespace AIO3.Tests
         public void Low_level_enhancement_goes_melee_when_it_cant_afford_the_opener()
         {
             // No mana for the Lightning Bolt opener → don't stand at caster range waiting for a spell we can't cast;
-            // report MELEE range so the bot walks straight in (Daniel).
+            // report MELEE range so the bot walks straight in (Talamin).
             var g = new FakeGameClient { Class = WowClass.Shaman };
             g.UnknownSpells.Add("Stormstrike");     // pre-Stormstrike
             g.SpellManaCosts["Lightning Bolt"] = 100;

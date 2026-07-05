@@ -283,20 +283,33 @@ namespace AIO3.Core.Rotations.DeathKnight
         public static RotationStep DeathAndDecay(Func<CombatContext, int> count, float priority) =>
             Strike("Death and Decay", priority, ctx => EnemiesNear(ctx) >= count(ctx));
 
-        // --- the ghoul (reuses PetControl; gated on UseRaiseDead + IsSpellKnown) ---
+        // --- the ghoul (reuses PetControl; gated on UseRaiseDead + reagent/corpse availability) ---
+
+        /// <summary>Corpse Dust — the Raise Dead reagent (3.3.5a item 37201). Consumed when no nearby humanoid corpse
+        /// is available; without a corpse AND without this in the bags, Raise Dead just fails, so the summon gates on
+        /// it (see <see cref="WithGhoul"/>).</summary>
+        public const uint CorpseDustItemId = 37201;
 
         /// <summary>Append the ghoul management band to a spec's step list (one call, like the hunter's pet band).
+        /// UNHOLY ONLY: Raise Dead's ghoul is a permanent pet only with the Master of Ghouls talent (Unholy); for
+        /// Blood/Frost it's a 60s temp minion that isn't worth a GCD + reagent, so those specs don't compose this.
         /// Reuses the class-agnostic <see cref="PetControl"/> blocks: Raise Dead to summon (no revive spell — a DK
         /// re-Raises rather than revives), target-sync the ghoul to the player's target, and the two ghoul abilities
         /// Gnaw (interrupt when the target is casting + the ghoul is in range) and Leap (gap-close when the ghoul is
         /// far). Every block is gated on the ghoul EXISTING (ctx.Pet) + the UseRaiseDead toggle, so a petless /
-        /// product-owned-pet DK skips them cleanly. Priorities sit in the pet band (~0.5-0.9), above the rotation.</summary>
+        /// product-owned-pet DK skips them cleanly. The SUMMON additionally requires a raisable corpse nearby OR
+        /// Corpse Dust in the bags — otherwise Raise Dead just fails and would spam a dead cast every tick.
+        /// Priorities sit in the pet band (~0.5-0.9), above the rotation.</summary>
         public static List<RotationStep> WithGhoul(DeathKnightSettings s, List<RotationStep> steps)
         {
             Func<CombatContext, bool> enabled = ctx => s.UseRaiseDead.Value;
+            // Raise Dead needs a nearby humanoid corpse OR its Corpse Dust reagent; with neither the cast just fails,
+            // so gate the SUMMON (not the target-sync / Gnaw / Leap, which only need the ghoul to exist) on it.
+            Func<CombatContext, bool> canSummon = ctx => enabled(ctx)
+                && (ctx.Game.HasRaiseableCorpseNearby() || ctx.Game.HasItemById(CorpseDustItemId));
             // Raise Dead summons; there is no revive spell (a dead/expired ghoul is re-Raised), so callSpell ==
             // reviveSpell == "Raise Dead" and the PetControl revive path simply re-casts it.
-            steps.Add(PetControl.Summon(enabled, "Raise Dead", "Raise Dead", priority: 0.5f));
+            steps.Add(PetControl.Summon(canSummon, "Raise Dead", "Raise Dead", priority: 0.5f));
             steps.Add(PetControl.Attack(enabled, priority: 0.7f));
             // Gnaw: the ghoul's interrupt — only when the target is casting (and the ghoul is in range, which the
             // adapter's PetAbilityReady + the pet's own positioning handle). Mirrors the old DeathKnightBehavior.

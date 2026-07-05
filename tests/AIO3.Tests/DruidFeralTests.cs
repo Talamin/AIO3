@@ -533,7 +533,7 @@ namespace AIO3.Tests
         {
             // The precise-cost gate (replaces the old flat % headroom). Mana% is ABOVE the user floor (30), so the old
             // %-only check would have dropped form — but the ABSOLUTE mana can't even cover the re-shift, so dropping
-            // would burn a shift and reform with NOTHING healed (Daniel's low-level "viel Mana weg, kein Grund im Log").
+            // would burn a shift and reform with NOTHING healed (Talamin's low-level "viel Mana weg, kein Grund im Log").
             // So we must NOT drop: keep fighting instead.
             var g = CatGame();
             g.MeUnit.HealthPercent = 30;

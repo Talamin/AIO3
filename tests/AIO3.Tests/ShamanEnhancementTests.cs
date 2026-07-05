@@ -82,7 +82,7 @@ namespace AIO3.Tests
         [Fact]
         public void Low_level_stops_Lightning_Bolt_once_in_combat_and_goes_melee()
         {
-            // The bug Daniel hit at lvl 15: in combat at range it kept spamming Lightning Bolt instead of closing.
+            // The bug Talamin hit at lvl 15: in combat at range it kept spamming Lightning Bolt instead of closing.
             // The opener is out-of-combat ONLY → once engaged, NO more Lightning Bolt (it closes + finishes in melee).
             FakeGameClient g = Game();      // Game() is already in combat
             g.TargetUnit.Distance = 20;     // still at range, but already engaged
@@ -111,7 +111,7 @@ namespace AIO3.Tests
         [Fact]
         public void Low_level_opener_holds_when_it_cant_afford_the_lightning_bolt()
         {
-            // Daniel: if there isn't enough mana, DON'T wait on the opener — no Lightning Bolt. (The module range also
+            // Talamin: if there isn't enough mana, DON'T wait on the opener — no Lightning Bolt. (The module range also
             // drops to melee so the bot walks straight in; see ShamanModuleTests.)
             FakeGameClient g = Game();
             g.InCombatFlag = false;

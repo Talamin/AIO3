@@ -45,7 +45,7 @@ namespace AIO3.Core.Rotations
         /// <summary>Combat distance reported to WRobot. Balance is always a caster. Feral reports MELEE only once a
         /// shapeshift form is learned (Bear Form at ~level 10, then Cat) — before that a formless leveling druid
         /// nukes with Wrath, so it reports CASTER range, otherwise WRobot drags the still-caster low-level druid
-        /// into melee (the level-1 behaviour Daniel saw). Mirrors the old AIO's DruidBehavior range logic
+        /// into melee (the level-1 behaviour Talamin saw). Mirrors the old AIO's DruidBehavior range logic
         /// (melee if it knows a form, else caster). Re-read live, so it switches to melee the moment a form is
         /// learned. A null game client (tests) keeps the melee default.</summary>
         public float Range

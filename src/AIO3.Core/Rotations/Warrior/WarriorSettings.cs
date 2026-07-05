@@ -65,7 +65,7 @@ namespace AIO3.Core.Rotations.Warrior
 
         /// <summary>Auto target switching: when several enemies are attacking, switch the current target
         /// to an attacker if it isn't already one. This is ONLY about which target we hit — it never
-        /// pulls or starts a fight (the product owns the opener). On by default per Daniel's preference;
+        /// pulls or starts a fight (the product owns the opener). On by default per Talamin's preference;
         /// turn it off if a WRobot product owns targeting and the two start fighting over the target.
         /// NOTE: other multi-enemy concerns (multi-target damage, defending against several attackers)
         /// will become their own separate settings later.</summary>

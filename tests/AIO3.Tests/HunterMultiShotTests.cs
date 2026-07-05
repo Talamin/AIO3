@@ -7,7 +7,7 @@ using Xunit;
 
 namespace AIO3.Tests
 {
-    // The shared HunterCommon.MultiShot block. Covers the AoE gate AND the throttle that fixes the bug Daniel saw:
+    // The shared HunterCommon.MultiShot block. Covers the AoE gate AND the throttle that fixes the bug Talamin saw:
     // Multi-Shot's short (~0.5s, less with haste) cast falls within the ~400ms spell-queue window, so without a
     // RecastDelay the engine re-issued it every tick and RESTARTED the shot before it completed — it only toggled
     // the spell on/off and never fired.
@@ -33,7 +33,7 @@ namespace AIO3.Tests
         private static HunterSettings AoeAt(int threshold)
         {
             var s = new HunterSettings();
-            s.AoeThreshold.Value = threshold; // mirror Daniel's config (AoE at 2)
+            s.AoeThreshold.Value = threshold; // mirror Talamin's config (AoE at 2)
             return s;
         }
 

@@ -108,7 +108,7 @@ namespace AIO3.Core.Rotations.Shaman
                 // Low-level OPENER: hard-cast Lightning Bolt ONCE to pull, ONLY while still OUT OF COMBAT and out of
                 // melee (target > ~8yd). The instant we're in combat this goes inert → the shaman closes and finishes
                 // in melee (auto-attack + Earth Shock), instead of standing at range spamming Lightning Bolt and going
-                // OOM against a caster (Daniel: "nur mit einem Spell pullen, danach sofort in den Nahkampf"). Paired
+                // OOM against a caster (Talamin: "nur mit einem Spell pullen, danach sofort in den Nahkampf"). Paired
                 // with the module's dynamic Range (caster to pull, melee once engaged). Inert once Stormstrike (L40)
                 // is learned (the Maelstrom-proc instant LB owns high level). Stands still to cast.
                 Skill.Spell("Lightning Bolt").Priority(6.0f).On(Targets.CurrentEnemy)

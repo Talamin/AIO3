@@ -53,7 +53,8 @@ namespace AIO3.Core.Rotations.DeathKnight
                 DeathKnightCommon.IceboundFortitude(s, priority: 0.3f),
             };
 
-            // --- ghoul: Unholy's permanent pet (Master of Ghouls). Highest-value of the pet band. ---
+            // --- ghoul: Unholy's permanent pet (Master of Ghouls). The ONLY spec that composes the ghoul band; the
+            //     summon self-gates on a raisable corpse OR Corpse Dust so it never spams a dead Raise Dead cast. ---
             DeathKnightCommon.WithGhoul(s, core);
 
             core.AddRange(new[]

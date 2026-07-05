@@ -45,7 +45,7 @@ namespace AIO3.Core.Rotations.Shaman
         /// <summary>Enhancement (melee) only plants its school totems once it's THIS close to the target — i.e. at the
         /// fight spot, not mid-run. Dropping while still sprinting in plants the totem far from where the melee
         /// happens; by the time we reach the mob it's out of <see cref="TotemUsefulRange"/> → a wasteful re-drop and
-        /// mana loss (Daniel). Wide enough to fire as we arrive, close enough that the totem stays useful at melee.</summary>
+        /// mana loss (Talamin). Wide enough to fire as we arrive, close enough that the totem stays useful at melee.</summary>
         public const float MeleeTotemDropRange = 15f;
 
         /// <summary>Radius around the player that counts as "an enemy is on me" for the defensive totems
@@ -114,7 +114,7 @@ namespace AIO3.Core.Rotations.Shaman
         /// <summary>Can a pre-Stormstrike Enhancement shaman afford its Lightning Bolt OPENER right now? True when the
         /// mana reserve (if any) is respected AND there is enough mana for one Lightning Bolt. Drives BOTH the opener
         /// step and the module's out-of-combat pull range: if we can't afford it we walk straight into melee instead
-        /// of standing at caster range waiting for a spell we can't cast (Daniel). The absolute cost matters because
+        /// of standing at caster range waiting for a spell we can't cast (Talamin). The absolute cost matters because
         /// the reserve defaults to 0 (never reserve), so the reserve check alone never trips.</summary>
         public static bool CanAffordLowLevelOpener(IGameClient game, ShamanSettings s)
         {
@@ -197,7 +197,7 @@ namespace AIO3.Core.Rotations.Shaman
                 {
                     if (!Fighting(ctx) || ctx.Game.PlayerIsMoving || ctx.Game.PlayerIsMounted) return false;
                     // Melee (Enhancement): only plant once we're at the fight — near the target — so the totem isn't
-                    // dropped mid-run far from the mob and then re-dropped (mana loss) once we reach melee (Daniel).
+                    // dropped mid-run far from the mob and then re-dropped (mana loss) once we reach melee (Talamin).
                     // Caster specs plant at their casting spot (the !PlayerIsMoving gate already covers that).
                     if (spec == ShamanSpec.Enhancement
                         && (!ctx.HasEnemyTarget || ctx.Target.Distance > MeleeTotemDropRange)) return false;

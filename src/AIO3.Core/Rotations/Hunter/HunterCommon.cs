@@ -78,7 +78,7 @@ namespace AIO3.Core.Rotations.Hunter
 
         /// <summary>Don't re-issue Multi-Shot during its own cast. Multi-Shot's ~0.5s cast time (less with haste)
         /// falls within the ~400ms spell-queue window, so without a throttle the engine re-casts it every tick and
-        /// RESTARTS the shot before it completes — it just toggles the spell on/off and never fires (the bug Daniel
+        /// RESTARTS the shot before it completes — it just toggles the spell on/off and never fires (the bug Talamin
         /// saw). One RecastDelay lets the cast finish; the shot's own ~10s cooldown then gates further casts, so this
         /// throttle never limits real usage. Longer than the cast + the cooldown-register latency.</summary>
         public const int MultiShotRecastMs = 1500;

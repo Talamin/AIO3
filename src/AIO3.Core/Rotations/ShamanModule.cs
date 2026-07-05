@@ -58,7 +58,7 @@ namespace AIO3.Core.Rotations
                     return _settings.EnhancementRange.Value; // melee once the strike is learned (L40+)
                 // Pre-Stormstrike: caster range to PULL (out of combat) — but ONLY if we can afford the opener;
                 // otherwise MELEE range so we walk straight in instead of standing at caster range waiting for a
-                // Lightning Bolt we can't cast (Daniel). Melee to CLOSE + finish once in combat.
+                // Lightning Bolt we can't cast (Talamin). Melee to CLOSE + finish once in combat.
                 bool inCombat = _game != null && _game.PlayerInCombat;
                 if (inCombat)
                     return _settings.EnhancementRange.Value;

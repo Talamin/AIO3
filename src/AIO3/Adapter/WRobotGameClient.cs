@@ -286,7 +286,7 @@ namespace AIO3.Adapter
                     {
                         // Real distance per active totem: GetTotemInfo says a slot is active but not WHERE. Without the
                         // distance the school reads "up" forever and we never re-drop after walking away from the totem —
-                        // it stays active in the slot but its buff is out of range (Daniel: totem up, no buff, no re-cast).
+                        // it stays active in the slot but its buff is out of range (Talamin: totem up, no buff, no re-cast).
                         // The totem is a unit (the "pet" and/or a summoned unit), so match it by name for GetDistance.
                         var dist = new Dictionary<string, float>();
                         foreach (WoWUnit u in ObjectManager.GetObjectWoWUnit())
@@ -456,12 +456,22 @@ namespace AIO3.Adapter
             return _debuffTypes.Contains(dispelType);
         }
 
-        // A Humanoid/Undead corpse within 8yd for Cannibalize. GetObjectWoWUnit() includes dead units (scout-
-        // verified); IsDead/Entry/GetDistance all resolve on them. The creature type comes from our per-entry
-        // cache (populated when the mob was alive + our target), so a fresh unfought corpse simply won't match.
-        public bool HasCannibalizeCorpseNearby() =>
-            ObjectManager.GetObjectWoWUnit().Any(u => u.IsDead && u.GetDistance <= 8f
-                && WRobotUnit.CachedCreatureTypeIs(u.Entry, "Humanoid", "Undead"));
+        // Corpse scan shared by Cannibalize and Raise Dead. GetObjectWoWUnit() includes dead units (scout-verified);
+        // IsDead/Entry/GetDistance all resolve on them. The creature type comes from our per-entry cache (populated
+        // when the mob was alive + our target), so a fresh unfought corpse simply won't match.
+        private bool AnyCorpseNearby(float range, params string[] creatureTypes) =>
+            ObjectManager.GetObjectWoWUnit().Any(u => u.IsDead && u.GetDistance <= range
+                && WRobotUnit.CachedCreatureTypeIs(u.Entry, creatureTypes));
+
+        // A Humanoid/Undead corpse within 8yd for Cannibalize.
+        public bool HasCannibalizeCorpseNearby() => AnyCorpseNearby(8f, "Humanoid", "Undead");
+
+        // A Humanoid corpse within reach for Raise Dead (which reanimates a humanoid corpse, else consumes Corpse
+        // Dust). Humanoid-only (Undead corpses don't feed Raise Dead) and a conservative range so a false positive
+        // can't make the summon fire when the corpse is actually out of reach — if none matches, the caller falls
+        // back to the Corpse Dust reagent gate.
+        private const float RaiseDeadCorpseRange = 10f;
+        public bool HasRaiseableCorpseNearby() => AnyCorpseNearby(RaiseDeadCorpseRange, "Humanoid");
 
         // Rest/regen phase: WRobot exposes no readable "currently regenerating" engine state to a FightClass
         // (scout-verified), so infer it from the Food/Drink auras — the clear, reliable signal that the bot is
@@ -1016,7 +1026,7 @@ namespace AIO3.Adapter
             // GetWeaponEnchantInfo() -> hasMain, mainExpirationMs, mainCharges, hasOff, offExpirationMs, offCharges.
             // Do the has-enchant truthy test IN Lua and return the remaining ms (or 0 when a hand has no enchant).
             // The has-flag is 1/nil on 3.3.5a (NOT true/false), so a C# `tostring(hm)=="true"` test reads EVERY hand
-            // as un-enchanted and re-poisons it forever (the bug Daniel saw — Instant Poison re-applied to the main
+            // as un-enchanted and re-poisons it forever (the bug Talamin saw — Instant Poison re-applied to the main
             // hand every ~5s). `(hm and me) or 0` is truthy for 1 or true and yields 0 when not enchanted.
             string[] r = Lua.LuaDoString<string[]>(
                 "local hm, me, _, ho, oe = GetWeaponEnchantInfo(); " +
@@ -1054,7 +1064,7 @@ namespace AIO3.Adapter
         }
 
         // Cast a shaman weapon imbue AND confirm the "replace your weapon enchant" popup WoW raises — without that the
-        // enchant never lands and WeaponImbue re-casts forever (Daniel's Rockbiter spam). The popup appears async, so
+        // enchant never lands and WeaponImbue re-casts forever (Talamin's Rockbiter spam). The popup appears async, so
         // click it ~100ms later off the tick thread (mirrors the old AIO ApplyEnchant). Guarded on IsVisible so we only
         // click when a popup is actually up.
         public CastResult ImbueWeapon(string spell)
@@ -1081,7 +1091,7 @@ namespace AIO3.Adapter
         //
         // CRITICAL: use the poison BY NAME (resolved from the id), NOT ItemsManager.UseItem(uint). The by-id overload
         // does a plain "use", which for a poison lands on the MAIN hand regardless of the slot we then pick — so every
-        // poison overwrote the main weapon and the off hand never got one (Daniel's bug). UseItem(name) is the proven
+        // poison overwrote the main weapon and the off hand never got one (Talamin's bug). UseItem(name) is the proven
         // mechanic from the old AIO ApplyPoison: it puts the poison on the cursor so PickupInventoryItem(slot) targets
         // the hand we chose. GetItemInfo returns the client-localized name, which UseItem(name) matches — so this is
         // still locale-safe. The Core step's RecastDelay throttles re-issue.
