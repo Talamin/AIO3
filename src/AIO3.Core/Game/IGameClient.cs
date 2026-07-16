@@ -113,6 +113,13 @@ namespace AIO3.Core.Game
         bool IsSpellKnown(string spell);
         bool IsSpellReady(string spell);
 
+        /// <summary>True when the CLIENT considers the spell castable in principle right now (WoW's
+        /// <c>IsUsableSpell</c>) — catching states the cooldown walk can't see: "Call Pet" for a hunter who
+        /// has LEARNED it but never TAMED a pet (or whose pet is dead), "Revive Pet" with no dead pet. A pure
+        /// resource shortage (the noMana return) still counts as usable — mana comes back, and gating it here
+        /// would wrongly park resource-starved steps. Adapter caches it (it is a Lua read).</summary>
+        bool IsSpellUsable(string spell);
+
         /// <summary>True if the named spell is the current/queued cast (e.g. an on-next-swing ability).</summary>
         bool IsCurrentSpell(string spell);
 

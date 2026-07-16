@@ -106,6 +106,11 @@ namespace AIO3.Core.Testing
 
         public bool IsSpellKnown(string spell) => !UnknownSpells.Contains(spell) && (KnownSpells.Count == 0 || KnownSpells.Contains(spell));
         public bool IsSpellReady(string spell) => !SpellsOnCooldown.Contains(spell);
+
+        /// <summary>Spells the CLIENT reports as not castable in principle (IsUsableSpell nil) — e.g. "Call
+        /// Pet" for a hunter who never tamed anything. Everything else is usable by default.</summary>
+        public readonly HashSet<string> UnusableSpells = new HashSet<string>();
+        public bool IsSpellUsable(string spell) => !UnusableSpells.Contains(spell);
         public bool IsCurrentSpell(string spell) => CurrentSpells.Contains(spell);
         public float SpellRange(string spell) => SpellRanges.TryGetValue(spell, out float r) ? r : DefaultSpellRange;
 

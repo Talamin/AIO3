@@ -77,6 +77,45 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Summon_idles_when_the_player_owns_no_pet()
+        {
+            // A hunter who has LEARNED Call Pet but never TAMED anything: the client reports both spells
+            // unusable ("You do not have a pet"). The step must idle — no cast, and above all no
+            // HoldPosition pin (the live bug: cast + 12s pin repeating every 15s forever).
+            FakeGameClient g = Game(pet: null);
+            g.UnusableSpells.Add("Call Pet");
+            g.UnusableSpells.Add("Revive Pet");
+            Assert.Null(Fire(g, PetControl.Summon(On, "Call Pet", "Revive Pet", 1f)));
+            Assert.DoesNotContain("Call Pet", g.CastLog);
+            Assert.Equal(0, g.HoldPositionCalls);
+        }
+
+        [Fact]
+        public void Summon_resumes_once_taming_makes_call_pet_usable()
+        {
+            FakeGameClient g = Game(pet: null);
+            g.UnusableSpells.Add("Call Pet");
+            g.UnusableSpells.Add("Revive Pet");
+            RotationStep step = PetControl.Summon(On, "Call Pet", "Revive Pet", 1f);
+            Assert.Null(Fire(g, step));
+            g.UnusableSpells.Remove("Call Pet");   // the hunter tamed a beast
+            Fire(g, step);
+            Assert.Contains("Call Pet", g.CastLog);
+        }
+
+        [Fact]
+        public void Summon_revives_a_dead_pet_whose_corpse_object_is_gone()
+        {
+            // Pet died and its world object despawned (died out of range / zoning): no pet unit, Call Pet
+            // is unusable on a dead pet, but the client reports Revive Pet usable — revive, don't call.
+            FakeGameClient g = Game(pet: null);
+            g.UnusableSpells.Add("Call Pet");
+            Fire(g, PetControl.Summon(On, "Call Pet", "Revive Pet", 1f));
+            Assert.Contains("Revive Pet", g.CastLog);
+            Assert.DoesNotContain("Call Pet", g.CastLog);
+        }
+
+        [Fact]
         public void Summon_waits_before_re_summoning_a_pet_that_suddenly_vanished()
         {
             // A pet we already had disappears (we just mounted) — the grace must stop us from instantly

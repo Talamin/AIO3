@@ -94,8 +94,12 @@ namespace AIO3.Core.Library
 
                     if (!enabled(ctx) || ctx.Game.PlayerInCombat || ctx.Game.PlayerIsMounted
                         || ctx.Game.PlayerIsCasting) return false; // never start a summon on top of a running cast
+                    // IsSpellUsable = the client's own "can this cast succeed": a hunter who has LEARNED Call
+                    // Pet but never TAMED anything gets usable=false and idles here — instead of casting into
+                    // "You do not have a pet" every SummonWaitMs and pinning the char via HoldPosition each time.
                     string spell = SummonSpell(ctx, callSpell, reviveSpell);
-                    return spell != null && ctx.Game.IsSpellKnown(spell) && ctx.Game.IsSpellReady(spell);
+                    return spell != null && ctx.Game.IsSpellKnown(spell) && ctx.Game.IsSpellReady(spell)
+                           && ctx.Game.IsSpellUsable(spell);
                 },
                 action: (ctx, t) =>
                 {
@@ -289,8 +293,22 @@ namespace AIO3.Core.Library
         }
 
         // A DEAD pet is revived; otherwise (no pet, OR a live pet we only reach here to SWAP — the not-swapping
-        // live-pet case already returned false in the condition) we cast the call/summon spell.
-        private static string SummonSpell(CombatContext ctx, Func<CombatContext, string> callSpell, Func<CombatContext, string> reviveSpell) =>
-            ctx.Pet != null && !ctx.Pet.IsAlive ? reviveSpell(ctx) : callSpell(ctx);
+        // live-pet case already returned false in the condition) we cast the call/summon spell. The middle
+        // branch catches a dead pet whose CORPSE OBJECT is gone (died out of range, zoning): ctx.Pet is null
+        // then, and reviving is the ONLY usable option (Call Pet is unusable on a dead pet) — calling would do
+        // nothing. Deliberately strict (revive only when call is unusable AND revive usable), so it can't
+        // misfire when usability is unavailable; for classes whose call and revive resolve to the same summon
+        // (warlock, DK) the names are equal and the branch never triggers.
+        private static string SummonSpell(CombatContext ctx, Func<CombatContext, string> callSpell, Func<CombatContext, string> reviveSpell)
+        {
+            string revive = reviveSpell(ctx);
+            if (ctx.Pet != null && !ctx.Pet.IsAlive) return revive;
+            string call = callSpell(ctx);
+            bool callUsable = call != null && ctx.Game.IsSpellUsable(call);
+            if (revive != null && !string.Equals(revive, call, StringComparison.OrdinalIgnoreCase)
+                && !callUsable && ctx.Game.IsSpellKnown(revive) && ctx.Game.IsSpellUsable(revive))
+                return revive;
+            return call;
+        }
     }
 }

@@ -382,6 +382,28 @@ namespace AIO3.Adapter
             return _cooldowns.CooldownLeftMs((uint)s.Id) <= 0;
         }
 
+        // WoW's own castability verdict (IsUsableSpell 1st return): nil when the cast cannot succeed in
+        // principle — the case that matters is "Call Pet"/"Revive Pet" for a hunter with no (dead) pet to
+        // call, which neither KnownSpell nor the cooldown walk can see (the old AIO got this for free via
+        // Spell.IsSpellUsable). noMana (2nd return) counts as usable: a temporary resource shortage is gated
+        // elsewhere. Cached — a petless hunter evaluates this every OOC tick.
+        private readonly Dictionary<string, (bool usable, int at)> _spellUsableCache = new Dictionary<string, (bool, int)>();
+        private const int SpellUsableTtlMs = 2500;
+
+        public bool IsSpellUsable(string spell)
+        {
+            if (_spellUsableCache.TryGetValue(spell, out var c) && unchecked(Now - c.at) < SpellUsableTtlMs) return c.usable;
+            bool v = true;
+            try
+            {
+                v = Lua.LuaDoString<bool>(
+                    "local u, nm = IsUsableSpell('" + spell.Replace("'", "\\'") + "'); return (u ~= nil or nm ~= nil)");
+            }
+            catch { }
+            _spellUsableCache[spell] = (v, Now);
+            return v;
+        }
+
         public int GlobalCooldownRemainingMs => _cooldowns.GcdRemainingMs;
 
         public bool PlayerIsCasting => ObjectManager.Me.IsCast;
