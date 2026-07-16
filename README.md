@@ -70,7 +70,7 @@ below (interrupts, racials, target switching, performance).
 *Ranged + pet. Source of the shared **pet controller** (`PetControl`).*
 
 - **Pet:** keep summoned / revived / healed · send it to the target · **peel** adds off you (lowest-HP mob attacking you, then a mob attacking the pet) · **taunt** (re-taunts when a mob switches back) · pet **specials** (Bite/Claw, Dash/Dive, Call of the Wild, Furious Howl, Rabid) when they're on the bar.
-- **Petless-safe:** everything keys on the pet *actually existing* (never on level) — a petless hunter plays clean ranged DPS, and abilities a pet lacks are skipped automatically. A hunter who has **learned Call Pet but never tamed** anything idles the summon entirely (gated on the client's own castability verdict — no more casting into *"You do not have a pet"*), and a pet that **died out of reach** (its corpse object despawned or you zoned) is correctly **revived**, not re-called.
+- **Petless-safe:** everything keys on the pet *actually existing* (never on level) — a petless hunter plays clean ranged DPS, and abilities a pet lacks are skipped automatically. A hunter who has **learned Call Pet but never tamed** anything can't spam the summon: a summon that **produces no pet** (only the server knows — the client casts it "successfully") puts the step into a **2-minute backoff**, so it retries at most once per backoff and resumes by itself after taming. A pet that **died out of reach** (its corpse object despawned or you zoned) is correctly **revived**, not re-called.
 - **Aspect:** Viper ↔ Hawk / Dragonhawk, managed by mana with hysteresis.
 
 ### Mage — Frost / Fire / Arcane

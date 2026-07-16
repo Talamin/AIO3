@@ -37,6 +37,13 @@ namespace AIO3.Core.Library
         // and breaks the cast. Generous enough to cover the cast on slow servers; auto-expires after.
         private const int SummonHoldMs = 12000;
 
+        // When a summon we issued produced NO pet by the end of the wait window, the summon FAILED — canonically
+        // a hunter who has LEARNED Call Pet but never TAMED anything: the client "casts" it fine (Success, spell
+        // not greyed, IsUsableSpell true) and only the server knows there is no pet. Stand the step down for this
+        // long instead of hammering cast + HoldPosition every wait window; one retry per backoff, so taming (or
+        // reaching the corpse after a failed revive) auto-resumes it within at most this delay.
+        private const int SummonFailBackoffMs = 120000;
+
         /// <summary>Keep a pet up: summon it with <paramref name="callSpell"/> when none exists, or revive it
         /// with <paramref name="reviveSpell"/> when it is dead. Out of combat / not mounted. If a pet we
         /// already had suddenly disappears (almost always because we just mounted), wait out a short grace
@@ -54,11 +61,13 @@ namespace AIO3.Core.Library
         /// desired one once it's affordable again. The warlock passes its resolved demon (which already accounts
         /// for shards, so "desired" == current while broke → no swap); a hunter leaves it null → never swaps.</summary>
         public static RotationStep Summon(Func<CombatContext, bool> enabled, Func<CombatContext, string> callSpell,
-            Func<CombatContext, string> reviveSpell, float priority, Func<CombatContext, string> desiredPetName = null)
+            Func<CombatContext, string> reviveSpell, float priority, Func<CombatContext, string> desiredPetName = null,
+            int summonWaitMs = SummonWaitMs, int failBackoffMs = SummonFailBackoffMs)
         {
             bool petSeen = false;
             int vanishedAt = 0;
             int summonedAt = 0; // when we last issued a summon/revive; 0 = not waiting on one
+            int failedAt = 0;   // when a summon wait expired with NO pet — the step backs off; 0 = not backing off
             return new RotationStep(
                 name: "Pet summon",
                 priority: priority,
@@ -71,6 +80,7 @@ namespace AIO3.Core.Library
                         vanishedAt = 0;
                         if (ctx.Pet.IsAlive)
                         {
+                            failedAt = 0; // a live pet = success, however it came about — drop any backoff
                             // Healthy pet → done, UNLESS it's the wrong demon and the desired one is now affordable
                             // (swap-back). When swapping we deliberately do NOT clear summonedAt, so the wait below
                             // still throttles the re-cast across the swap's cast → spawn gap.
@@ -85,12 +95,23 @@ namespace AIO3.Core.Library
                     }
 
                     // A summon/revive we already cast hasn't taken effect yet — the cast is multi-second and the
-                    // pet spawns a beat after it ends. Don't cast again until the pet is up (cleared above) or this
-                    // generous timeout passes (the summon failed / was interrupted), which is what stops the
-                    // double-cast regardless of how long the summon cast actually takes. The PlayerIsCasting gate
-                    // below ALSO blocks re-entry while the cast runs.
-                    if (summonedAt != 0 && unchecked(Environment.TickCount - summonedAt) < SummonWaitMs) return false;
-                    summonedAt = 0;
+                    // pet spawns a beat after it ends. Don't cast again until the pet is up (cleared above) or the
+                    // wait window passes. The PlayerIsCasting gate below ALSO blocks re-entry while the cast runs.
+                    if (summonedAt != 0)
+                    {
+                        if (unchecked(Environment.TickCount - summonedAt) < summonWaitMs) return false;
+                        // Wait expired and no live pet materialized (that would have cleared summonedAt above):
+                        // the summon FAILED — e.g. nothing tamed yet, only the server knows. Back off instead of
+                        // hammering cast + HoldPosition every window; retry once per backoff so taming resumes us.
+                        summonedAt = 0;
+                        failedAt = Environment.TickCount;
+                        return false;
+                    }
+                    if (failedAt != 0)
+                    {
+                        if (unchecked(Environment.TickCount - failedAt) < failBackoffMs) return false;
+                        failedAt = 0; // backoff over — one fresh attempt
+                    }
 
                     if (!enabled(ctx) || ctx.Game.PlayerInCombat || ctx.Game.PlayerIsMounted
                         || ctx.Game.PlayerIsCasting) return false; // never start a summon on top of a running cast

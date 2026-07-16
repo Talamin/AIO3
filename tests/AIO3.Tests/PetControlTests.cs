@@ -104,6 +104,37 @@ namespace AIO3.Tests
         }
 
         [Fact]
+        public void Summon_backs_off_after_a_summon_that_produced_no_pet()
+        {
+            // The client happily "casts" Call Pet for a hunter with nothing tamed (spell not greyed, cast
+            // returns Success — only the SERVER knows there is no pet). Once the wait window expires with no
+            // pet, the step must stand down for the backoff instead of re-casting (+ re-pinning) forever.
+            FakeGameClient g = Game(pet: null);
+            RotationStep step = PetControl.Summon(On, ctx => "Call Pet", ctx => "Revive Pet", 1f,
+                summonWaitMs: 60, failBackoffMs: 60000);
+            Fire(g, step);                        // first (and only) attempt
+            System.Threading.Thread.Sleep(120);   // wait window expires — no pet appeared
+            Assert.Null(Fire(g, step));           // failure detected → backoff starts
+            Assert.Null(Fire(g, step));           // and it stays quiet
+            Assert.Single(g.CastLog.FindAll(s => s == "Call Pet"));
+            Assert.Equal(1, g.HoldPositionCalls); // exactly one pin, not one per window
+        }
+
+        [Fact]
+        public void Summon_retries_after_the_backoff_expires()
+        {
+            FakeGameClient g = Game(pet: null);
+            RotationStep step = PetControl.Summon(On, ctx => "Call Pet", ctx => "Revive Pet", 1f,
+                summonWaitMs: 40, failBackoffMs: 120);
+            Fire(g, step);                        // first attempt
+            System.Threading.Thread.Sleep(80);    // wait expired, no pet
+            Assert.Null(Fire(g, step));           // enters the backoff
+            System.Threading.Thread.Sleep(200);   // backoff over (the hunter tamed something meanwhile...)
+            Fire(g, step);                        // ...so the fresh attempt runs
+            Assert.Equal(2, g.CastLog.FindAll(s => s == "Call Pet").Count);
+        }
+
+        [Fact]
         public void Summon_revives_a_dead_pet_whose_corpse_object_is_gone()
         {
             // Pet died and its world object despawned (died out of range / zoning): no pet unit, Call Pet
